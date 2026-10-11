@@ -1,0 +1,10 @@
+{
+  "description": "Creates precise HTML and CSS code replicating slide designs for web developers seeking exact visual conversions from presentations to web pages.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

@@ -1,0 +1,77 @@
+# SDD Configuration for exepa-logistica (Control de Bodega v1.4)
+project: exepa-logistica
+display_name: "Control de Bodega v1.4"
+root: /Users/mac/Documents/EXEPA-Logistica/Proyecto Control de Bodega/Control bodega v1.4/Diseño web de diapositiva
+
+# Stack context
+stack:
+  frontend: "React 19 + TypeScript 5.7 + Vite 8 + Tailwind CSS v4"
+  backend: "Firebase (Firestore, Auth, Functions Gen2 Python 3.11, Hosting, Storage)"
+  data: "Firestore with RBAC, warehouse isolation, operation-id idempotency"
+
+# Strict TDD mode (enabled because test runner detected)
+strict_tdd: true
+
+# Testing capabilities
+testing:
+  runner:
+    command: "npm run test:run"
+    framework: "Vitest 5.0.3"
+  layers:
+    unit:
+      available: true
+      tool: "Vitest + React Testing Library 14 + @testing-library/jest-dom"
+    integration:
+      available: true
+      tool: "Vitest + MSW + @firebase/rules-unit-testing"
+    e2e:
+      available: true
+      tool: "Playwright 1.63 (Chromium)"
+  coverage:
+    available: true
+    command: "npm run test:coverage"
+    provider: "@vitest/coverage-v8 (v8)"
+    thresholds:
+      lines: 55
+      functions: 55
+      branches: 50
+      statements: 55
+  quality:
+    linter:
+      available: true
+      command: "npm run lint"
+    typecheck:
+      available: true
+      command: "npm run typecheck"
+    formatter:
+      available: true
+      command: "npm run format"
+
+# Phase rules
+proposal:
+  require_issue: true
+  max_scope_lines: 400
+
+spec:
+  require_scenarios: true
+  require_acceptance_criteria: true
+
+design:
+  require_architecture_decision: true
+  require_data_model: true
+
+tasks:
+  max_tasks_per_change: 20
+  require_test_first: true
+
+apply:
+  require_verification: true
+  allow_partial: false
+
+verify:
+  require_coverage: true
+  require_typecheck: true
+  require_lint: true
+
+archive:
+  auto_sync: true

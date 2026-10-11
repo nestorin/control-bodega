@@ -1,0 +1,164 @@
+enum OrganizationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum MembershipRole {
+  OPERATOR
+  SUPERVISOR
+  AUDITOR
+  ADMIN
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  OPEN
+  RECEIVED
+  CLOSED
+  CANCELLED
+}
+
+enum ReceptionStatus {
+  DRAFT
+  IN_PROGRESS
+  CONFIRMED
+  CANCELLED
+}
+
+enum PalletStatus {
+  CREATED
+  RECEIVED
+  STORED
+  BLOCKED
+}
+
+enum MovementType {
+  RECEIPT
+  TRANSFER
+  ADJUSTMENT
+}
+
+type Organization @table {
+  id: UUID! @default(expr: "uuidV4()")
+  name: String!
+  status: OrganizationStatus! @default(value: ACTIVE)
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type Warehouse @table {
+  id: UUID! @default(expr: "uuidV4()")
+  organization: Organization!
+  code: String!
+  name: String!
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type UserMembership @table {
+  id: UUID! @default(expr: "uuidV4()")
+  organization: Organization!
+  warehouse: Warehouse
+  userId: String!
+  role: MembershipRole!
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type Supplier @table {
+  id: UUID! @default(expr: "uuidV4()")
+  organization: Organization!
+  code: String!
+  name: String!
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type Product @table {
+  id: UUID! @default(expr: "uuidV4()")
+  organization: Organization!
+  sku: String!
+  name: String!
+  unit: String!
+  lotControlled: Boolean! @default(value: false)
+  expiryControlled: Boolean! @default(value: false)
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type PurchaseOrder @table {
+  id: UUID! @default(expr: "uuidV4()")
+  organization: Organization!
+  warehouse: Warehouse!
+  supplier: Supplier!
+  number: String!
+  status: PurchaseOrderStatus! @default(value: DRAFT)
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type PurchaseOrderLine @table {
+  id: UUID! @default(expr: "uuidV4()")
+  purchaseOrder: PurchaseOrder!
+  product: Product!
+  orderedQuantity: Float!
+  unit: String!
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type Reception @table {
+  id: UUID! @default(expr: "uuidV4()")
+  organization: Organization!
+  warehouse: Warehouse!
+  purchaseOrder: PurchaseOrder
+  status: ReceptionStatus! @default(value: DRAFT)
+  operationId: String!
+  receivedAt: Timestamp
+  actorUserId: String!
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type ReceptionLine @table {
+  id: UUID! @default(expr: "uuidV4()")
+  reception: Reception!
+  product: Product!
+  quantity: Float!
+  unit: String!
+  lot: String
+  expiryDate: Date
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type Pallet @table {
+  id: UUID! @default(expr: "uuidV4()")
+  organization: Organization!
+  warehouse: Warehouse!
+  reception: Reception
+  qrIdentifier: String!
+  status: PalletStatus! @default(value: CREATED)
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type InventoryMovement @table {
+  id: UUID! @default(expr: "uuidV4()")
+  organization: Organization!
+  warehouse: Warehouse!
+  pallet: Pallet
+  product: Product!
+  movementType: MovementType!
+  quantity: Float!
+  unit: String!
+  lot: String
+  expiryDate: Date
+  operationId: String!
+  actorUserId: String!
+  occurredAt: Timestamp! @default(expr: "request.time")
+}
+
+type AuditEvent @table {
+  id: UUID! @default(expr: "uuidV4()")
+  organization: Organization!
+  warehouse: Warehouse
+  entityType: String!
+  entityId: String!
+  action: String!
+  actorUserId: String!
+  operationId: String
+  metadata: String
+  occurredAt: Timestamp! @default(expr: "request.time")
+}

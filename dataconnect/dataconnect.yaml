@@ -1,0 +1,12 @@
+specVersion: "v1"
+serviceId: warehouse
+location: us-central1
+schema:
+  source: ./schema
+  datasource:
+    postgresql:
+      database: warehouse
+      cloudSql:
+        instanceId: warehouse-db
+connectorDirs:
+  - ./connector

@@ -1,0 +1,156 @@
+{
+  "organizationId": "org_exepa_001",
+  "warehouse": {
+    "id": "wh_tehuacan_1",
+    "name": "Tehuacan-1"
+  },
+  "sourceFile": "Inventario de Caducidades.pdf",
+  "sourceDate": "2026-10-04",
+  "expiryDateNormalization": "The CSV provides month only; expiryDate is stored as the first UTC day of that month and monthKey preserves the source precision.",
+  "excludedProductIds": [
+    "NSU0201"
+  ],
+  "excludedReason": "Suavitel has no expiration and the source row is stale/blank.",
+  "lots": [
+    {
+      "id": "cad_CB0302_dic-26",
+      "warehouseId": "wh_tehuacan_1",
+      "productId": "CB0302",
+      "productName": "BEBIDA SABOR COLA 3L C/6 PZS S",
+      "lot": "SIN_LOTE",
+      "monthKey": "dic-26",
+      "expiryDate": "2026-12-01",
+      "cajas": 1,
+      "sourceRow": "Coca Cola 3 L",
+      "sourceQuantity": 1,
+      "inventoryQuantity": 1,
+      "quantityMismatch": false,
+      "expiryPrecision": "month"
+    },
+    {
+      "id": "cad_CL0101_jul-27",
+      "warehouseId": "wh_tehuacan_1",
+      "productId": "CL0101",
+      "productName": "LECHE EVAPORADA 360 GRS C/48 PZS S",
+      "lot": "SIN_LOTE",
+      "monthKey": "jul-27",
+      "expiryDate": "2027-07-01",
+      "cajas": 189,
+      "sourceRow": "Carnation 360grs c/48",
+      "sourceQuantity": 2736,
+      "inventoryQuantity": 189,
+      "quantityMismatch": false,
+      "expiryPrecision": "month",
+      "sourceAdjustment": "Source quantity reduced to current inventory truth; month retained because source has one unambiguous month bucket."
+    },
+    {
+      "id": "cad_CL0201_jul-27",
+      "warehouseId": "wh_tehuacan_1",
+      "productId": "CL0201",
+      "productName": "LECHE CONDENSADA 375 GRS C/48 PZS S",
+      "lot": "SIN_LOTE",
+      "monthKey": "jul-27",
+      "expiryDate": "2027-07-01",
+      "cajas": 3984,
+      "sourceRow": "Lechera 375grs c/48",
+      "sourceQuantity": 3984,
+      "inventoryQuantity": 3984,
+      "quantityMismatch": false,
+      "expiryPrecision": "month",
+      "sourceAdjustment": "PDF month buckets nov-27/dic-27 were stale; current 3,984 cajas are confirmed in jul-27."
+    }
+  ],
+  "audit": {
+    "mappedRows": [
+      "Coca Cola 3 L",
+      "Carnation 360grs c/48",
+      "Lechera 375grs c/48"
+    ],
+    "excludedRows": [
+      {
+        "sourceRow": "Suavitel 8.5 L",
+        "reason": "excluded_product_no_expiry"
+      },
+      {
+        "sourceRow": "Squir toronja 3l",
+        "reason": "dated_row_unmatched_to_current_catalog",
+        "datedQuantities": {
+          "feb-27": 300,
+          "mar-27": 2055
+        }
+      },
+      {
+        "sourceRow": "Pepsi 3l",
+        "reason": "dated_row_unmatched_to_current_catalog",
+        "datedQuantities": {
+          "ago-27": 189
+        }
+      },
+      {
+        "sourceRow": "Lala media crema 250grs c/27",
+        "reason": "dated_row_unmatched_to_current_catalog_or_ambiguous",
+        "rawValue": "1 junio*"
+      }
+    ],
+    "noMonthRows": [
+      {
+        "sourceRow": "Aceite 1 lt",
+        "totalCajas": 1658,
+        "reason": "no_expiry_month"
+      },
+      {
+        "sourceRow": "Coca Cola regular 235ml",
+        "reason": "no_expiry_month"
+      },
+      {
+        "sourceRow": "Agua mineral 355ml c/24",
+        "reason": "no_expiry_month"
+      },
+      {
+        "sourceRow": "Mayonesa",
+        "totalCajas": 232,
+        "reason": "no_expiry_month"
+      },
+      {
+        "sourceRow": "Ace 8.5 L",
+        "totalCajas": 84,
+        "reason": "no_expiry_month"
+      },
+      {
+        "sourceRow": "Ace líquido 4.85",
+        "reason": "no_expiry_month"
+      },
+      {
+        "sourceRow": "Ace líquido 2.8",
+        "reason": "no_expiry_month"
+      }
+    ],
+    "quantityMismatches": [
+      {
+        "productId": "CL0101",
+        "sourceRow": "Carnation 360grs c/48",
+        "sourceQuantity": 2736,
+        "inventoryQuantity": 189,
+        "resolution": "seeded 189 cajas in jul-27; source-adjusted to current inventory truth"
+      }
+    ],
+    "pendingReconciliation": [],
+    "staleSourceBucketsResolved": [
+      {
+        "productId": "CL0201",
+        "sourceRow": "Lechera 375grs c/48",
+        "staleBuckets": [
+          {
+            "monthKey": "nov-27",
+            "cajas": 9083
+          },
+          {
+            "monthKey": "dic-27",
+            "cajas": 3328
+          }
+        ],
+        "resolution": "replaced with 3,984 cajas in jul-27 per user confirmation"
+      }
+    ]
+  }
+}

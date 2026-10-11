@@ -1,0 +1,463 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===== ROOT-LEVEL COLLECTION GROUP RULES =====
+    // Pallets collection group (for QR lookup across all organizations)
+    // This rule is evaluated for collection group queries on "pallets"
+    match /{path=**}/pallets/{palletId} {
+      allow list: if request.query.limit != null;
+      allow get: if resource.data.organizationId != null &&
+        resource.data.warehouseId != null &&
+        isMemberOf(resource.data.organizationId) &&
+        canAccessWarehouse(resource.data.organizationId, resource.data.warehouseId);
+    }
+
+    // ===== HELPER FUNCTIONS =====
+
+    // Get user membership for an organization
+    function getUserMembership(orgId) {
+      return get(/databases/$(database)/documents/organizations/$(orgId)/users/$(request.auth.uid));
+    }
+
+    // Check if user is member of organization
+    function isMemberOf(orgId) {
+      let membership = getUserMembership(orgId);
+      // Firestore rules DocumentSnapshot exposes data; it does not expose an
+      // `exists` property. A missing document has null data.
+      return request.auth != null && membership.data != null &&
+        membership.data.userId == request.auth.uid &&
+        membership.data.organizationId == orgId &&
+        membership.data.status == 'ACTIVE' &&
+        membership.data.role in [
+          'SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN',
+          'AUXILIAR_ALMACENISTA', 'AUDITOR', 'OPERATOR', 'SUPERVISOR'
+        ];
+    }
+
+    // Check if user has specific role(s)
+    function hasRole(orgId, roles) {
+      let membership = getUserMembership(orgId);
+      return isMemberOf(orgId) && membership.data.role in roles;
+    }
+
+    // Warehouse IDs are stable references. Display names must not be used as IDs.
+    function isCanonicalWarehouseId(warehouseId) {
+      return warehouseId is string && warehouseId in ['wh_tehuacan_1', 'wh_tehuacan_2'];
+    }
+
+    // Check warehouse access (null warehouseId = access to all)
+    function canAccessWarehouse(orgId, warehouseId) {
+      let membership = getUserMembership(orgId);
+      return isCanonicalWarehouseId(warehouseId) && isMemberOf(orgId) && (
+        membership.data.role in ['SUPER_ADMIN', 'ADMIN'] ||
+        (membership.data.warehouseId != null &&
+          isCanonicalWarehouseId(membership.data.warehouseId) &&
+          membership.data.warehouseId == warehouseId) ||
+        (membership.data.warehouseIds is list &&
+          membership.data.warehouseIds.hasAny([warehouseId]))
+      );
+    }
+
+    // Operational records must remain assigned to their original warehouse.
+    function warehouseAssignmentUnchanged() {
+      return !('warehouseId' in resource.data) ||
+        ('warehouseId' in request.resource.data &&
+          request.resource.data.warehouseId == resource.data.warehouseId);
+    }
+
+    // A role check alone is not an integrity check. Every state transition
+    // must explicitly limit the fields that can change.
+    function hasOnlyChanged(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    // Role checks
+    function isOrgAdmin(orgId) {
+      return hasRole(orgId, ['SUPER_ADMIN', 'ADMIN']);
+    }
+
+    function isSupervisorOrAdmin(orgId) {
+      return hasRole(orgId, ['GERENTE_ALMACEN', 'SUPERVISOR', 'SUPER_ADMIN', 'ADMIN']);
+    }
+
+    function isOperatorOrAbove(orgId) {
+      return hasRole(orgId, [
+        'AUXILIAR_ALMACENISTA', 'OPERATOR', 'GERENTE_ALMACEN',
+        'SUPERVISOR', 'SUPER_ADMIN', 'ADMIN'
+      ]);
+    }
+
+    // Check if user is the actor who created the document
+    function isActor(orgId, actorUserId) {
+      return request.auth.uid == actorUserId;
+    }
+
+    // ===== ORGANIZATIONS =====
+    match /organizations/{orgId} {
+      // Members can read their organization
+      allow read: if isMemberOf(orgId);
+
+      // Only admins can create/update organization
+      allow create: if isOrgAdmin(orgId) ||
+        (request.auth != null && request.auth.token.admin == true);
+      allow update: if isOrgAdmin(orgId);
+      allow delete: if isOrgAdmin(orgId);
+
+      // ===== WAREHOUSES =====
+      match /warehouses/{warehouseId} {
+        allow read: if isCanonicalWarehouseId(warehouseId) && isMemberOf(orgId);
+        allow create: if isCanonicalWarehouseId(warehouseId) &&
+          isOrgAdmin(orgId) &&
+          request.resource.data.id == warehouseId &&
+          request.resource.data.organizationId == orgId;
+        allow update: if isCanonicalWarehouseId(warehouseId) &&
+          isOrgAdmin(orgId) &&
+          resource.data.id == warehouseId &&
+          request.resource.data.id == resource.data.id &&
+          request.resource.data.organizationId == orgId;
+        allow delete: if isCanonicalWarehouseId(warehouseId) && isOrgAdmin(orgId);
+      }
+
+      // ===== USERS (MEMBERSHIPS) =====
+      match /users/{userId} {
+        // The owner may read status before ACTIVE, but cannot list memberships.
+        allow get: if request.auth != null && request.auth.uid == userId;
+        allow list: if isMemberOf(orgId);
+        // Allow users to create their own profile on first login
+        allow create: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.organizationId == orgId
+          && request.resource.data.status == 'PENDING'
+          && request.resource.data.role in ['AUXILIAR_ALMACENISTA', 'OPERATOR']
+          && (!('warehouseId' in request.resource.data) ||
+              request.resource.data.warehouseId == null)
+          && (!('warehouseIds' in request.resource.data) ||
+              (request.resource.data.warehouseIds is list &&
+               request.resource.data.warehouseIds.size() == 0));
+        allow update: if isOrgAdmin(orgId);
+        allow delete: if isOrgAdmin(orgId);
+      }
+
+      // ===== SUPPLIERS =====
+      match /suppliers/{supplierId} {
+        allow read: if isMemberOf(orgId);
+        allow create: if isSupervisorOrAdmin(orgId);
+        allow update: if isSupervisorOrAdmin(orgId);
+        allow delete: if isOrgAdmin(orgId);
+      }
+
+      // ===== PRODUCTS =====
+      match /products/{productId} {
+        allow read: if isMemberOf(orgId);
+        allow create: if isSupervisorOrAdmin(orgId);
+        allow update: if isSupervisorOrAdmin(orgId);
+        allow delete: if isOrgAdmin(orgId);
+      }
+
+      // ===== CONVERSIONS =====
+      match /conversions/{conversionId} {
+        allow read: if isMemberOf(orgId);
+        allow create, update: if isSupervisorOrAdmin(orgId);
+        allow delete: if isOrgAdmin(orgId);
+      }
+
+      // ===== PURCHASE ORDERS =====
+      match /purchase_orders/{poId} {
+        allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId);
+        allow create: if isMemberOf(orgId) &&
+          canAccessWarehouse(orgId, request.resource.data.warehouseId) &&
+          isOperatorOrAbove(orgId);
+        allow update: if isMemberOf(orgId) &&
+          canAccessWarehouse(orgId, resource.data.warehouseId) &&
+          warehouseAssignmentUnchanged() &&
+          isSupervisorOrAdmin(orgId);
+        allow delete: if isOrgAdmin(orgId);
+      }
+
+      // ===== RECEPTIONS (CORE) =====
+      match /receptions/{receptionId} {
+        function isValidReception(data) {
+          return data.keys().hasAll([
+              'id', 'organizationId', 'warehouseId', 'status', 'operationId',
+              'actorUserId', 'createdAt', 'updatedAt'
+            ]) &&
+            data.keys().hasOnly([
+              'id', 'organizationId', 'warehouseId', 'purchaseOrderId',
+              'supplierId', 'status', 'operationId', 'receivedAt',
+              'actorUserId', 'evidencePhotos', 'invoicePreviewPath',
+              'invoicePreviewUrl', 'draftExpiresAt', 'createdAt', 'updatedAt'
+            ]) &&
+            data.id == receptionId &&
+            data.organizationId == orgId &&
+            data.warehouseId is string && data.warehouseId.size() > 0 &&
+            data.warehouseId.size() <= 100 &&
+            data.status in ['DRAFT', 'IN_PROGRESS', 'CONFIRMED', 'CANCELLED'] &&
+            data.operationId is string && data.operationId.size() > 0 &&
+            data.operationId.size() <= 160 &&
+            data.actorUserId is string && data.actorUserId.size() > 0 &&
+            data.actorUserId.size() <= 128 &&
+            data.createdAt is timestamp && data.updatedAt is timestamp &&
+            (!('purchaseOrderId' in data) ||
+              (data.purchaseOrderId is string && data.purchaseOrderId.size() <= 128)) &&
+            (!('supplierId' in data) ||
+              (data.supplierId is string && data.supplierId.size() <= 128)) &&
+            (!('receivedAt' in data) || data.receivedAt is timestamp) &&
+            (!('draftExpiresAt' in data) || data.draftExpiresAt is timestamp) &&
+            (!('evidencePhotos' in data) ||
+              (data.evidencePhotos is map &&
+               data.evidencePhotos.keys().hasOnly(['trailer', 'product', 'documentation']) &&
+               (!('trailer' in data.evidencePhotos) ||
+                 (data.evidencePhotos.trailer is string && data.evidencePhotos.trailer.size() <= 2048)) &&
+               (!('product' in data.evidencePhotos) ||
+                 (data.evidencePhotos.product is string && data.evidencePhotos.product.size() <= 2048)) &&
+               (!('documentation' in data.evidencePhotos) ||
+                 (data.evidencePhotos.documentation is string && data.evidencePhotos.documentation.size() <= 2048)))) &&
+            (!('invoicePreviewPath' in data) ||
+              (data.invoicePreviewPath is string && data.invoicePreviewPath.size() <= 512)) &&
+            (!('invoicePreviewUrl' in data) ||
+              (data.invoicePreviewUrl is string && data.invoicePreviewUrl.size() <= 2048));
+        }
+
+        function isValidDraftPreviewUpdate() {
+          return resource.data.status == 'DRAFT' &&
+            request.resource.data.status == 'DRAFT' &&
+            request.auth.uid == resource.data.actorUserId &&
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['invoicePreviewPath', 'invoicePreviewUrl', 'updatedAt']) &&
+            (!('invoicePreviewPath' in request.resource.data) ||
+              request.resource.data.invoicePreviewPath.matches('^receptions/' + receptionId + '/invoice-preview\\.(jpg|jpeg)$')) &&
+            (!('invoicePreviewUrl' in request.resource.data) ||
+              request.resource.data.invoicePreviewUrl.matches('^https://firebasestorage\\.googleapis\\.com/.*'));
+        }
+
+        allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId);
+
+        // Create: operators can create draft receptions
+        allow create: if isMemberOf(orgId) &&
+          canAccessWarehouse(orgId, request.resource.data.warehouseId) &&
+          isOperatorOrAbove(orgId) &&
+          request.resource.data.status == 'DRAFT' &&
+          request.resource.data.actorUserId == request.auth.uid &&
+          isValidReception(request.resource.data);
+
+        // Update: state transitions controlled by role
+        allow update: if isMemberOf(orgId) &&
+          canAccessWarehouse(orgId, resource.data.warehouseId) &&
+          warehouseAssignmentUnchanged() &&
+          isValidReception(request.resource.data) &&
+          (
+            // The creator may attach only validated preview metadata to a draft.
+            (isOperatorOrAbove(orgId) && isValidDraftPreviewUpdate()) ||
+            // Operators can advance: DRAFT -> IN_PROGRESS -> CONFIRMED
+            (isOperatorOrAbove(orgId) &&
+             request.resource.data.status in ['IN_PROGRESS', 'CONFIRMED'] &&
+             request.resource.data.status != 'CANCELLED' &&
+             // Can't go backwards
+             ((resource.data.status == 'DRAFT' && request.resource.data.status == 'IN_PROGRESS' &&
+               hasOnlyChanged(['status', 'updatedAt'])) ||
+              (resource.data.status == 'IN_PROGRESS' && request.resource.data.status == 'CONFIRMED' &&
+               hasOnlyChanged(['status', 'receivedAt', 'updatedAt'])))
+            ) ||
+            // Supervisors/Admins can cancel
+            (isSupervisorOrAdmin(orgId) && request.resource.data.status == 'CANCELLED' &&
+             hasOnlyChanged(['status', 'updatedAt']))
+          );
+
+        allow delete: if isOrgAdmin(orgId);
+
+        // ---- SUB-COLLECTION: LINES ----
+        match /lines/{lineId} {
+          allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId,
+            get(/databases/$(database)/documents/organizations/$(orgId)/receptions/$(receptionId)).data.warehouseId);
+          allow create: if isMemberOf(orgId) &&
+            canAccessWarehouse(orgId,
+              getAfter(/databases/$(database)/documents/organizations/$(orgId)/receptions/$(receptionId)).data.warehouseId) &&
+            request.resource.data.id == lineId &&
+            request.resource.data.organizationId == orgId &&
+            request.resource.data.receptionId == receptionId &&
+            isOperatorOrAbove(orgId);
+          allow update, delete: if isMemberOf(orgId) &&
+            canAccessWarehouse(orgId,
+              get(/databases/$(database)/documents/organizations/$(orgId)/receptions/$(receptionId)).data.warehouseId) &&
+            resource.data.id == lineId &&
+            resource.data.organizationId == orgId &&
+            resource.data.receptionId == receptionId &&
+            isSupervisorOrAdmin(orgId);
+        }
+
+        // ---- SUB-COLLECTION: PALLETS (QR) ----
+        match /pallets/{palletId} {
+          allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId);
+          allow create: if isMemberOf(orgId) &&
+            canAccessWarehouse(orgId,
+              getAfter(/databases/$(database)/documents/organizations/$(orgId)/receptions/$(receptionId)).data.warehouseId) &&
+            request.resource.data.id == palletId &&
+            request.resource.data.organizationId == orgId &&
+            request.resource.data.receptionId == receptionId &&
+            request.resource.data.warehouseId ==
+              getAfter(/databases/$(database)/documents/organizations/$(orgId)/receptions/$(receptionId)).data.warehouseId &&
+            isOperatorOrAbove(orgId) &&
+            // QR identifier must be unique (validated by unique index)
+            request.resource.data.qrIdentifier != '';
+          allow update: if isMemberOf(orgId) &&
+            canAccessWarehouse(orgId, resource.data.warehouseId) &&
+            warehouseAssignmentUnchanged() &&
+            resource.data.id == palletId &&
+            resource.data.organizationId == orgId &&
+            resource.data.receptionId == receptionId &&
+            isOperatorOrAbove(orgId);
+          allow delete: if isSupervisorOrAdmin(orgId);
+        }
+      }
+
+      // ===== COLLECTION GROUP: PALLETS (for QR lookup) =====
+      // Allows reading pallets by qrIdentifier across all receptions
+      match /{path=**}/pallets/{palletId} {
+        allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId);
+      }
+
+      // ===== INVENTORY MOVEMENTS (IMMUTABLE AFTER CREATE) =====
+      match /inventory_movements/{movementId} {
+        allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId);
+        // Append-only inventory is written by trusted backend transactions;
+        // never trust a client-provided actorUserId or movement direction.
+        allow create, update, delete: if false;
+      }
+
+      // Deterministic transaction locks used to serialize shipment completion
+      // for a warehouse/product pair. They contain no business inventory data.
+      match /inventory_locks/{lockId} {
+        allow read: if isMemberOf(orgId) &&
+          isCanonicalWarehouseId(resource.data.warehouseId);
+        allow create: if isSupervisorOrAdmin(orgId) &&
+          isCanonicalWarehouseId(request.resource.data.warehouseId);
+        allow update: if isSupervisorOrAdmin(orgId) &&
+          isCanonicalWarehouseId(resource.data.warehouseId) &&
+          warehouseAssignmentUnchanged();
+        allow delete: if isOrgAdmin(orgId);
+      }
+
+      // ===== INVENTORY SNAPSHOTS =====
+      match /inventory/{inventoryId} {
+        allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId);
+        allow create: if isSupervisorOrAdmin(orgId) &&
+          isCanonicalWarehouseId(request.resource.data.warehouseId);
+        allow update: if isSupervisorOrAdmin(orgId) &&
+          canAccessWarehouse(orgId, resource.data.warehouseId) &&
+          warehouseAssignmentUnchanged();
+        allow delete: if isOrgAdmin(orgId);
+      }
+
+      // ===== EXPIRY LOTS =====
+      match /lotes_caducidades/{lotId} {
+        allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId);
+        allow create: if isOperatorOrAbove(orgId) &&
+          canAccessWarehouse(orgId, request.resource.data.warehouseId);
+        allow update: if isOperatorOrAbove(orgId) &&
+          canAccessWarehouse(orgId, resource.data.warehouseId) &&
+          warehouseAssignmentUnchanged();
+        allow delete: if isSupervisorOrAdmin(orgId);
+      }
+
+      // ===== AUDIT EVENTS =====
+      match /audit_events/{eventId} {
+        allow read: if hasRole(orgId, ['AUDITOR', 'SUPERVISOR', 'ADMIN']);
+        // Audit records are emitted by trusted backend transactions only.
+        allow create, update, delete: if false;
+      }
+
+      // ===== SHIPMENTS (EMBARQUES) =====
+      match /shipments/{shipmentId} {
+        allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId);
+        allow create: if isMemberOf(orgId) &&
+          canAccessWarehouse(orgId, request.resource.data.warehouseId) &&
+          isOperatorOrAbove(orgId);
+        allow update: if isMemberOf(orgId) &&
+          canAccessWarehouse(orgId, resource.data.warehouseId) &&
+          warehouseAssignmentUnchanged() &&
+          isOperatorOrAbove(orgId) &&
+          hasOnlyChanged(['status', 'lines', 'updatedAt']) &&
+          ((resource.data.status == 'PROGRAMMED' && request.resource.data.status == 'IN_PROGRESS') ||
+           (resource.data.status == 'IN_PROGRESS' && request.resource.data.status == 'IN_PROGRESS') ||
+           (isSupervisorOrAdmin(orgId) && request.resource.data.status == 'CANCELLED'));
+        allow delete: if isSupervisorOrAdmin(orgId);
+      }
+
+      // ===== EMBARQUES (PLANIFICADOS) =====
+      match /embarques/{embarqueId} {
+        allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId);
+
+        // Create: operators can create planned embarques
+        allow create: if isMemberOf(orgId) &&
+          canAccessWarehouse(orgId, request.resource.data.warehouseId) &&
+          isOperatorOrAbove(orgId) &&
+          request.resource.data.status == 'planned';
+
+        // Update: controlled transitions
+        allow update: if isMemberOf(orgId) &&
+          canAccessWarehouse(orgId, resource.data.warehouseId) &&
+          warehouseAssignmentUnchanged() &&
+          (
+            // Operators: planned -> in_progress (al primer scan)
+            (isOperatorOrAbove(orgId) &&
+             resource.data.status == 'planned' &&
+             request.resource.data.status == 'in_progress' &&
+             hasOnlyChanged(['status', 'updatedAt'])) ||
+            // Operators: in_progress (increment tarimasCompletadas)
+            (isOperatorOrAbove(orgId) &&
+             resource.data.status == 'in_progress' &&
+             request.resource.data.status == 'in_progress' &&
+             request.resource.data.tarimasCompletadas is int &&
+             request.resource.data.totalTarimas is int &&
+             request.resource.data.tarimasCompletadas >= resource.data.tarimasCompletadas &&
+             request.resource.data.tarimasCompletadas <= request.resource.data.totalTarimas &&
+             hasOnlyChanged(['status', 'tarimasCompletadas', 'updatedAt'])) ||
+            // System/Supervisor: completed (cuando todas tarimas escaneadas)
+            (isSupervisorOrAdmin(orgId) &&
+             request.resource.data.status == 'completed' &&
+             request.resource.data.tarimasCompletadas == request.resource.data.totalTarimas &&
+             hasOnlyChanged(['status', 'tarimasCompletadas', 'updatedAt'])) ||
+            // Admin: cancelar planned
+            (isOrgAdmin(orgId) &&
+             resource.data.status == 'planned' &&
+             request.resource.data.status == 'cancelled' &&
+             hasOnlyChanged(['status', 'updatedAt']))
+          );
+
+        allow delete: if isOrgAdmin(orgId);
+      }
+
+      // ===== TARIMAS (STICKERS/ESCANEOS) =====
+      match /tarimas/{tarimaId} {
+        allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId,
+          get(/databases/$(database)/documents/organizations/$(orgId)/embarques/$(resource.data.embarqueId)).data.warehouseId);
+
+        // Create: solo backend al planificar embarque (status planned)
+        allow create: if isMemberOf(orgId) &&
+          isOperatorOrAbove(orgId) &&
+          canAccessWarehouse(orgId,
+            get(/databases/$(database)/documents/organizations/$(orgId)/embarques/$(request.resource.data.embarqueId)).data.warehouseId) &&
+          get(/databases/$(database)/documents/organizations/$(orgId)/embarques/$(request.resource.data.embarqueId)).data.status == 'planned' &&
+          request.resource.data.organizationId == orgId &&
+          request.resource.data.warehouseId ==
+            get(/databases/$(database)/documents/organizations/$(orgId)/embarques/$(request.resource.data.embarqueId)).data.warehouseId &&
+          request.resource.data.status == 'pending';
+
+        // Update: solo pending -> scanned con datos válidos
+        allow update: if isMemberOf(orgId) &&
+          canAccessWarehouse(orgId,
+            get(/databases/$(database)/documents/organizations/$(orgId)/embarques/$(resource.data.embarqueId)).data.warehouseId) &&
+          isOperatorOrAbove(orgId) &&
+          resource.data.status == 'pending' &&
+          request.resource.data.status == 'scanned' &&
+          request.resource.data.scannedBy == request.auth.uid &&
+          // Solo campos permitidos al escanear
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'lote', 'caducidad', 'observaciones', 'scannedAt', 'scannedBy', 'lastKnownLote', 'lastKnownCaducidad']);
+
+        allow delete: if isOrgAdmin(orgId);
+      }
+    }
+  }
+}

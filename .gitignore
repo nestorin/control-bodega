@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+functions/venv/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.cache/
+*.tsbuildinfo
+vite.config.*.timestamp-*
+
+# Environment
+.env*
+!.env.example
+
+# IDE/OS
+.DS_Store
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Test/coverage
+coverage/
+test-results/
+*.log
+logs/
+*.lcov
+.nyc_output/
+
+# Vite
+.vite/
+
+# Figma Make
+/.figma/design-context/
+
+# Platform-managed agentplat state
+/.plugins/
+/.opencode-skills/
+
+# TypeScript
+*.tsbuildinfo
+
+# Firebase
+firebase-debug.log
+firebase-debug.*.log
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini

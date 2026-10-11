@@ -1,0 +1,12 @@
+# SECURITY HOLD
+#
+# The previous operations accepted an arbitrary organization UUID after only
+# checking that a caller was signed in. The checked-in local toolchain does not
+# include a Data Connect validator or an authoritative local reference for a
+# relation-backed membership expression. Rather than ship guessed @auth syntax,
+# these operations are disabled until a validated authorization design proves
+# UserMembership.userId == auth.uid and scopes every queried organization,
+# warehouse, reception, and pallet to that membership.
+#
+# Re-enable only with a generated/validated connector and tests that demonstrate
+# an authenticated user cannot read or mutate another organization's records.
