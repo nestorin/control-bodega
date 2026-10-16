@@ -50,3 +50,20 @@ firebase-debug.*.log
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+# Build/test artifacts (never commit)
+**/__pycache__/
+*.pyc
+playwright-report/
+.firebase/
+
+# Local debug/debris (not part of the deliverable)
+/e2e/debug-*.spec.ts
+/e2e/test-*.spec.ts
+/tests/
+/playwright/
+/create-auth-state*.cjs
+/test-login.cjs
+/update-auth-user.cjs
+/fix_ts_annotations.py
+/extraccion-diseno-grafico/
+/componentes-interfaz/
