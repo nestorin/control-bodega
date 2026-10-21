@@ -1,0 +1,4 @@
+# Formatter ignore (oxfmt reads .gitignore/.prettierignore by default).
+# GraphQL schemas are not formattable by oxfmt.
+*.gql
+*.graphql
