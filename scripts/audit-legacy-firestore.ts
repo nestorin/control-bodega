@@ -11,17 +11,13 @@
  *   ALLOW_LEGACY_MIGRATION=1 pnpm tsx scripts/audit-legacy-firestore.ts --apply
  */
 
-import { initializeApp, getApps } from "firebase-admin/app"
-import {
-  getFirestore,
-  Timestamp,
-  type DocumentData,
-} from "firebase-admin/firestore"
+import { initializeApp, getApps } from "firebase-admin/app";
+import { getFirestore, Timestamp, type DocumentData } from "firebase-admin/firestore";
 
-const ORG_ID = process.env.FIREBASE_ORG_ID ?? "org_exepa_001"
-const APPLY = process.argv.includes("--apply")
-const DRY_RUN = !APPLY
-const APPLY_GUARD = process.env.ALLOW_LEGACY_MIGRATION === "1"
+const ORG_ID = process.env.FIREBASE_ORG_ID ?? "org_exepa_001";
+const APPLY = process.argv.includes("--apply");
+const DRY_RUN = !APPLY;
+const APPLY_GUARD = process.env.ALLOW_LEGACY_MIGRATION === "1";
 
 const LEGACY_COLLECTIONS = [
   "users",
@@ -35,18 +31,18 @@ const LEGACY_COLLECTIONS = [
   "inventory",
   "inventory_movements",
   "lotes_caducidades",
-] as const
+] as const;
 
 type AuditRecord = {
-  sourcePath: string
-  targetPath: string
-  status: "already_scoped" | "eligible" | "skipped"
-  reason?: string
-}
+  sourcePath: string;
+  targetPath: string;
+  status: "already_scoped" | "eligible" | "skipped";
+  reason?: string;
+};
 
 function getDb() {
-  const app = getApps()[0] ?? initializeApp()
-  return getFirestore(app)
+  const app = getApps()[0] ?? initializeApp();
+  return getFirestore(app);
 }
 
 function targetData(data: DocumentData, sourcePath: string) {
@@ -58,62 +54,55 @@ function targetData(data: DocumentData, sourcePath: string) {
       auditedAt: Timestamp.now(),
       migratedBy: "audit-legacy-firestore",
     },
-  }
+  };
 }
 
 async function main() {
   if (APPLY && !APPLY_GUARD) {
-    throw new Error("Refusing --apply without ALLOW_LEGACY_MIGRATION=1")
+    throw new Error("Refusing --apply without ALLOW_LEGACY_MIGRATION=1");
   }
 
-  const db = getDb()
-  const records: AuditRecord[] = []
-  const writes: Array<{ path: string data: DocumentData }> = []
+  const db = getDb();
+  const records: AuditRecord[] = [];
+  const writes: Array<{ path: string; data: DocumentData }> = [];
 
-  console.log(
-    `${
-      DRY_RUN ? "DRY-RUN" : "APPLY"
-    }: auditing legacy root collections for ${ORG_ID}`,
-  )
+  console.log(`${DRY_RUN ? "DRY-RUN" : "APPLY"}: auditing legacy root collections for ${ORG_ID}`);
 
   for (const collectionName of LEGACY_COLLECTIONS) {
-    const snapshot = await db.collection(collectionName).get()
+    const snapshot = await db.collection(collectionName).get();
     for (const document of snapshot.docs) {
-      const sourcePath = document.ref.path
-      const targetPath = `organizations/${ORG_ID}/${collectionName}/${document.id}`
-      const data = document.data()
+      const sourcePath = document.ref.path;
+      const targetPath = `organizations/${ORG_ID}/${collectionName}/${document.id}`;
+      const data = document.data();
 
       if (data.organizationId === ORG_ID) {
-        records.push({ sourcePath, targetPath, status: "already_scoped" })
-        continue
+        records.push({ sourcePath, targetPath, status: "already_scoped" });
+        continue;
       }
 
       // Do not guess an organization for documents explicitly scoped elsewhere.
-      if (
-        typeof data.organizationId === "string" &&
-        data.organizationId.length > 0
-      ) {
+      if (typeof data.organizationId === "string" && data.organizationId.length > 0) {
         records.push({
           sourcePath,
           targetPath,
           status: "skipped",
           reason: `already belongs to ${data.organizationId}`,
-        })
-        continue
+        });
+        continue;
       }
 
-      records.push({ sourcePath, targetPath, status: "eligible" })
-      writes.push({ path: targetPath, data: targetData(data, sourcePath) })
+      records.push({ sourcePath, targetPath, status: "eligible" });
+      writes.push({ path: targetPath, data: targetData(data, sourcePath) });
     }
   }
 
   if (APPLY) {
     for (let index = 0; index < writes.length; index += 400) {
-      const batch = db.batch()
+      const batch = db.batch();
       for (const write of writes.slice(index, index + 400)) {
-        batch.set(db.doc(write.path), write.data, { merge: true })
+        batch.set(db.doc(write.path), write.data, { merge: true });
       }
-      await batch.commit()
+      await batch.commit();
     }
   }
 
@@ -130,10 +119,10 @@ async function main() {
       null,
       2,
     ),
-  )
+  );
 }
 
 main().catch((error: unknown) => {
-  console.error("Legacy audit failed:", error)
-  process.exitCode = 1
-})
+  console.error("Legacy audit failed:", error);
+  process.exitCode = 1;
+});

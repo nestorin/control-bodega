@@ -5,37 +5,30 @@
  * Idempotent: uses merge: true to upsert by ID
  */
 
-import { initializeApp, cert, getApps } from "firebase-admin/app"
-import { getFirestore, Timestamp, WriteBatch } from "firebase-admin/firestore"
-import * as fs from "fs"
-import * as path from "path"
+import { initializeApp, cert, getApps } from "firebase-admin/app";
+import { getFirestore, Timestamp, WriteBatch } from "firebase-admin/firestore";
+import * as fs from "fs";
+import * as path from "path";
 
 // ============================================================
 // CONFIGURATION
 // ============================================================
 
-const ORG_ID = "org_exepa_001" // Main organization ID
-const SERVICE_ACCOUNT_PATH = path.resolve(
-  __dirname,
-  "../serviceAccountKey.json",
-)
+const ORG_ID = "org_exepa_001"; // Main organization ID
+const SERVICE_ACCOUNT_PATH = path.resolve(__dirname, "../serviceAccountKey.json");
 
 // Check for service account
 if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-  console.error("❌ serviceAccountKey.json not found at:", SERVICE_ACCOUNT_PATH)
-  console.error(
-    "   Download from Firebase Console > Project Settings > Service Accounts",
-  )
-  process.exit(1)
+  console.error("❌ serviceAccountKey.json not found at:", SERVICE_ACCOUNT_PATH);
+  console.error("   Download from Firebase Console > Project Settings > Service Accounts");
+  process.exit(1);
 }
 
 // Initialize Firebase Admin
-const serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, "utf8"))
+const serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, "utf8"));
 const app =
-  getApps().length > 0
-    ? getApps()[0]
-    : initializeApp({ credential: cert(serviceAccount) })
-const db = getFirestore(app)
+  getApps().length > 0 ? getApps()[0] : initializeApp({ credential: cert(serviceAccount) });
+const db = getFirestore(app);
 
 // ============================================================
 // SEED DATA (extracted from _INIT arrays in source code)
@@ -187,24 +180,24 @@ const seedData = {
       ],
     },
   ],
-}
+};
 
 // ============================================================
 // MIGRATION FUNCTIONS
 // ============================================================
 
 function getOrgRef() {
-  return db.collection("organizations").doc(ORG_ID)
+  return db.collection("organizations").doc(ORG_ID);
 }
 
 function getCollectionRef(collectionName: string) {
-  return getOrgRef().collection(collectionName)
+  return getOrgRef().collection(collectionName);
 }
 
 async function migrateOrganization() {
-  console.log("📦 Migrating organization...")
-  const batch = db.batch()
-  const ref = getOrgRef()
+  console.log("📦 Migrating organization...");
+  const batch = db.batch();
+  const ref = getOrgRef();
   batch.set(
     ref,
     {
@@ -214,16 +207,16 @@ async function migrateOrganization() {
       updatedAt: Timestamp.now(),
     },
     { merge: true },
-  )
-  await batch.commit()
-  console.log("   ✅ Organization migrated")
+  );
+  await batch.commit();
+  console.log("   ✅ Organization migrated");
 }
 
 async function migrateWarehouses() {
-  console.log("🏭 Migrating warehouses...")
-  const batch = db.batch()
+  console.log("🏭 Migrating warehouses...");
+  const batch = db.batch();
   for (const w of seedData.warehouses) {
-    const ref = getCollectionRef("warehouses").doc(w.id)
+    const ref = getCollectionRef("warehouses").doc(w.id);
     batch.set(
       ref,
       {
@@ -233,17 +226,17 @@ async function migrateWarehouses() {
         createdAt: Timestamp.now(),
       },
       { merge: true },
-    )
+    );
   }
-  await batch.commit()
-  console.log(`   ✅ ${seedData.warehouses.length} warehouses migrated`)
+  await batch.commit();
+  console.log(`   ✅ ${seedData.warehouses.length} warehouses migrated`);
 }
 
 async function migrateSuppliers() {
-  console.log("🚚 Migrating suppliers...")
-  const batch = db.batch()
+  console.log("🚚 Migrating suppliers...");
+  const batch = db.batch();
   for (const s of seedData.suppliers) {
-    const ref = getCollectionRef("suppliers").doc(s.id)
+    const ref = getCollectionRef("suppliers").doc(s.id);
     batch.set(
       ref,
       {
@@ -253,17 +246,17 @@ async function migrateSuppliers() {
         createdAt: Timestamp.now(),
       },
       { merge: true },
-    )
+    );
   }
-  await batch.commit()
-  console.log(`   ✅ ${seedData.suppliers.length} suppliers migrated`)
+  await batch.commit();
+  console.log(`   ✅ ${seedData.suppliers.length} suppliers migrated`);
 }
 
 async function migrateProducts() {
-  console.log("📦 Migrating products...")
-  const batch = db.batch()
+  console.log("📦 Migrating products...");
+  const batch = db.batch();
   for (const p of seedData.products) {
-    const ref = getCollectionRef("products").doc(p.id)
+    const ref = getCollectionRef("products").doc(p.id);
     batch.set(
       ref,
       {
@@ -277,17 +270,17 @@ async function migrateProducts() {
         createdAt: Timestamp.now(),
       },
       { merge: true },
-    )
+    );
   }
-  await batch.commit()
-  console.log(`   ✅ ${seedData.products.length} products migrated`)
+  await batch.commit();
+  console.log(`   ✅ ${seedData.products.length} products migrated`);
 }
 
 async function migratePurchaseOrders() {
-  console.log("📋 Migrating purchase orders...")
-  const batch = db.batch()
+  console.log("📋 Migrating purchase orders...");
+  const batch = db.batch();
   for (const po of seedData.purchaseOrders) {
-    const ref = getCollectionRef("purchase_orders").doc(po.id)
+    const ref = getCollectionRef("purchase_orders").doc(po.id);
     batch.set(
       ref,
       {
@@ -300,21 +293,19 @@ async function migratePurchaseOrders() {
         createdAt: Timestamp.now(),
       },
       { merge: true },
-    )
+    );
   }
-  await batch.commit()
-  console.log(
-    `   ✅ ${seedData.purchaseOrders.length} purchase orders migrated`,
-  )
+  await batch.commit();
+  console.log(`   ✅ ${seedData.purchaseOrders.length} purchase orders migrated`);
 }
 
 async function migrateReceptions() {
-  console.log("📥 Migrating receptions...")
-  const batch = db.batch()
+  console.log("📥 Migrating receptions...");
+  const batch = db.batch();
 
   for (const rec of seedData.receptions) {
-    const receptionRef = getCollectionRef("receptions").doc(rec.id)
-    const { lines, ...receptionData } = rec
+    const receptionRef = getCollectionRef("receptions").doc(rec.id);
+    const { lines, ...receptionData } = rec;
 
     batch.set(
       receptionRef,
@@ -326,13 +317,13 @@ async function migrateReceptions() {
         updatedAt: Timestamp.now(),
       },
       { merge: true },
-    )
+    );
 
     // Migrate reception lines
     for (const [lineIndex, line] of lines.entries()) {
       const lineRef = receptionRef
         .collection("lines")
-        .doc(`line_${rec.id}_${String(lineIndex + 1).padStart(3, "0")}`)
+        .doc(`line_${rec.id}_${String(lineIndex + 1).padStart(3, "0")}`);
       batch.set(
         lineRef,
         {
@@ -346,31 +337,29 @@ async function migrateReceptions() {
           createdAt: Timestamp.now(),
         },
         { merge: true },
-      )
+      );
     }
   }
 
-  await batch.commit()
-  console.log(
-    `   ✅ ${seedData.receptions.length} receptions migrated with lines`,
-  )
+  await batch.commit();
+  console.log(`   ✅ ${seedData.receptions.length} receptions migrated with lines`);
 }
 
 async function migratePallets() {
-  console.log("📦 Migrating pallets (generating unique QR codes)...")
-  const batch = db.batch()
-  let palletCounter = 1
+  console.log("📦 Migrating pallets (generating unique QR codes)...");
+  const batch = db.batch();
+  let palletCounter = 1;
 
   for (const rec of seedData.receptions) {
     for (const line of rec.lines) {
       for (let i = 0; i < line.palletCount; i++) {
-        const palletId = `pallet_${rec.id}_${palletCounter}`
-        const qrIdentifier = `TQR-${rec.operationId.split("-")[1]}-${String(palletCounter).padStart(3, "0")}`
+        const palletId = `pallet_${rec.id}_${palletCounter}`;
+        const qrIdentifier = `TQR-${rec.operationId.split("-")[1]}-${String(palletCounter).padStart(3, "0")}`;
 
         const palletRef = getCollectionRef("receptions")
           .doc(rec.id)
           .collection("pallets")
-          .doc(palletId)
+          .doc(palletId);
         batch.set(
           palletRef,
           {
@@ -387,12 +376,12 @@ async function migratePallets() {
             updatedAt: Timestamp.now(),
           },
           { merge: true },
-        )
+        );
 
         // Inventory movement RECEIPT
         const movementRef = getCollectionRef("inventory_movements").doc(
           `movement_${rec.id}_${palletId}_receipt`,
-        )
+        );
         batch.set(
           movementRef,
           {
@@ -410,25 +399,23 @@ async function migratePallets() {
             occurredAt: Timestamp.now(),
           },
           { merge: true },
-        )
+        );
 
-        palletCounter++
+        palletCounter++;
       }
     }
   }
 
-  await batch.commit()
-  console.log(
-    `   ✅ ${palletCounter - 1} pallets migrated with unique QR codes`,
-  )
+  await batch.commit();
+  console.log(`   ✅ ${palletCounter - 1} pallets migrated with unique QR codes`);
 }
 
 async function migrateShipments() {
-  console.log("🚛 Migrating shipments...")
-  const batch = db.batch()
+  console.log("🚛 Migrating shipments...");
+  const batch = db.batch();
 
   for (const ship of seedData.shipments) {
-    const shipmentRef = getCollectionRef("shipments").doc(ship.id)
+    const shipmentRef = getCollectionRef("shipments").doc(ship.id);
     batch.set(
       shipmentRef,
       {
@@ -441,7 +428,7 @@ async function migrateShipments() {
         updatedAt: Timestamp.now(),
       },
       { merge: true },
-    )
+    );
 
     // Inventory movements for shipment
     for (const line of ship.lines) {
@@ -452,15 +439,15 @@ async function migrateShipments() {
           .collection("pallets")
           .where("qrIdentifier", "==", palletQR)
           .limit(1)
-          .get()
+          .get();
 
         if (!palletSnap.empty) {
-          const palletDoc = palletSnap.docs[0]
-          const palletData = palletDoc.data()
+          const palletDoc = palletSnap.docs[0];
+          const palletData = palletDoc.data();
 
           const movementRef = getCollectionRef("inventory_movements").doc(
             `movement_${ship.id}_${line.productId}_${palletQR}_shipment`,
-          )
+          );
           batch.set(
             movementRef,
             {
@@ -476,14 +463,14 @@ async function migrateShipments() {
               occurredAt: Timestamp.now(),
             },
             { merge: true },
-          )
+          );
         }
       }
     }
   }
 
-  await batch.commit()
-  console.log(`   ✅ ${seedData.shipments.length} shipments migrated`)
+  await batch.commit();
+  console.log(`   ✅ ${seedData.shipments.length} shipments migrated`);
 }
 
 // ============================================================
@@ -491,25 +478,25 @@ async function migrateShipments() {
 // ============================================================
 
 async function main() {
-  console.log("🚀 Starting Firestore migration (idempotent seed)...\n")
+  console.log("🚀 Starting Firestore migration (idempotent seed)...\n");
 
   try {
-    await migrateOrganization()
-    await migrateWarehouses()
-    await migrateSuppliers()
-    await migrateProducts()
-    await migratePurchaseOrders()
-    await migrateReceptions()
-    await migratePallets()
-    await migrateShipments()
+    await migrateOrganization();
+    await migrateWarehouses();
+    await migrateSuppliers();
+    await migrateProducts();
+    await migratePurchaseOrders();
+    await migrateReceptions();
+    await migratePallets();
+    await migrateShipments();
 
-    console.log("\n✅ Migration completed successfully!")
-    console.log("   Run again anytime - it's idempotent (merge: true)")
-    process.exit(0)
+    console.log("\n✅ Migration completed successfully!");
+    console.log("   Run again anytime - it's idempotent (merge: true)");
+    process.exit(0);
   } catch (error) {
-    console.error("\n❌ Migration failed:", error)
-    process.exit(1)
+    console.error("\n❌ Migration failed:", error);
+    process.exit(1);
   }
 }
 
-main()
+main();
