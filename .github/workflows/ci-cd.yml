@@ -110,6 +110,9 @@ jobs:
       - name: Run E2E tests
         env:
           PLAYWRIGHT_ARTIFACTS_DIR: ${{ runner.temp }}/control-bodega-e2e
+          # webServer stdout goes to the debug log, not the console; without
+          # this an emulator startup failure surfaces as a bare exit code.
+          DEBUG: pw:webserver
         run: pnpm test:e2e
 
       - name: Upload Playwright report
