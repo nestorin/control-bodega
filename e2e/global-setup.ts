@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 // Seeds the Firestore emulator through its REST API. Runs after Playwright's
 // webServer has answered on :8082 (webServer starts before globalSetup), and
@@ -149,7 +149,19 @@ async function seedPallet(): Promise<void> {
   });
 }
 
+// Several specs declare test.use({ storageState: "playwright/.auth/user.json" })
+// for real-auth runs. In mock mode auth.setup.ts never runs, so fresh checkouts
+// (CI) have no file and a leftover real-auth state would be stale. Mock mode
+// authenticates in-app, so the expected state is the empty one.
+function ensureMockAuthState(): void {
+  if (process.env.VITE_USE_MOCK_AUTH === "false") return;
+  const authFile = resolve(process.cwd(), "playwright/.auth/user.json");
+  mkdirSync(dirname(authFile), { recursive: true });
+  writeFileSync(authFile, JSON.stringify({ cookies: [], origins: [] }));
+}
+
 export default async function globalSetup(): Promise<void> {
+  ensureMockAuthState();
   const lotes = await seedLotes();
   await seedPallet();
   console.log(
