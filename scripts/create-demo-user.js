@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Script para crear usuario demo en Firebase Auth
 // Ejecutar: DEMO_USER_PASSWORD='...' node scripts/create-demo-user.js
+// Credenciales: FIREBASE_SERVICE_ACCOUNT (JSON inline) o
+// GOOGLE_APPLICATION_CREDENTIALS (ruta al archivo de cuenta de servicio).
 
 const password = process.env.DEMO_USER_PASSWORD;
 if (!password) {
@@ -12,11 +14,13 @@ if (!password) {
 
 const admin = require("firebase-admin");
 
-// Configuración del proyecto
-const serviceAccount = require("../functions/venv/lib/python3.11/site-packages/firebase_admin/credentials/cert.json");
+const inlineServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+const credential = inlineServiceAccount
+  ? admin.credential.cert(JSON.parse(inlineServiceAccount))
+  : admin.credential.applicationDefault();
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+  credential,
   projectId: "exepa-almacen-safe",
 });
 
@@ -55,6 +59,7 @@ async function createDemoUser() {
     const db = admin.firestore();
     await db.doc(`organizations/org_exepa_001/users/${userRecord.uid}`).set({
       userId: userRecord.uid,
+      organizationId: "org_exepa_001",
       email: email,
       displayName: displayName,
       photoURL: "",

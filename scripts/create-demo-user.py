@@ -57,6 +57,7 @@ def create_demo_user():
         db = firestore.client()
         db.document(f'organizations/org_exepa_001/users/{user_record.uid}').set({
             'userId': user_record.uid,
+            'organizationId': 'org_exepa_001',
             'email': email,
             'displayName': display_name,
             'photoURL': '',
