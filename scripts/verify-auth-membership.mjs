@@ -19,9 +19,7 @@ import { initializeApp as initClient, getApps as clientApps } from "firebase/app
 import { getAuth, signInWithEmailAndPassword, connectAuthEmulator } from "firebase/auth";
 import { getFirestore, doc, getDoc, connectFirestoreEmulator } from "firebase/firestore";
 
-const firebaseJson = JSON.parse(
-  readFileSync(new URL("../firebase.json", import.meta.url), "utf8"),
-);
+const firebaseJson = JSON.parse(readFileSync(new URL("../firebase.json", import.meta.url), "utf8"));
 const authPort = firebaseJson.emulators?.auth?.port ?? 9099;
 const firestoreHostPort = firebaseJson.emulators?.firestore?.port ?? 8080;
 const projectId = process.env.GCLOUD_PROJECT ?? "demo-exepa-e2e";
@@ -100,7 +98,9 @@ try {
           .doc(`organizations/${ORG_ID}/users/${createdUid}`)
           .delete()
           .catch(() => {});
-        await adminGetAuth(adminApp).deleteUser(createdUid).catch(() => {});
+        await adminGetAuth(adminApp)
+          .deleteUser(createdUid)
+          .catch(() => {});
       }
     }
   } catch {
