@@ -557,6 +557,7 @@ export default function LotesCaducidades() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <select
+            aria-label="Filtrar por estado"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value as any)}
             className="px-3 py-2 bg-[#f4f7f8] border border-[#dce4e7] rounded-[10px] text-[12px] focus:border-[#f2b84b] focus:outline-none focus:ring-1 focus:ring-[#f2b84b]"
@@ -568,6 +569,7 @@ export default function LotesCaducidades() {
             <option value="vencido">✗ Vencido</option>
           </select>
           <select
+            aria-label="Filtrar por mes"
             value={filterMonth}
             onChange={(e) => setFilterMonth(e.target.value)}
             className="px-3 py-2 bg-[#f4f7f8] border border-[#dce4e7] rounded-[10px] text-[12px] focus:border-[#f2b84b] focus:outline-none focus:ring-1 focus:ring-[#f2b84b]"

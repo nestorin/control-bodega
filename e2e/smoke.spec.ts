@@ -3,11 +3,11 @@ import { test, expect } from "@playwright/test"
 test.describe("EXEPA Bodega App - Smoke Tests", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/")
-    await page.waitForLoadState("networkidle")
+    await page.waitForLoadState("domcontentloaded")
   })
 
   test("should load the app", async ({ page }) => {
-    await expect(page).toHaveTitle(/Figma Make App/)
+    await expect(page).toHaveTitle(/Exapa_Control_Bodega_V1.4/)
   })
 
   test("should have root element", async ({ page }) => {
@@ -19,7 +19,7 @@ test.describe("EXEPA Bodega App - Smoke Tests", () => {
     const responses: string[] = []
     page.on("response", (response) => responses.push(response.url()))
 
-    await page.reload({ waitUntil: "networkidle" })
+    await page.reload({ waitUntil: "load" })
 
     const hasJs = responses.some((url) => url.includes(".js"))
     const hasCss = responses.some((url) => url.includes(".css"))
@@ -36,7 +36,7 @@ test.describe("EXEPA Bodega App - Smoke Tests", () => {
       }
     })
 
-    await page.reload({ waitUntil: "networkidle" })
+    await page.reload({ waitUntil: "load" })
 
     // Filter out expected errors (like favicon, etc.)
     const realErrors = errors.filter(

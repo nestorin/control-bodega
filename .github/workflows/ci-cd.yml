@@ -94,25 +94,30 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm playwright install --with-deps chromium
 
-      - name: Build application
-        run: pnpm build
+      - name: Set up Python for Functions Emulator
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-      - name: Start preview server
-        run: pnpm preview --port 4173 &
-        shell: bash
+      - name: Install Functions Emulator dependencies
+        run: |
+          python -m venv functions/venv
+          functions/venv/bin/python -m pip install --disable-pip-version-check -r functions/requirements.txt
 
-      - name: Wait for server
-        run: sleep 10 && curl -f http://localhost:4173 || exit 1
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools@15.30.2
 
       - name: Run E2E tests
-        run: pnpm test:e2e --reporter=html
+        env:
+          PLAYWRIGHT_ARTIFACTS_DIR: ${{ runner.temp }}/control-bodega-e2e
+        run: pnpm test:e2e
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: playwright-report
-          path: playwright-report/
+          path: ${{ runner.temp }}/control-bodega-e2e/playwright-report/
           retention-days: 7
 
       - name: Upload test results
@@ -120,7 +125,7 @@ jobs:
         if: always()
         with:
           name: test-results
-          path: test-results/
+          path: ${{ runner.temp }}/control-bodega-e2e/test-results/
           retention-days: 7
 
   build-and-deploy-preview:

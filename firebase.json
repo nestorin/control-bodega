@@ -48,16 +48,20 @@
       "port": 5002
     },
     "auth": {
-      "port": 9099
+      "port": 9100
     },
     "firestore": {
-      "port": 8080
+      "port": 8082
     },
     "functions": {
       "port": 5001
     },
     "storage": {
       "port": 9199
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
     }
   }
 }

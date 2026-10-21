@@ -1,0 +1,6 @@
+{
+  "auth": 9100,
+  "firestore": 8082,
+  "functions": 5001,
+  "storage": 9199
+}
