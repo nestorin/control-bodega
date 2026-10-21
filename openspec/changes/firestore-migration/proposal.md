@@ -8,16 +8,17 @@ Migrate all ephemeral React `useState` + hardcoded seed data to **Firestore with
 
 ### In Scope (6 domains)
 
-| Domain | Current Location | Data Types |
-|--------|------------------|------------|
-| **Catálogos** | `Configuracion.tsx` (4 `_INIT` arrays) | Productos, Proveedores, Conversiones, Almacenes |
-| **Recepciones** | `Recepciones.tsx` (`recepciones[]`) | OC folios, proveedor, producto, tarimas, estado, incidencias |
-| **Evidencias** | `Evidencias.tsx` (`evidenciasData[]`) | Fotos, lote, caducidad, OC folio, estado |
-| **Inventario** | `App.tsx` (`inventario` Record) | Por almacén: `Record<productoId, cajas>` |
-| **Lotes/Caducidades** | `LotesCaducidades.tsx` (`DATA_INICIAL`) | Por bodega: `Record<mes, cajas>` |
-| **Embarques** | `Embarques.tsx` (`EMBARQUES_INICIALES`) | Folio, cliente, productos, tarimas escaneadas, evidencia |
+| Domain                | Current Location                        | Data Types                                                   |
+| --------------------- | --------------------------------------- | ------------------------------------------------------------ |
+| **Catálogos**         | `Configuracion.tsx` (4 `_INIT` arrays)  | Productos, Proveedores, Conversiones, Almacenes              |
+| **Recepciones**       | `Recepciones.tsx` (`recepciones[]`)     | OC folios, proveedor, producto, tarimas, estado, incidencias |
+| **Evidencias**        | `Evidencias.tsx` (`evidenciasData[]`)   | Fotos, lote, caducidad, OC folio, estado                     |
+| **Inventario**        | `App.tsx` (`inventario` Record)         | Por almacén: `Record<productoId, cajas>`                     |
+| **Lotes/Caducidades** | `LotesCaducidades.tsx` (`DATA_INICIAL`) | Por bodega: `Record<mes, cajas>`                             |
+| **Embarques**         | `Embarques.tsx` (`EMBARQUES_INICIALES`) | Folio, cliente, productos, tarimas escaneadas, evidencia     |
 
 ### Out of Scope
+
 - Authentication/authorization redesign (use existing Firebase Auth)
 - Real-time presence/cursors
 - Analytics/events collection
@@ -27,6 +28,7 @@ Migrate all ephemeral React `useState` + hardcoded seed data to **Firestore with
 ## Capabilities
 
 ### New Capabilities
+
 - `firestore-schema`: Collection/document structure, indexes, composite queries
 - `security-rules`: Per-domain access control (owner, role-based, read/write rules)
 - `firestore-service`: Typed service layer (CRUD + listeners) replacing direct `useState`
@@ -34,6 +36,7 @@ Migrate all ephemeral React `useState` + hardcoded seed data to **Firestore with
 - `migration-script`: One-time seed from `_INIT` arrays → Firestore
 
 ### Modified Capabilities
+
 - `catalogos`: State → Firestore listeners; Config screen becomes admin UI
 - `recepciones`: Local array → real-time collection with offline queue
 - `evidencias`: Same as recepciones
@@ -53,6 +56,7 @@ Migrate all ephemeral React `useState` + hardcoded seed data to **Firestore with
 6. **Phase 6 — Cleanup**: Remove all `_INIT` arrays, `useState` in App.tsx, dual-write flag
 
 **Why incremental?**
+
 - App stays shippable every phase
 - Can rollback single domain if issues arise
 - Offline queue validates progressively
@@ -60,31 +64,31 @@ Migrate all ephemeral React `useState` + hardcoded seed data to **Firestore with
 
 ## Affected Areas
 
-| Area | Impact | Description |
-|------|--------|-------------|
-| `src/lib/firebase.ts` | Modified | Add `getFirestore`, `enableIndexedDbPersistence` |
-| `src/services/firestore.ts` | New | Typed service layer (CRUD, transactions, batch) |
-| `src/hooks/useFirestore.ts` | New | `useCollection`, `useDocument`, `useOfflineQueue` |
-| `src/screens/Configuracion.tsx` | Modified | Dual-write → Firestore service |
-| `src/screens/Recepciones.tsx` | Modified | Replace `recepciones[]` with hook |
-| `src/screens/Evidencias.tsx` | Modified | Replace `evidenciasData[]` with hook |
-| `src/screens/LotesCaducidades.tsx` | Modified | Replace `DATA_INICIAL` with hook |
-| `src/screens/Embarques.tsx` | Modified | Replace `EMBARQUES_INICIALES` with hook |
-| `src/App.tsx` | Modified | Remove `inventario` state; use service |
-| `scripts/migrate-seed.ts` | New | One-time seed from `_INIT` arrays |
-| `firestore.rules` | New | Security rules per domain |
-| `firestore.indexes.json` | New | Composite indexes for queries |
+| Area                               | Impact   | Description                                       |
+| ---------------------------------- | -------- | ------------------------------------------------- |
+| `src/lib/firebase.ts`              | Modified | Add `getFirestore`, `enableIndexedDbPersistence`  |
+| `src/services/firestore.ts`        | New      | Typed service layer (CRUD, transactions, batch)   |
+| `src/hooks/useFirestore.ts`        | New      | `useCollection`, `useDocument`, `useOfflineQueue` |
+| `src/screens/Configuracion.tsx`    | Modified | Dual-write → Firestore service                    |
+| `src/screens/Recepciones.tsx`      | Modified | Replace `recepciones[]` with hook                 |
+| `src/screens/Evidencias.tsx`       | Modified | Replace `evidenciasData[]` with hook              |
+| `src/screens/LotesCaducidades.tsx` | Modified | Replace `DATA_INICIAL` with hook                  |
+| `src/screens/Embarques.tsx`        | Modified | Replace `EMBARQUES_INICIALES` with hook           |
+| `src/App.tsx`                      | Modified | Remove `inventario` state; use service            |
+| `scripts/migrate-seed.ts`          | New      | One-time seed from `_INIT` arrays                 |
+| `firestore.rules`                  | New      | Security rules per domain                         |
+| `firestore.indexes.json`           | New      | Composite indexes for queries                     |
 
 ## Risks
 
-| Risk | Likelihood | Mitigation |
-|------|------------|------------|
-| Cold start latency (first load) | High | Enable persistence; pre-fetch critical collections; show skeleton UI |
-| Security rules complexity | High | Start restrictive; use emulator for testing; per-domain rule files |
-| Offline conflict resolution | Medium | Server timestamps + last-write-wins; expose `pendingChanges` in UI |
-| Data loss during migration | Low | Run migration script against emulator first; backup export |
-| Index build failures | Medium | Declare indexes upfront; use `firebase firestore:indexes` |
-| Bundle size increase | Low | Tree-shake Firebase SDK; lazy-load non-critical domains |
+| Risk                            | Likelihood | Mitigation                                                           |
+| ------------------------------- | ---------- | -------------------------------------------------------------------- |
+| Cold start latency (first load) | High       | Enable persistence; pre-fetch critical collections; show skeleton UI |
+| Security rules complexity       | High       | Start restrictive; use emulator for testing; per-domain rule files   |
+| Offline conflict resolution     | Medium     | Server timestamps + last-write-wins; expose `pendingChanges` in UI   |
+| Data loss during migration      | Low        | Run migration script against emulator first; backup export           |
+| Index build failures            | Medium     | Declare indexes upfront; use `firebase firestore:indexes`            |
+| Bundle size increase            | Low        | Tree-shake Firebase SDK; lazy-load non-critical domains              |
 
 ## Rollback Plan
 

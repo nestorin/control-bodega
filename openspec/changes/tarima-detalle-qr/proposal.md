@@ -8,13 +8,13 @@ Complete the **TarimaDetalle** screen to fetch and display real tarima (pallet) 
 
 ### In Scope
 
-| Component | Current State | Required Change |
-|-----------|---------------|-----------------|
-| **QR Format Definition** | Implicit in `CapturaTarima.tsx` (`TQR-${ocNumber}-${padStart(3,'0')}`) | Document as formal contract; add TypeScript type |
-| **Firestore Service** | `PalletService.getByQR(qrIdentifier)` exists at `domainServices.ts:347` | Expose via `createFirestoreServices()` factory; verify it works with collection group query |
-| **TarimaDetalle Screen** | Hardcoded mock data (`tarimaNum = 3`, static product info) | Accept `qrCode` prop; call `pallets.getByQR(qrCode)`; render real `PalletDoc` data + joined product/supplier info |
-| **Navigation (App.tsx)** | `EscanearQR.onFound` calls `navigate("tarima-detalle")` without passing QR code | Pass scanned `qrCode` to TarimaDetalle via state or route params |
-| **Tests** | No tests for QR→TarimaDetalle flow | Unit tests for service; component tests for TarimaDetalle with mocked service; integration test for full flow |
+| Component                | Current State                                                                   | Required Change                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **QR Format Definition** | Implicit in `CapturaTarima.tsx` (`TQR-${ocNumber}-${padStart(3,'0')}`)          | Document as formal contract; add TypeScript type                                                                  |
+| **Firestore Service**    | `PalletService.getByQR(qrIdentifier)` exists at `domainServices.ts:347`         | Expose via `createFirestoreServices()` factory; verify it works with collection group query                       |
+| **TarimaDetalle Screen** | Hardcoded mock data (`tarimaNum = 3`, static product info)                      | Accept `qrCode` prop; call `pallets.getByQR(qrCode)`; render real `PalletDoc` data + joined product/supplier info |
+| **Navigation (App.tsx)** | `EscanearQR.onFound` calls `navigate("tarima-detalle")` without passing QR code | Pass scanned `qrCode` to TarimaDetalle via state or route params                                                  |
+| **Tests**                | No tests for QR→TarimaDetalle flow                                              | Unit tests for service; component tests for TarimaDetalle with mocked service; integration test for full flow     |
 
 ### Out of Scope
 
@@ -50,9 +50,13 @@ Complete the **TarimaDetalle** screen to fetch and display real tarima (pallet) 
 ### Implementation Steps
 
 1. **Define QR Format Type** (`src/types/qrcode.ts` or extend `types.ts`)
+
    ```typescript
    export type TarimaQRCode = `TQR-${string}-${string}`; // e.g., TQR-24891-003
-   export interface ParsedQR { ocNumber: string; tarimaIndex: number; }
+   export interface ParsedQR {
+     ocNumber: string;
+     tarimaIndex: number;
+   }
    export function parseTarimaQR(qr: string): ParsedQR | null;
    ```
 
@@ -80,26 +84,26 @@ Complete the **TarimaDetalle** screen to fetch and display real tarima (pallet) 
 
 ## Affected Areas
 
-| File | Impact | Description |
-|------|--------|-------------|
-| `src/types/qrcode.ts` | **New** | QR format type + parser |
-| `src/services/firestore/index.ts` | **Modified** | Ensure `pallets` service exposed (already done) |
-| `src/services/firestore/domainServices.ts` | **Verify** | `PalletService.getByQR` exists at line 347 |
-| `src/screens/TarimaDetalle.tsx` | **Modified** | Accept `qrCode` prop; fetch real data; join product/supplier |
-| `src/App.tsx` | **Modified** | Add `pendingQrCode` state; pass to TarimaDetalle |
-| `src/test/services/palletService.getByQR.test.ts` | **New** | Unit tests for service method |
-| `src/test/components/TarimaDetalle.qr.test.tsx` | **New** | Component tests with mocked service |
-| `src/test/integration/tarimaQRFlow.test.ts` | **New** | End-to-end flow test |
+| File                                              | Impact       | Description                                                  |
+| ------------------------------------------------- | ------------ | ------------------------------------------------------------ |
+| `src/types/qrcode.ts`                             | **New**      | QR format type + parser                                      |
+| `src/services/firestore/index.ts`                 | **Modified** | Ensure `pallets` service exposed (already done)              |
+| `src/services/firestore/domainServices.ts`        | **Verify**   | `PalletService.getByQR` exists at line 347                   |
+| `src/screens/TarimaDetalle.tsx`                   | **Modified** | Accept `qrCode` prop; fetch real data; join product/supplier |
+| `src/App.tsx`                                     | **Modified** | Add `pendingQrCode` state; pass to TarimaDetalle             |
+| `src/test/services/palletService.getByQR.test.ts` | **New**      | Unit tests for service method                                |
+| `src/test/components/TarimaDetalle.qr.test.tsx`   | **New**      | Component tests with mocked service                          |
+| `src/test/integration/tarimaQRFlow.test.ts`       | **New**      | End-to-end flow test                                         |
 
 ## Risks
 
-| Risk | Likelihood | Mitigation |
-|------|------------|------------|
-| `qrIdentifier` in Firestore doesn't match scanned QR format | Medium | Verify seed data format matches `TQR-${oc}-${NNN}`; add normalization in `parseTarimaQR` |
-| Collection group query requires composite index | High | Check `firestore.indexes.json` for `pallets` + `qrIdentifier` index; add if missing |
-| `PalletDoc` lacks product name/supplier (only has `productId`) | High | Join with `ProductService.getById` + `SupplierService` in component; handle missing gracefully |
-| Race condition: navigation fires before `pendingQrCode` set | Low | Use `useEffect` in `TarimaDetalle` watching `qrCode` prop; or pass via route params (React Router v6) |
-| Backward compatibility broken for Recepciones → TarimaDetalle | Medium | Keep `currentReception` + `tarimaActual` path; only use QR fetch when `qrCode` prop provided |
+| Risk                                                           | Likelihood | Mitigation                                                                                            |
+| -------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------- |
+| `qrIdentifier` in Firestore doesn't match scanned QR format    | Medium     | Verify seed data format matches `TQR-${oc}-${NNN}`; add normalization in `parseTarimaQR`              |
+| Collection group query requires composite index                | High       | Check `firestore.indexes.json` for `pallets` + `qrIdentifier` index; add if missing                   |
+| `PalletDoc` lacks product name/supplier (only has `productId`) | High       | Join with `ProductService.getById` + `SupplierService` in component; handle missing gracefully        |
+| Race condition: navigation fires before `pendingQrCode` set    | Low        | Use `useEffect` in `TarimaDetalle` watching `qrCode` prop; or pass via route params (React Router v6) |
+| Backward compatibility broken for Recepciones → TarimaDetalle  | Medium     | Keep `currentReception` + `tarimaActual` path; only use QR fetch when `qrCode` prop provided          |
 
 ## Dependencies
 
@@ -112,7 +116,7 @@ Complete the **TarimaDetalle** screen to fetch and display real tarima (pallet) 
 
 - [ ] **QR Format**: Documented TypeScript type + parser with tests
 - [ ] **Service**: `pallets.getByQR(qrCode)` returns `PalletDoc | null` from emulator
-- [ ] **Navigation**: Scan QR in `EscanearQR` → `TarimaDetalle` shows *that specific tarima's* data
+- [ ] **Navigation**: Scan QR in `EscanearQR` → `TarimaDetalle` shows _that specific tarima's_ data
 - [ ] **Display**: Product name, lot, expiry, quantity, unit, supplier, warehouse, status from Firestore
 - [ ] **States**: Loading skeleton → data / error toast / "Tarima no encontrada" (not found)
 - [ ] **Backward Compat**: Recepciones list → TarimaDetalle still works (uses `currentReception` + `tarimaActual`)

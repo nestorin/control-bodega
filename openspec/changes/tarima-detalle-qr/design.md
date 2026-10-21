@@ -2,13 +2,13 @@
 
 ## Overview
 
-| Field | Value |
-|-------|-------|
-| **Change ID** | `tarima-detalle-qr` |
-| **Project** | `exepa-logistica` (Control de Bodega v1.4) |
+| Field              | Value                                        |
+| ------------------ | -------------------------------------------- |
+| **Change ID**      | `tarima-detalle-qr`                          |
+| **Project**        | `exepa-logistica` (Control de Bodega v1.4)   |
 | **Spec Reference** | `openspec/changes/tarima-detalle-qr/spec.md` |
-| **TDD Mode** | Strict (`pnpm test:run`) |
-| **Artifact Store** | Engram + OpenSpec |
+| **TDD Mode**       | Strict (`pnpm test:run`)                     |
+| **Artifact Store** | Engram + OpenSpec                            |
 
 ---
 
@@ -114,8 +114,8 @@ export function buildTarimaQR(ocNumber: string, tarimaIndex: number): TarimaQRCo
 
 ```typescript
 // src/types/tarimaDetail.ts
-import { PalletDoc } from '@/services/firestore/types';
-import { Timestamp } from 'firebase/firestore';
+import { PalletDoc } from "@/services/firestore/types";
+import { Timestamp } from "firebase/firestore";
 
 export interface TarimaDetailView {
   // From PalletDoc
@@ -124,7 +124,7 @@ export interface TarimaDetailView {
   expiryDate: Timestamp;
   quantity: number;
   unit: string;
-  status: PalletDoc['status'];
+  status: PalletDoc["status"];
   location?: string;
   notes?: string;
   createdAt: Timestamp;
@@ -141,10 +141,10 @@ export interface TarimaDetailView {
 }
 
 export type TarimaDetailState =
-  | { status: 'loading' }
-  | { status: 'success'; data: TarimaDetailView }
-  | { status: 'not-found'; qrCode: string }
-  | { status: 'error'; message: string; retry: () => void };
+  | { status: "loading" }
+  | { status: "success"; data: TarimaDetailView }
+  | { status: "not-found"; qrCode: string }
+  | { status: "error"; message: string; retry: () => void };
 ```
 
 ### 2.2 Modified Components
@@ -209,12 +209,11 @@ async getByQR(qrIdentifier: string): Promise<PalletDoc | null> {
 ```
 
 **Index Required:** `firestore.indexes.json` must contain:
+
 ```json
 {
   "collectionGroup": "pallets",
-  "fields": [
-    { "fieldPath": "qrIdentifier", "order": "ASCENDING" }
-  ]
+  "fields": [{ "fieldPath": "qrIdentifier", "order": "ASCENDING" }]
 }
 ```
 
@@ -229,7 +228,7 @@ async function fetchTarimaDetail(qrCode: string): Promise<TarimaDetailView> {
   const [product, supplier] = await Promise.all([
     products.getById(pallet.productId),
     // Supplier via product.supplierId or reception lookup
-    suppliers.getById(product?.supplierId || pallet.supplierId)
+    suppliers.getById(product?.supplierId || pallet.supplierId),
   ]);
 
   return {
@@ -243,8 +242,8 @@ async function fetchTarimaDetail(qrCode: string): Promise<TarimaDetailView> {
     notes: pallet.notes,
     createdAt: pallet.createdAt,
     productName: product?.name ?? pallet.productId,
-    productCode: product?.code ?? '—',
-    supplierName: supplier?.name ?? '—',
+    productCode: product?.code ?? "—",
+    supplierName: supplier?.name ?? "—",
     supplierCode: supplier?.code,
     // reception context optional
   };
@@ -253,12 +252,12 @@ async function fetchTarimaDetail(qrCode: string): Promise<TarimaDetailView> {
 
 ### 3.3 Error Handling in Service Layer
 
-| Error Type | Handling |
-|------------|----------|
-| `permission-denied` | Throw `AuthError` → UI shows "Sin permisos" |
-| `unavailable` (emulator down) | Throw `NetworkError` → UI shows retry |
-| `not-found` | Return `null` → UI shows "Tarima no encontrada" |
-| `join missing` | Use fallback IDs; log warning; don't crash |
+| Error Type                    | Handling                                        |
+| ----------------------------- | ----------------------------------------------- |
+| `permission-denied`           | Throw `AuthError` → UI shows "Sin permisos"     |
+| `unavailable` (emulator down) | Throw `NetworkError` → UI shows retry           |
+| `not-found`                   | Return `null` → UI shows "Tarima no encontrada" |
+| `join missing`                | Use fallback IDs; log warning; don't crash      |
 
 ---
 
@@ -320,12 +319,12 @@ useEffect(() => {
 
 ### 4.3 Render Logic by State
 
-| State | Render |
-|-------|--------|
-| `loading` | Skeleton cards (shimmer) |
-| `success` | Full detail grid with joined data |
+| State       | Render                                                       |
+| ----------- | ------------------------------------------------------------ |
+| `loading`   | Skeleton cards (shimmer)                                     |
+| `success`   | Full detail grid with joined data                            |
 | `not-found` | Centered "Tarima no encontrada" + "Volver al escáner" button |
-| `error` | Toast + inline error card with "Reintentar" button |
+| `error`     | Toast + inline error card with "Reintentar" button           |
 
 ---
 
@@ -361,11 +360,11 @@ const handleQRFound = (qr: string) => {
 
 ### 5.3 Back Navigation
 
-| Flow | Back Behavior |
-|------|---------------|
-| QR Scan → TarimaDetalle | `onBack` → `clearPendingQrCode()` → `navigate(-1)` → EscanearQR |
-| Recepciones → TarimaDetalle | Existing `onBack` prop (unchanged) |
-| Error/Not-Found | Buttons call `onBack` or `retry()` |
+| Flow                        | Back Behavior                                                   |
+| --------------------------- | --------------------------------------------------------------- |
+| QR Scan → TarimaDetalle     | `onBack` → `clearPendingQrCode()` → `navigate(-1)` → EscanearQR |
+| Recepciones → TarimaDetalle | Existing `onBack` prop (unchanged)                              |
+| Error/Not-Found             | Buttons call `onBack` or `retry()`                              |
 
 ---
 
@@ -373,65 +372,69 @@ const handleQRFound = (qr: string) => {
 
 ### 6.1 Unit Tests
 
-| File | Coverage |
-|------|----------|
-| `src/test/types/qrcode.test.ts` | `parseTarimaQR`, `isValidTarimaQR`, `buildTarimaQR` — valid, invalid, edge cases |
-| `src/test/services/palletService.getByQR.test.ts` | `PalletService.getByQR` against emulator — found, not-found, error |
+| File                                              | Coverage                                                                         |
+| ------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `src/test/types/qrcode.test.ts`                   | `parseTarimaQR`, `isValidTarimaQR`, `buildTarimaQR` — valid, invalid, edge cases |
+| `src/test/services/palletService.getByQR.test.ts` | `PalletService.getByQR` against emulator — found, not-found, error               |
 
 ### 6.2 Component Tests (Vitest + RTL)
 
-| File | Coverage |
-|------|----------|
+| File                                            | Coverage                                                                                   |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `src/test/components/TarimaDetalle.qr.test.tsx` | Render with `qrCode` prop → loading → success/not-found/error states; mock service factory |
 
 ```typescript
 // Test pattern
-vi.mock('@/services/firestore', () => ({
+vi.mock("@/services/firestore", () => ({
   createFirestoreServices: () => ({
     pallets: { getByQR: vi.fn() },
     products: { getById: vi.fn() },
-    suppliers: { getById: vi.fn() }
-  })
+    suppliers: { getById: vi.fn() },
+  }),
 }));
 ```
 
 ### 6.3 Integration Tests (Emulator)
 
-| File | Coverage |
-|------|----------|
+| File                                                | Coverage                                                                         |
+| --------------------------------------------------- | -------------------------------------------------------------------------------- |
 | `src/test/integration/tarimaQR.integration.test.ts` | Full service chain: write pallet + product + supplier → `getByQR` → verify joins |
 
 ```typescript
 // Runs against emulator
-beforeAll(async () => { await setupEmulator(); });
-afterAll(async () => { await teardownEmulator(); });
+beforeAll(async () => {
+  await setupEmulator();
+});
+afterAll(async () => {
+  await teardownEmulator();
+});
 ```
 
 ### 6.4 E2E Tests (Playwright)
 
-| File | Coverage |
-|------|----------|
+| File                                | Coverage                                                                                                           |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `src/test/e2e/tarimaQRFlow.test.ts` | Launch app → click "Escanear QR" → mock camera input → verify navigation → verify detail view renders correct data |
 
 ```typescript
 // Playwright mock QR input
-await page.fill('[data-testid="qr-input"]', 'TQR-24891-003');
+await page.fill('[data-testid="qr-input"]', "TQR-24891-003");
 await page.click('[data-testid="qr-submit"]');
-await expect(page.locator('[data-testid="product-name"]')).toHaveText('Manzana Gala');
+await expect(page.locator('[data-testid="product-name"]')).toHaveText("Manzana Gala");
 ```
 
 ---
 
 ## 7. Error Handling Strategy
 
-| Layer | Error | User-Facing | Recovery |
-|-------|-------|-------------|----------|
-| Parser | Invalid format | Inline error in EscanearQR | Stay on screen, correct input |
-| Service | Not found | "Tarima no encontrada" card | "Volver al escáner" button |
-| Service | Network | Toast "Error de conexión" | "Reintentar" button (re-fetches) |
-| Service | Permission | Toast "Sin permisos" | Log out/in; contact admin |
-| Join | Missing product/supplier | Show IDs as fallback | No crash; log warning |
-| Component | Unexpected | Error boundary catches | Show generic error + reload |
+| Layer     | Error                    | User-Facing                 | Recovery                         |
+| --------- | ------------------------ | --------------------------- | -------------------------------- |
+| Parser    | Invalid format           | Inline error in EscanearQR  | Stay on screen, correct input    |
+| Service   | Not found                | "Tarima no encontrada" card | "Volver al escáner" button       |
+| Service   | Network                  | Toast "Error de conexión"   | "Reintentar" button (re-fetches) |
+| Service   | Permission               | Toast "Sin permisos"        | Log out/in; contact admin        |
+| Join      | Missing product/supplier | Show IDs as fallback        | No crash; log warning            |
+| Component | Unexpected               | Error boundary catches      | Show generic error + reload      |
 
 **Toast System:** Use existing `useToast()` hook (already in project).
 
@@ -450,30 +453,30 @@ If integration fails in `sdd-apply` or `sdd-verify`:
 
 ## 9. File-by-File Implementation Plan (Matches Spec §7)
 
-| Order | File | Action | Tests |
-|-------|------|--------|-------|
-| 1 | `src/types/qrcode.ts` | Create type + parser + unit tests | `qrcode.test.ts` |
-| 2 | `src/test/types/qrcode.test.ts` | Unit tests for parser | — |
-| 3 | `src/test/services/palletService.getByQR.test.ts` | Integration test vs emulator | — |
-| 4 | `src/types/tarimaDetail.ts` | Create `TarimaDetailView` + `TarimaDetailState` | — |
-| 5 | `src/screens/TarimaDetalle.tsx` | Refactor: accept `qrCode` prop, state machine, fetch + join | `TarimaDetalle.qr.test.tsx` |
-| 6 | `src/test/components/TarimaDetalle.qr.test.tsx` | Component tests (mock services) | — |
-| 7 | `src/App.tsx` | Add `pendingQrCode` state + pass to route | — |
-| 8 | `src/test/e2e/tarimaQRFlow.test.ts` | Playwright E2E full flow | — |
-| 9 | Cleanup | Remove hardcoded `tarimaNum = 3` mock constants | — |
+| Order | File                                              | Action                                                      | Tests                       |
+| ----- | ------------------------------------------------- | ----------------------------------------------------------- | --------------------------- |
+| 1     | `src/types/qrcode.ts`                             | Create type + parser + unit tests                           | `qrcode.test.ts`            |
+| 2     | `src/test/types/qrcode.test.ts`                   | Unit tests for parser                                       | —                           |
+| 3     | `src/test/services/palletService.getByQR.test.ts` | Integration test vs emulator                                | —                           |
+| 4     | `src/types/tarimaDetail.ts`                       | Create `TarimaDetailView` + `TarimaDetailState`             | —                           |
+| 5     | `src/screens/TarimaDetalle.tsx`                   | Refactor: accept `qrCode` prop, state machine, fetch + join | `TarimaDetalle.qr.test.tsx` |
+| 6     | `src/test/components/TarimaDetalle.qr.test.tsx`   | Component tests (mock services)                             | —                           |
+| 7     | `src/App.tsx`                                     | Add `pendingQrCode` state + pass to route                   | —                           |
+| 8     | `src/test/e2e/tarimaQRFlow.test.ts`               | Playwright E2E full flow                                    | —                           |
+| 9     | Cleanup                                           | Remove hardcoded `tarimaNum = 3` mock constants             | —                           |
 
 ---
 
 ## 10. Dependencies Verification
 
-| Dependency | Status |
-|------------|--------|
-| `firebase/firestore` | ✅ In `package.json` |
-| `@zxing/browser` | ✅ Used by `EscanearQR` |
-| `vitest` + `@testing-library/react` | ✅ Configured |
-| `playwright` | ✅ Configured |
-| Firestore emulator | ✅ `./scripts/emulator-dev.sh up` works |
-| Composite index `qrIdentifier` | ⚠️ Verify in `firestore.indexes.json` |
+| Dependency                          | Status                                  |
+| ----------------------------------- | --------------------------------------- |
+| `firebase/firestore`                | ✅ In `package.json`                    |
+| `@zxing/browser`                    | ✅ Used by `EscanearQR`                 |
+| `vitest` + `@testing-library/react` | ✅ Configured                           |
+| `playwright`                        | ✅ Configured                           |
+| Firestore emulator                  | ✅ `./scripts/emulator-dev.sh up` works |
+| Composite index `qrIdentifier`      | ⚠️ Verify in `firestore.indexes.json`   |
 
 ---
 

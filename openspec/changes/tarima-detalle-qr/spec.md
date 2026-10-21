@@ -2,15 +2,15 @@
 
 ## Overview
 
-| Field | Value |
-|-------|-------|
-| **Change ID** | `tarima-detalle-qr` |
-| **Project** | `exepa-logistica` (Control de Bodega v1.4) |
-| **Stack** | React 18 + TypeScript + Vite + Firebase (Firestore, Auth, Functions Gen2 Python) |
-| **Testing** | Vitest + React Testing Library (unit/component), Playwright (E2E), Firestore Emulator |
-| **TDD Mode** | Strict (tests first, `pnpm test:run`) |
-| **Artifact Store** | Engram (primary), OpenSpec (this file) |
-| **Execution Mode** | Automatic (gatekeeper validates each phase) |
+| Field              | Value                                                                                 |
+| ------------------ | ------------------------------------------------------------------------------------- |
+| **Change ID**      | `tarima-detalle-qr`                                                                   |
+| **Project**        | `exepa-logistica` (Control de Bodega v1.4)                                            |
+| **Stack**          | React 18 + TypeScript + Vite + Firebase (Firestore, Auth, Functions Gen2 Python)      |
+| **Testing**        | Vitest + React Testing Library (unit/component), Playwright (E2E), Firestore Emulator |
+| **TDD Mode**       | Strict (tests first, `pnpm test:run`)                                                 |
+| **Artifact Store** | Engram (primary), OpenSpec (this file)                                                |
+| **Execution Mode** | Automatic (gatekeeper validates each phase)                                           |
 
 ---
 
@@ -18,25 +18,25 @@
 
 ### 1.1 Functional Requirements
 
-| ID | Requirement | Priority | Traceability |
-|----|-------------|----------|--------------|
-| **FR-01** | Define formal `TarimaQRCode` type and `parseTarimaQR()` parser | P0 | Proposal §1 |
-| **FR-02** | Verify `PalletService.getByQR(qrIdentifier)` works against Firestore emulator | P0 | Proposal §2 |
-| **FR-03** | `TarimaDetalle` accepts optional `qrCode` prop; when provided, fetches real `PalletDoc` via `pallets.getByQR()` | P0 | Proposal §3 |
-| **FR-04** | `TarimaDetalle` joins `PalletDoc` with `ProductService.getById(productId)` and `SupplierService` for display fields (product name, supplier name) | P0 | Proposal §3 |
-| **FR-05** | `TarimaDetalle` displays loading skeleton, error toast, "Tarima no encontrada" state | P0 | Proposal §4 |
-| **FR-06** | Navigation: `EscanearQR.onFound(qr)` → `App.tsx` sets `pendingQrCode` → `TarimaDetalle` receives `qrCode` prop | P0 | Proposal §3 |
-| **FR-07** | Backward compatibility: Recepciones → `TarimaDetalle` (via `currentReception` + `tarimaActual`) continues working unchanged | P0 | Proposal §6 |
+| ID        | Requirement                                                                                                                                       | Priority | Traceability |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------ |
+| **FR-01** | Define formal `TarimaQRCode` type and `parseTarimaQR()` parser                                                                                    | P0       | Proposal §1  |
+| **FR-02** | Verify `PalletService.getByQR(qrIdentifier)` works against Firestore emulator                                                                     | P0       | Proposal §2  |
+| **FR-03** | `TarimaDetalle` accepts optional `qrCode` prop; when provided, fetches real `PalletDoc` via `pallets.getByQR()`                                   | P0       | Proposal §3  |
+| **FR-04** | `TarimaDetalle` joins `PalletDoc` with `ProductService.getById(productId)` and `SupplierService` for display fields (product name, supplier name) | P0       | Proposal §3  |
+| **FR-05** | `TarimaDetalle` displays loading skeleton, error toast, "Tarima no encontrada" state                                                              | P0       | Proposal §4  |
+| **FR-06** | Navigation: `EscanearQR.onFound(qr)` → `App.tsx` sets `pendingQrCode` → `TarimaDetalle` receives `qrCode` prop                                    | P0       | Proposal §3  |
+| **FR-07** | Backward compatibility: Recepciones → `TarimaDetalle` (via `currentReception` + `tarimaActual`) continues working unchanged                       | P0       | Proposal §6  |
 
 ### 1.2 Non-Functional Requirements
 
-| ID | Requirement | Metric |
-|----|-------------|--------|
-| **NFR-01** | Initial data fetch < 500ms on emulator (cold) | Latency |
-| **NFR-02** | TypeScript strict mode passes (`pnpm typecheck`) | Type safety |
-| **NFR-03** | ESLint + Prettier pass (`pnpm lint`) | Code quality |
-| **NFR-04** | Test coverage ≥ 90% on new/modified code | Coverage |
-| **NFR-05** | No regression in existing Recepciones flow | Regression |
+| ID         | Requirement                                      | Metric       |
+| ---------- | ------------------------------------------------ | ------------ |
+| **NFR-01** | Initial data fetch < 500ms on emulator (cold)    | Latency      |
+| **NFR-02** | TypeScript strict mode passes (`pnpm typecheck`) | Type safety  |
+| **NFR-03** | ESLint + Prettier pass (`pnpm lint`)             | Code quality |
+| **NFR-04** | Test coverage ≥ 90% on new/modified code         | Coverage     |
+| **NFR-05** | No regression in existing Recepciones flow       | Regression   |
 
 ---
 
@@ -49,8 +49,8 @@
 export type TarimaQRCode = `TQR-${string}-${string}`; // e.g., TQR-24891-003
 
 export interface ParsedQR {
-  ocNumber: string;      // Orden de compra number
-  tarimaIndex: number;   // 1-based index within the OC
+  ocNumber: string; // Orden de compra number
+  tarimaIndex: number; // 1-based index within the OC
 }
 
 export function parseTarimaQR(qr: string): ParsedQR | null {
@@ -61,6 +61,7 @@ export function parseTarimaQR(qr: string): ParsedQR | null {
 ```
 
 **Examples:**
+
 - `TQR-24891-001` → `{ ocNumber: "24891", tarimaIndex: 1 }`
 - `TQR-ABC-123-003` → `{ ocNumber: "ABC-123", tarimaIndex: 3 }`
 - `INVALID` → `null`
@@ -69,17 +70,17 @@ export function parseTarimaQR(qr: string): ParsedQR | null {
 
 ```typescript
 export interface PalletDoc extends BaseDoc {
-  qrIdentifier: string;           // Matches TarimaQRCode format
-  receptionId: string;            // Parent reception document ID
-  productId: string;              // Reference to products collection
-  warehouseId: string;            // Reference to warehouses collection
-  lot: string;                    // Lote de producción
-  expiryDate: Timestamp;          // Fecha de caducidad
-  quantity: number;               // Cantidad (unidades)
-  unit: string;                   // Unidad de medida (pz, kg, etc.)
-  status: 'RECEIVED' | 'STORED' | 'SHIPPED' | 'EXPIRED' | 'DAMAGED';
-  location?: string;              // Ubicación en bodega (opcional)
-  notes?: string;                 // Observaciones
+  qrIdentifier: string; // Matches TarimaQRCode format
+  receptionId: string; // Parent reception document ID
+  productId: string; // Reference to products collection
+  warehouseId: string; // Reference to warehouses collection
+  lot: string; // Lote de producción
+  expiryDate: Timestamp; // Fecha de caducidad
+  quantity: number; // Cantidad (unidades)
+  unit: string; // Unidad de medida (pz, kg, etc.)
+  status: "RECEIVED" | "STORED" | "SHIPPED" | "EXPIRED" | "DAMAGED";
+  location?: string; // Ubicación en bodega (opcional)
+  notes?: string; // Observaciones
 }
 ```
 
@@ -94,14 +95,14 @@ export interface TarimaDetailView {
   expiryDate: Timestamp;
   quantity: number;
   unit: string;
-  status: PalletDoc['status'];
+  status: PalletDoc["status"];
   location?: string;
   notes?: string;
   createdAt: Timestamp;
 
   // Joined from ProductService
   productName: string;
-  productCode: string;            // SKU / código interno
+  productCode: string; // SKU / código interno
 
   // Joined from SupplierService (via product.supplierId or reception)
   supplierName: string;
@@ -209,35 +210,35 @@ Feature: Tarima detail via QR scan
 
 ## 4. Acceptance Criteria
 
-| AC ID | Scenario | Expected Result | Test Type |
-|-------|----------|-----------------|-----------|
-| **AC-01** | `parseTarimaQR("TQR-24891-003")` | Returns `{ ocNumber: "24891", tarimaIndex: 3 }` | Unit |
-| **AC-02** | `parseTarimaQR("INVALID")` | Returns `null` | Unit |
-| **AC-03** | `PalletService.getByQR("TQR-24891-003")` on emulator | Returns `PalletDoc` matching QR | Integration |
-| **AC-04** | `PalletService.getByQR("NOTFOUND")` on emulator | Returns `null` | Integration |
-| **AC-05** | `TarimaDetalle` with `qrCode` prop → renders `TarimaDetailView` with joined product/supplier names | Component |
-| **AC-06** | `TarimaDetalle` with `qrCode` for non-existent → shows "Tarima no encontrada" | Component |
-| **AC-07** | `TarimaDetalle` with `qrCode` + service error → shows error toast + retry | Component |
-| **AC-08** | `TarimaDetalle` without `qrCode` + `currentReception` → shows existing mock/real data (no regression) | Component |
-| **AC-09** | Full flow: `EscanearQR` scan → `App.tsx` navigation → `TarimaDetalle` shows correct data | E2E (Playwright) |
-| **AC-10** | `pnpm test:run` passes (all new + existing tests) | Suite |
-| **AC-11** | `pnpm typecheck` passes | Suite |
-| **AC-12** | `pnpm lint` passes | Suite |
+| AC ID     | Scenario                                                                                              | Expected Result                                 | Test Type   |
+| --------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ----------- |
+| **AC-01** | `parseTarimaQR("TQR-24891-003")`                                                                      | Returns `{ ocNumber: "24891", tarimaIndex: 3 }` | Unit        |
+| **AC-02** | `parseTarimaQR("INVALID")`                                                                            | Returns `null`                                  | Unit        |
+| **AC-03** | `PalletService.getByQR("TQR-24891-003")` on emulator                                                  | Returns `PalletDoc` matching QR                 | Integration |
+| **AC-04** | `PalletService.getByQR("NOTFOUND")` on emulator                                                       | Returns `null`                                  | Integration |
+| **AC-05** | `TarimaDetalle` with `qrCode` prop → renders `TarimaDetailView` with joined product/supplier names    | Component                                       |
+| **AC-06** | `TarimaDetalle` with `qrCode` for non-existent → shows "Tarima no encontrada"                         | Component                                       |
+| **AC-07** | `TarimaDetalle` with `qrCode` + service error → shows error toast + retry                             | Component                                       |
+| **AC-08** | `TarimaDetalle` without `qrCode` + `currentReception` → shows existing mock/real data (no regression) | Component                                       |
+| **AC-09** | Full flow: `EscanearQR` scan → `App.tsx` navigation → `TarimaDetalle` shows correct data              | E2E (Playwright)                                |
+| **AC-10** | `pnpm test:run` passes (all new + existing tests)                                                     | Suite                                           |
+| **AC-11** | `pnpm typecheck` passes                                                                               | Suite                                           |
+| **AC-12** | `pnpm lint` passes                                                                                    | Suite                                           |
 
 ---
 
 ## 5. Error Cases & Edge Cases
 
-| Case | Handling |
-|------|----------|
-| **QR format invalid** | Parser returns `null`; `EscanearQR` shows inline error; no navigation |
-| **QR not in Firestore** | `TarimaDetalle` shows "Tarima no encontrada" + back button |
-| **Firestore permission denied** | Error toast "Sin permisos para leer tarima"; log for debugging |
-| **Network offline (emulator down)** | Error toast "Error de conexión. Verifique emulador." + retry button |
-| **Product/Supplier join missing** | Show `productId` / `supplierId` as fallback; no crash |
-| **Race: navigation before `pendingQrCode` set** | `TarimaDetalle` uses `useEffect` watching `qrCode` prop; safe |
-| **Multiple rapid scans** | `pendingQrCode` overwritten; last scan wins (acceptable) |
-| **Empty `lot` or `expiryDate` in Firestore** | Show "—" placeholder; not an error |
+| Case                                            | Handling                                                              |
+| ----------------------------------------------- | --------------------------------------------------------------------- |
+| **QR format invalid**                           | Parser returns `null`; `EscanearQR` shows inline error; no navigation |
+| **QR not in Firestore**                         | `TarimaDetalle` shows "Tarima no encontrada" + back button            |
+| **Firestore permission denied**                 | Error toast "Sin permisos para leer tarima"; log for debugging        |
+| **Network offline (emulator down)**             | Error toast "Error de conexión. Verifique emulador." + retry button   |
+| **Product/Supplier join missing**               | Show `productId` / `supplierId` as fallback; no crash                 |
+| **Race: navigation before `pendingQrCode` set** | `TarimaDetalle` uses `useEffect` watching `qrCode` prop; safe         |
+| **Multiple rapid scans**                        | `pendingQrCode` overwritten; last scan wins (acceptable)              |
+| **Empty `lot` or `expiryDate` in Firestore**    | Show "—" placeholder; not an error                                    |
 
 ---
 
@@ -255,18 +256,18 @@ Feature: Tarima detail via QR scan
 
 ## 7. File Impact Map
 
-| File | Change Type | Description |
-|------|-------------|-------------|
-| `src/types/qrcode.ts` | **New** | QR format type + parser + tests |
-| `src/types/tarimaDetail.ts` | **New** | Joined display type |
-| `src/services/firestore/domainServices.ts` | **Verify** | `PalletService.getByQR` exists (line 347) |
-| `src/services/firestore/index.ts` | **Verify** | `pallets` service exposed via factory |
-| `src/screens/TarimaDetalle.tsx` | **Modified** | Accept `qrCode` prop; fetch + join; states |
-| `src/App.tsx` | **Modified** | `pendingQrCode` state; pass to `TarimaDetalle` |
-| `src/test/types/qrcode.test.ts` | **New** | Unit tests for parser |
-| `src/test/services/palletService.getByQR.test.ts` | **New** | Unit/integration tests for service |
-| `src/test/components/TarimaDetalle.qr.test.tsx` | **New** | Component tests with mocked service |
-| `src/test/e2e/tarimaQRFlow.test.ts` | **New** | Playwright E2E full flow |
+| File                                              | Change Type  | Description                                    |
+| ------------------------------------------------- | ------------ | ---------------------------------------------- |
+| `src/types/qrcode.ts`                             | **New**      | QR format type + parser + tests                |
+| `src/types/tarimaDetail.ts`                       | **New**      | Joined display type                            |
+| `src/services/firestore/domainServices.ts`        | **Verify**   | `PalletService.getByQR` exists (line 347)      |
+| `src/services/firestore/index.ts`                 | **Verify**   | `pallets` service exposed via factory          |
+| `src/screens/TarimaDetalle.tsx`                   | **Modified** | Accept `qrCode` prop; fetch + join; states     |
+| `src/App.tsx`                                     | **Modified** | `pendingQrCode` state; pass to `TarimaDetalle` |
+| `src/test/types/qrcode.test.ts`                   | **New**      | Unit tests for parser                          |
+| `src/test/services/palletService.getByQR.test.ts` | **New**      | Unit/integration tests for service             |
+| `src/test/components/TarimaDetalle.qr.test.tsx`   | **New**      | Component tests with mocked service            |
+| `src/test/e2e/tarimaQRFlow.test.ts`               | **New**      | Playwright E2E full flow                       |
 
 ---
 

@@ -46,14 +46,14 @@ organizations/{organizationId}/users/{userId}
 
 Esquema mínimo:
 
-| Campo | Tipo | Reglas |
-|---|---|---|
-| `userId` | string | Igual al ID del documento y a `request.auth.uid` al crear el propio registro pendiente. |
-| `organizationId` | string | Igual al segmento de ruta. |
-| `role` | enum | `AUXILIAR_ALMACENISTA`, `GERENTE_ALMACEN`, `ADMIN`. Sólo `ADMIN` autorizado puede cambiarlo. `SUPER_ADMIN` vive en un custom claim. |
-| `status` | enum | `PENDING`, `ACTIVE`, `INACTIVE`. Sólo un `ADMIN` puede activar, desactivar o reactivar. |
-| `warehouseId` | string/null | `null` significa todos los almacenes y sólo puede ser asignado por `ADMIN`. En otro caso debe ser un ID canónico. |
-| `createdAt`/`updatedAt` | timestamp | Servidor; no aceptados desde el cliente como autoridad. |
+| Campo                   | Tipo        | Reglas                                                                                                                              |
+| ----------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `userId`                | string      | Igual al ID del documento y a `request.auth.uid` al crear el propio registro pendiente.                                             |
+| `organizationId`        | string      | Igual al segmento de ruta.                                                                                                          |
+| `role`                  | enum        | `AUXILIAR_ALMACENISTA`, `GERENTE_ALMACEN`, `ADMIN`. Sólo `ADMIN` autorizado puede cambiarlo. `SUPER_ADMIN` vive en un custom claim. |
+| `status`                | enum        | `PENDING`, `ACTIVE`, `INACTIVE`. Sólo un `ADMIN` puede activar, desactivar o reactivar.                                             |
+| `warehouseId`           | string/null | `null` significa todos los almacenes y sólo puede ser asignado por `ADMIN`. En otro caso debe ser un ID canónico.                   |
+| `createdAt`/`updatedAt` | timestamp   | Servidor; no aceptados desde el cliente como autoridad.                                                                             |
 
 El registro `PENDING` auto-creado por el usuario no debe conceder acceso a ningún dato operativo.
 
@@ -109,35 +109,35 @@ Cada documento operacional con alcance de almacén debe contener `warehouseId`. 
 
 ## 3. Roles y permisos
 
-| Permiso | `AUXILIAR_ALMACENISTA` | `GERENTE_ALMACEN` | `ADMIN` | `SUPER_ADMIN` |
-|---|:---:|:---:|:---:|:---:|
-| Leer operaciones de su almacén | Sí | Sí | Sí | Sí |
-| Leer operaciones de todos los almacenes | No | No | Sí | Sí |
-| Crear recepción en su almacén | Sí | Sí | Sí | Sí |
-| Avanzar recepción | Sí | Sí | Sí | Sí |
-| Cancelar recepción | No | Sí | Sí | Sí |
-| Crear/editar catálogos | No | Sí | Sí | Sí |
-| Crear embarque | Sí | Sí | Sí | Sí |
-| Escanear tarima | Sí | Sí | Sí | Sí |
-| Completar/cancelar embarque | No | Sí | Sí | Sí |
-| Crear movimientos de inventario | Sí, sólo por flujo autorizado | Sí | Sólo por backend | Sólo por backend |
-| Corregir movimiento | No | No | Sí, con auditoría | Sí, con auditoría |
-| Leer auditoría | No | Sí | Sí | Sí |
-| Escribir auditoría | Sólo mediante función/flujo autorizado | Sólo mediante función/flujo autorizado | Sólo mediante función/flujo autorizado | Sólo mediante función/flujo autorizado |
-| Administrar membresías | No | No | Sí | Sí |
-| Administrar plataforma y claims | No | No | No | Sí |
-| Eliminar datos operativos | No | No | Sí, preferir soft delete | Sí, preferir soft delete |
+| Permiso                                 |         `AUXILIAR_ALMACENISTA`         |           `GERENTE_ALMACEN`            |                `ADMIN`                 |             `SUPER_ADMIN`              |
+| --------------------------------------- | :------------------------------------: | :------------------------------------: | :------------------------------------: | :------------------------------------: |
+| Leer operaciones de su almacén          |                   Sí                   |                   Sí                   |                   Sí                   |                   Sí                   |
+| Leer operaciones de todos los almacenes |                   No                   |                   No                   |                   Sí                   |                   Sí                   |
+| Crear recepción en su almacén           |                   Sí                   |                   Sí                   |                   Sí                   |                   Sí                   |
+| Avanzar recepción                       |                   Sí                   |                   Sí                   |                   Sí                   |                   Sí                   |
+| Cancelar recepción                      |                   No                   |                   Sí                   |                   Sí                   |                   Sí                   |
+| Crear/editar catálogos                  |                   No                   |                   Sí                   |                   Sí                   |                   Sí                   |
+| Crear embarque                          |                   Sí                   |                   Sí                   |                   Sí                   |                   Sí                   |
+| Escanear tarima                         |                   Sí                   |                   Sí                   |                   Sí                   |                   Sí                   |
+| Completar/cancelar embarque             |                   No                   |                   Sí                   |                   Sí                   |                   Sí                   |
+| Crear movimientos de inventario         |     Sí, sólo por flujo autorizado      |                   Sí                   |            Sólo por backend            |            Sólo por backend            |
+| Corregir movimiento                     |                   No                   |                   No                   |           Sí, con auditoría            |           Sí, con auditoría            |
+| Leer auditoría                          |                   No                   |                   Sí                   |                   Sí                   |                   Sí                   |
+| Escribir auditoría                      | Sólo mediante función/flujo autorizado | Sólo mediante función/flujo autorizado | Sólo mediante función/flujo autorizado | Sólo mediante función/flujo autorizado |
+| Administrar membresías                  |                   No                   |                   No                   |                   Sí                   |                   Sí                   |
+| Administrar plataforma y claims         |                   No                   |                   No                   |                   No                   |                   Sí                   |
+| Eliminar datos operativos               |                   No                   |                   No                   |        Sí, preferir soft delete        |        Sí, preferir soft delete        |
 
 `SUPER_ADMIN` es global y se administra sólo con Admin SDK. `AUDITOR` puede mantenerse como permiso especializado de sólo lectura si el producto lo necesita, pero no reemplaza a los cuatro roles operativos acordados. Ninguna ruta de frontend o regla debe convertirlo indirectamente en un rol de escritura.
 
 ### 3.1 Compatibilidad durante la migración
 
-| Rol legacy | Rol objetivo |
-|---|---|
-| `OPERATOR` | `AUXILIAR_ALMACENISTA` |
-| `SUPERVISOR` | `GERENTE_ALMACEN` |
-| `ADMIN` | `ADMIN` |
-| claim `superAdmin: true` | `SUPER_ADMIN` |
+| Rol legacy               | Rol objetivo           |
+| ------------------------ | ---------------------- |
+| `OPERATOR`               | `AUXILIAR_ALMACENISTA` |
+| `SUPERVISOR`             | `GERENTE_ALMACEN`      |
+| `ADMIN`                  | `ADMIN`                |
+| claim `superAdmin: true` | `SUPER_ADMIN`          |
 
 La compatibilidad legacy sólo debe existir durante la migración y nunca debe permitir más privilegios que el rol objetivo equivalente.
 
@@ -241,18 +241,18 @@ Requisitos:
 
 Crear callable functions con autenticación y validación de entrada obligatorias:
 
-| Function | Propósito | Requisitos |
-|---|---|---|
-| `createMembership` | Solicitar/provisionar membresía | Sólo `ADMIN`; impide autoasignación y valida organización/almacén. |
-| `setMembershipStatus` | Activar/desactivar | Sólo `ADMIN`; protege último admin. |
-| `updateMembershipRole` | Cambiar rol/alcance | Sólo `ADMIN`; registra auditoría. |
-| `createReception` | Crear recepción y líneas | Valida dominio, actor y almacén en una transacción. |
-| `advanceReception` | Ejecutar transición | Máquina de estados única; idempotencia por `operationId`. |
-| `createShipment` | Crear embarque y tarimas | Valida stock, almacén y cantidades de forma atómica. |
-| `scanPallet` | Registrar escaneo | Verifica QR, estado, almacén, usuario y evita doble escaneo. |
-| `completeShipment` | Completar y mover inventario | Revalida stock en transacción y emite auditoría. |
-| `writeAuditEvent` | Registrar eventos internos | No expuesta al cliente salvo contrato muy restringido. |
-| `extract_ocr_secure` | OCR | Auth obligatoria, MIME/tamaño limitado, rate limit y no logging de payload. |
+| Function               | Propósito                       | Requisitos                                                                  |
+| ---------------------- | ------------------------------- | --------------------------------------------------------------------------- |
+| `createMembership`     | Solicitar/provisionar membresía | Sólo `ADMIN`; impide autoasignación y valida organización/almacén.          |
+| `setMembershipStatus`  | Activar/desactivar              | Sólo `ADMIN`; protege último admin.                                         |
+| `updateMembershipRole` | Cambiar rol/alcance             | Sólo `ADMIN`; registra auditoría.                                           |
+| `createReception`      | Crear recepción y líneas        | Valida dominio, actor y almacén en una transacción.                         |
+| `advanceReception`     | Ejecutar transición             | Máquina de estados única; idempotencia por `operationId`.                   |
+| `createShipment`       | Crear embarque y tarimas        | Valida stock, almacén y cantidades de forma atómica.                        |
+| `scanPallet`           | Registrar escaneo               | Verifica QR, estado, almacén, usuario y evita doble escaneo.                |
+| `completeShipment`     | Completar y mover inventario    | Revalida stock en transacción y emite auditoría.                            |
+| `writeAuditEvent`      | Registrar eventos internos      | No expuesta al cliente salvo contrato muy restringido.                      |
+| `extract_ocr_secure`   | OCR                             | Auth obligatoria, MIME/tamaño limitado, rate limit y no logging de payload. |
 
 Todas las funciones deben:
 
