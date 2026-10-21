@@ -299,7 +299,7 @@ function statusColor(s: EmbarqueStatus) {
 
 // ─── Components ───────────────────────────────────────────────────────────────
 
-function Pill({ label, s }: { label: string s: EmbarqueStatus }) {
+function Pill({ label, s }: { label: string; s: EmbarqueStatus }) {
   const c = statusColor(s)
   return (
     <span
@@ -1035,7 +1035,7 @@ export function Paso1({
                         ? "(consultando catálogo)"
                         : conversionSource === "firestore"
                           ? "(catálogo Firestore)"
-                          : "(respaldo local; Firestore no disponible)"}
+                          : "(respaldo local, Firestore no disponible)"}
                     </span>
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -2045,7 +2045,7 @@ export default function Embarques({
   catalogoConversiones: EmbarqueConversion[]
   onReducirInventario?: (
     almacenId: string,
-    productos: { productoId: string cajas: number }[],
+    productos: { productoId: string; cajas: number }[],
   ) => void
 }) {
   const { canQuery } = useAuthorization()
@@ -2063,10 +2063,15 @@ export default function Embarques({
   const [conversionSource, setConversionSource] =
     useState<"loading" | "firestore" | "fallback">(db ? "loading" : "fallback")
 
-  // Local state (fallback)
+  // Local history remains the offline fallback. Firestore replaces it after
+  // the initial load, while reconciliation retains only an active local draft.
   const [embarques, setEmbarques] = useState<Embarque[]>(EMBARQUES_INICIALES)
   const [view, setView] = useState<View>("historial")
   const [activeId, setActiveId] = useState<string | null>(null)
+  // The initial Firestore request can resolve after the user begins a new
+  // shipment. Keep that local draft outside the request closure so the stale
+  // response cannot replace the editor's only active record.
+  const activeLocalDraftRef = useRef<Embarque | null>(null)
   const [filterStatus, setFilterStatus] = useState<EmbarqueStatus | "todos">(
     "todos",
   )
@@ -2130,7 +2135,20 @@ export default function Embarques({
         const converted = shipments.map((s: any) =>
           fromFirestoreShipment(s, catalogoProductos),
         )
-        setEmbarques(converted)
+        setEmbarques((current) => {
+          const localDraft = activeLocalDraftRef.current
+          if (
+            !localDraft ||
+            converted.some((shipment) => shipment.id === localDraft.id)
+          ) {
+            return converted
+          }
+
+          const latestDraft =
+            current.find((shipment) => shipment.id === localDraft.id) ??
+            localDraft
+          return [latestDraft, ...converted]
+        })
         setLoadingFs(false)
       })
       .catch((err: Error) => {
@@ -2158,6 +2176,7 @@ export default function Embarques({
       paso: 1,
       fechaCreacion: new Date().toISOString().slice(0, 10),
     }
+    activeLocalDraftRef.current = nuevo
 
     // If using Firestore, create there too
     if (useFirestore && fsServices) {
@@ -2183,10 +2202,12 @@ export default function Embarques({
           // Keep the editor selection aligned with the persisted document.
           // Otherwise activeEmbarque becomes null as soon as the temporary
           // client ID is replaced, leaving the create view blank.
+          const persistedDraft = { ...nuevo, id: created.id }
+          activeLocalDraftRef.current = persistedDraft
+          setEmbarques((prev) => {
+            return prev.map((e) => (e.id === id ? { ...e, id: created.id } : e))
+          })
           setActiveId(created.id)
-          setEmbarques((prev) =>
-            prev.map((e) => (e.id === id ? { ...e, id: created.id } : e)),
-          )
         })
         .catch((err: Error) => {
           console.error("Error creating shipment:", err)
@@ -2200,6 +2221,9 @@ export default function Embarques({
   }
 
   function updateActive(updated: Embarque) {
+    if (activeLocalDraftRef.current?.id === updated.id) {
+      activeLocalDraftRef.current = updated
+    }
     setEmbarques((prev) => prev.map((e) => (e.id === updated.id ? updated : e)))
 
     // Dual-write to Firestore

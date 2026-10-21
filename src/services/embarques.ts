@@ -67,7 +67,7 @@ function generateQR(embarqueId: string, tarimaIndex: number): string {
 
 function parseQR(
   qr: string,
-): { embarqueId: string tarimaIndex: number } | null {
+): { embarqueId: string; tarimaIndex: number } | null {
   const parts = qr.split("|")
   if (parts.length !== 2) return null
   const index = parseInt(parts[1], 10)
@@ -278,7 +278,7 @@ export async function escanearTarima(
 // ============================================
 export async function getAutoFillData(
   embarqueId: string,
-): Promise<{ lote?: string caducidad?: Date }> {
+): Promise<{ lote?: string; caducidad?: Date }> {
   const snap = await getDocs(
     query(
       collection(DB, TARIMAS_COL),
@@ -302,7 +302,7 @@ export async function getAutoFillData(
 // 5. CONFIRMAR EMBARQUE (Hard Reserve + Inventory)
 // ============================================
 export async function confirmarEmbarque(embarqueId: string): Promise<void> {
-  const confirm = httpsCallable<{ shipmentId: string operationId: string }, {
+  const confirm = httpsCallable<{ shipmentId: string; operationId: string }, {
     shipmentId: string
     status: string
     idempotent: boolean
