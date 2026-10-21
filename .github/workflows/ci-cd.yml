@@ -219,7 +219,8 @@ jobs:
           firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
           projectId: exepa-almacen-safe
           channelId: live
-          entryPoint: ./dist
+          # firebase.json lives at the repo root; hosting.public points at dist.
+          entryPoint: .
 
       - name: Deploy Firestore Rules & Indexes
         env:
