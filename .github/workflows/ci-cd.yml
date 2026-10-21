@@ -170,7 +170,7 @@ jobs:
           firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
           projectId: exepa-almacen-safe
           previewChannelId: pr-${{ github.event.number }}
-          entryPoint: ./dist
+          entryPoint: .
 
   deploy-production:
     name: Deploy Production
