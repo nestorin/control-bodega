@@ -1,12 +1,20 @@
 // hooks/useOcr.ts
 import { useState, useCallback } from "react";
-import { getFunctions, httpsCallable } from "firebase/functions";
+import { getFunctions, httpsCallable, type Functions } from "firebase/functions";
 import { getApp } from "firebase/app";
 import { type RawOcrResponseDto, type DocTipo } from "../services/paddleOcr";
 import { normalizeOcrResponse, type OcrResponse } from "../services/domain/ocrMapper";
 
-const app = getApp();
-const functions = getFunctions(app, "us-central1");
+// Lazy: getApp() must not run at import time. Unit tests render screens that
+// import this hook without a Firebase app initialized (no .env config in CI).
+let functionsInstance: Functions | null = null;
+
+function getOcrFunctions(): Functions {
+  if (!functionsInstance) {
+    functionsInstance = getFunctions(getApp(), "us-central1");
+  }
+  return functionsInstance;
+}
 
 export function useOcr() {
   const [loading, setLoading] = useState(false);
@@ -40,7 +48,7 @@ export function useOcr() {
           tipo: DocTipo;
         },
         RawOcrResponseDto
-      >(functions, "extract_ocr_secure");
+      >(getOcrFunctions(), "extract_ocr_secure");
 
       const response = await extractOcr({
         fileBase64: base64,
