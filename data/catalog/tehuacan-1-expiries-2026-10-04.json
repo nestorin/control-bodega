@@ -7,9 +7,7 @@
   "sourceFile": "Inventario de Caducidades.pdf",
   "sourceDate": "2026-10-04",
   "expiryDateNormalization": "The CSV provides month only; expiryDate is stored as the first UTC day of that month and monthKey preserves the source precision.",
-  "excludedProductIds": [
-    "NSU0201"
-  ],
+  "excludedProductIds": ["NSU0201"],
   "excludedReason": "Suavitel has no expiration and the source row is stale/blank.",
   "lots": [
     {
@@ -61,11 +59,7 @@
     }
   ],
   "audit": {
-    "mappedRows": [
-      "Coca Cola 3 L",
-      "Carnation 360grs c/48",
-      "Lechera 375grs c/48"
-    ],
+    "mappedRows": ["Coca Cola 3 L", "Carnation 360grs c/48", "Lechera 375grs c/48"],
     "excludedRows": [
       {
         "sourceRow": "Suavitel 8.5 L",

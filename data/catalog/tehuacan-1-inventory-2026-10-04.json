@@ -7,17 +7,94 @@
   "snapshotDate": "2026-10-04",
   "totalExistence": 33643,
   "products": [
-    { "id": "CB0301", "sku": "CB0301", "name": "BEBIDA SABOR COLA 235ML C/24 PZS S", "unit": "Caja", "lotControlled": false, "expiryControlled": false },
-    { "id": "CB0302", "sku": "CB0302", "name": "BEBIDA SABOR COLA 3L C/6 PZS S", "unit": "Caja", "lotControlled": false, "expiryControlled": false },
-    { "id": "CB0401", "sku": "CB0401", "name": "AGUA MINERAL 355 ML C/24 PZS S", "unit": "Caja", "lotControlled": false, "expiryControlled": false },
-    { "id": "CL0101", "sku": "CL0101", "name": "LECHE EVAPORADA 360 GRS C/48 PZS S", "unit": "Caja", "lotControlled": false, "expiryControlled": false },
-    { "id": "CL0201", "sku": "CL0201", "name": "LECHE CONDENSADA 375 GRS C/48 PZS S", "unit": "Caja", "lotControlled": false, "expiryControlled": false },
-    { "id": "CL0301", "sku": "CL0301", "name": "CREMA DE MESA 225 GRS C/24 PZS S", "unit": "Caja", "lotControlled": false, "expiryControlled": false },
-    { "id": "CM0001", "sku": "CM0001", "name": "Mayonesa 12pz S", "unit": "Caja", "lotControlled": false, "expiryControlled": false },
-    { "id": "NDE0101", "sku": "NDE0101", "name": "DETERGENTE LIQUIDO ACE 8.5 LTS 1 PZA S", "unit": "Pieza", "lotControlled": false, "expiryControlled": false },
-    { "id": "NDE0105", "sku": "NDE0105", "name": "DETERGENTE LIQUIDO ACE 4.85 L C/2 PZS S", "unit": "Caja", "lotControlled": false, "expiryControlled": false },
-    { "id": "NDE0108", "sku": "NDE0108", "name": "DETERGENTE LIQUIDO ACE 2.8 L C/4 PZS S", "unit": "Caja", "lotControlled": false, "expiryControlled": false },
-    { "id": "NSU0201", "sku": "NSU0201", "name": "SUAVIZANTE SUAVITEL 8.5 LTS C/2 PZS S", "unit": "Caja", "lotControlled": false, "expiryControlled": false }
+    {
+      "id": "CB0301",
+      "sku": "CB0301",
+      "name": "BEBIDA SABOR COLA 235ML C/24 PZS S",
+      "unit": "Caja",
+      "lotControlled": false,
+      "expiryControlled": false
+    },
+    {
+      "id": "CB0302",
+      "sku": "CB0302",
+      "name": "BEBIDA SABOR COLA 3L C/6 PZS S",
+      "unit": "Caja",
+      "lotControlled": false,
+      "expiryControlled": false
+    },
+    {
+      "id": "CB0401",
+      "sku": "CB0401",
+      "name": "AGUA MINERAL 355 ML C/24 PZS S",
+      "unit": "Caja",
+      "lotControlled": false,
+      "expiryControlled": false
+    },
+    {
+      "id": "CL0101",
+      "sku": "CL0101",
+      "name": "LECHE EVAPORADA 360 GRS C/48 PZS S",
+      "unit": "Caja",
+      "lotControlled": false,
+      "expiryControlled": false
+    },
+    {
+      "id": "CL0201",
+      "sku": "CL0201",
+      "name": "LECHE CONDENSADA 375 GRS C/48 PZS S",
+      "unit": "Caja",
+      "lotControlled": false,
+      "expiryControlled": false
+    },
+    {
+      "id": "CL0301",
+      "sku": "CL0301",
+      "name": "CREMA DE MESA 225 GRS C/24 PZS S",
+      "unit": "Caja",
+      "lotControlled": false,
+      "expiryControlled": false
+    },
+    {
+      "id": "CM0001",
+      "sku": "CM0001",
+      "name": "Mayonesa 12pz S",
+      "unit": "Caja",
+      "lotControlled": false,
+      "expiryControlled": false
+    },
+    {
+      "id": "NDE0101",
+      "sku": "NDE0101",
+      "name": "DETERGENTE LIQUIDO ACE 8.5 LTS 1 PZA S",
+      "unit": "Pieza",
+      "lotControlled": false,
+      "expiryControlled": false
+    },
+    {
+      "id": "NDE0105",
+      "sku": "NDE0105",
+      "name": "DETERGENTE LIQUIDO ACE 4.85 L C/2 PZS S",
+      "unit": "Caja",
+      "lotControlled": false,
+      "expiryControlled": false
+    },
+    {
+      "id": "NDE0108",
+      "sku": "NDE0108",
+      "name": "DETERGENTE LIQUIDO ACE 2.8 L C/4 PZS S",
+      "unit": "Caja",
+      "lotControlled": false,
+      "expiryControlled": false
+    },
+    {
+      "id": "NSU0201",
+      "sku": "NSU0201",
+      "name": "SUAVIZANTE SUAVITEL 8.5 LTS C/2 PZS S",
+      "unit": "Caja",
+      "lotControlled": false,
+      "expiryControlled": false
+    }
   ],
   "inventorySnapshot": [
     { "productId": "CB0301", "warehouseId": "wh_tehuacan_1", "quantity": 1958, "unit": "Caja" },

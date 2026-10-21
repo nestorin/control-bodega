@@ -1,12 +1,12 @@
-import { spawnSync } from "node:child_process"
-import { readFileSync } from "node:fs"
+import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
-const projectId = "demo-exepa-e2e"
+const projectId = "demo-exepa-e2e";
 const emulatorPorts = JSON.parse(
   readFileSync(new URL("../config/e2e-emulator-ports.json", import.meta.url), "utf8"),
-)
-const ocrEmulatorUrl = `http://127.0.0.1:${emulatorPorts.functions}/${projectId}/us-central1`
-const useMockAuth = process.env.VITE_USE_MOCK_AUTH !== "false"
+);
+const ocrEmulatorUrl = `http://127.0.0.1:${emulatorPorts.functions}/${projectId}/us-central1`;
+const useMockAuth = process.env.VITE_USE_MOCK_AUTH !== "false";
 
 for (const [name, value] of Object.entries({
   VITE_FIREBASE_PROJECT_ID: process.env.VITE_FIREBASE_PROJECT_ID,
@@ -15,18 +15,16 @@ for (const [name, value] of Object.entries({
   FIREBASE_PROJECT: process.env.FIREBASE_PROJECT,
 })) {
   if (value && value !== projectId) {
-    throw new Error(
-      `E2E build is restricted to ${projectId}; ${name} points to ${value}.`,
-    )
+    throw new Error(`E2E build is restricted to ${projectId}; ${name} points to ${value}.`);
   }
 }
 
 if (process.env.FIREBASE_CONFIG) {
-  const firebaseConfig = JSON.parse(process.env.FIREBASE_CONFIG)
+  const firebaseConfig = JSON.parse(process.env.FIREBASE_CONFIG);
   if (firebaseConfig.projectId && firebaseConfig.projectId !== projectId) {
     throw new Error(
       `E2E build is restricted to ${projectId}; FIREBASE_CONFIG points to ${firebaseConfig.projectId}.`,
-    )
+    );
   }
 }
 
@@ -61,7 +59,7 @@ const child = spawnSync("pnpm", ["run", "build"], {
     VITE_FIRESTORE_OFFLINE_QUEUE: "true",
     VITE_USE_NEW_RECEPTION_FLOW: "true",
   },
-})
+});
 
-if (child.error) throw child.error
-process.exitCode = child.status ?? 1
+if (child.error) throw child.error;
+process.exitCode = child.status ?? 1;

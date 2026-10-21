@@ -1,9 +1,9 @@
-import { defineConfig, devices } from "@playwright/test"
+import { defineConfig, devices } from "@playwright/test";
 // En modo MOCK (E2E), no necesitamos auth.setup - el mock provee usuario automáticamente
 // El setup solo es necesario para tests con Firebase Auth real
 // The E2E build is mock-auth by default. Real-auth runs are opt-in and must
 // explicitly provide VITE_USE_MOCK_AUTH=false together with their emulators.
-const isMockMode = process.env.VITE_USE_MOCK_AUTH !== "false"
+const isMockMode = process.env.VITE_USE_MOCK_AUTH !== "false";
 
 const projects = isMockMode
   ? [
@@ -30,7 +30,7 @@ const projects = isMockMode
         name: "cleanup",
         testMatch: /.*\.cleanup\.ts/,
       },
-    ]
+    ];
 
 export default defineConfig({
   testDir: "./e2e",
@@ -85,4 +85,4 @@ export default defineConfig({
       maxDiffPixels: 100,
     },
   },
-})
+});
