@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest"
-import { canCreateExtraPallet } from "./CapturaTarima"
+import { describe, expect, it } from "vitest";
+import { canCreateExtraPallet } from "./CapturaTarima";
 
 describe("extra pallet authorization", () => {
   it.each(["ADMIN", "SUPERVISOR"])("allows active %s memberships", (role) => {
-    expect(canCreateExtraPallet("ACTIVE", role)).toBe(true)
-  })
+    expect(canCreateExtraPallet("ACTIVE", role)).toBe(true);
+  });
 
   it.each([
     ["UNAUTHENTICATED", "ADMIN"],
@@ -12,6 +12,6 @@ describe("extra pallet authorization", () => {
     ["ACTIVE", "OPERATOR"],
     ["ACTIVE", undefined],
   ])("denies %s/%s", (status, role) => {
-    expect(canCreateExtraPallet(status, role)).toBe(false)
-  })
-})
+    expect(canCreateExtraPallet(status, role)).toBe(false);
+  });
+});

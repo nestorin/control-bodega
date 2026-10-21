@@ -1,13 +1,13 @@
 export interface ExpiryAlertLot {
-  productName: string
-  lot: string
-  monthKey?: string
-  expiryDate: Date | { toDate: () => Date }
-  cajas: number
+  productName: string;
+  lot: string;
+  monthKey?: string;
+  expiryDate: Date | { toDate: () => Date };
+  cajas: number;
 }
 
 function asDate(value: ExpiryAlertLot["expiryDate"]): Date {
-  return value instanceof Date ? value : value.toDate()
+  return value instanceof Date ? value : value.toDate();
 }
 
 /**
@@ -19,16 +19,16 @@ export function buildUpcomingExpiryAlert(
   now = new Date(),
   horizonDays = 90,
 ): string | null {
-  const horizonMs = horizonDays * 24 * 60 * 60 * 1000
+  const horizonMs = horizonDays * 24 * 60 * 60 * 1000;
   const upcoming = lots
     .map((lot) => ({ lot, date: asDate(lot.expiryDate) }))
     .filter(({ date }) => {
-      const remaining = date.getTime() - now.getTime()
-      return remaining >= 0 && remaining <= horizonMs
+      const remaining = date.getTime() - now.getTime();
+      return remaining >= 0 && remaining <= horizonMs;
     })
-    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
 
-  if (!upcoming.length) return null
+  if (!upcoming.length) return null;
 
   const details = upcoming
     .slice(0, 3)
@@ -37,14 +37,12 @@ export function buildUpcomingExpiryAlert(
         month: "long",
         year: "numeric",
         timeZone: "UTC",
-      })
-      const lotLabel =
-        lot.lot && lot.lot !== "SIN_LOTE" ? ` lote ${lot.lot}` : ""
-      return `${lot.productName}${lotLabel} (${expiry}, ${lot.cajas} cajas)`
+      });
+      const lotLabel = lot.lot && lot.lot !== "SIN_LOTE" ? ` lote ${lot.lot}` : "";
+      return `${lot.productName}${lotLabel} (${expiry}, ${lot.cajas} cajas)`;
     })
-    .join("; ")
+    .join("; ");
 
-  const suffix =
-    upcoming.length > 3 ? `; y ${upcoming.length - 3} lote(s) más` : ""
-  return `Aviso: hay caducidades próximas en el inventario: ${details}${suffix}.`
+  const suffix = upcoming.length > 3 ? `; y ${upcoming.length - 3} lote(s) más` : "";
+  return `Aviso: hay caducidades próximas en el inventario: ${details}${suffix}.`;
 }

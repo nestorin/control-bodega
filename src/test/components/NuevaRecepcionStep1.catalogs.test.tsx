@@ -1,10 +1,10 @@
-import { describe, expect, it, vi } from "vitest"
-import { fireEvent, render, screen } from "@testing-library/react"
-import NuevaRecepcionStep1 from "@/screens/NuevaRecepcionStep1"
+import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import NuevaRecepcionStep1 from "@/screens/NuevaRecepcionStep1";
 
 vi.mock("@/hooks/useAuthorization", () => ({
   useAuthorization: () => ({ user: null, canQuery: false }),
-}))
+}));
 
 vi.mock("@/hooks/useOcr", () => ({
   useOcr: () => ({
@@ -14,11 +14,11 @@ vi.mock("@/hooks/useOcr", () => ({
     error: null,
     clear: vi.fn(),
   }),
-}))
+}));
 
 vi.mock("@/hooks/useFirestore", () => ({
   useOfflineQueue: () => ({ enqueue: vi.fn(), isOnline: true }),
-}))
+}));
 
 describe("NuevaRecepcionStep1 catalog loading contract", () => {
   const catalogos = {
@@ -50,7 +50,7 @@ describe("NuevaRecepcionStep1 catalog loading contract", () => {
         activo: true,
       },
     ],
-  }
+  };
 
   it("transitions from catalog loading to loaded without changing hook order", () => {
     const { rerender } = render(
@@ -60,9 +60,9 @@ describe("NuevaRecepcionStep1 catalog loading contract", () => {
         catalogos={catalogos}
         catalogosStatus={{ loading: true, error: null }}
       />,
-    )
+    );
 
-    expect(screen.getByText("Cargando catálogos…")).toBeInTheDocument()
+    expect(screen.getByText("Cargando catálogos…")).toBeInTheDocument();
 
     rerender(
       <NuevaRecepcionStep1
@@ -71,15 +71,11 @@ describe("NuevaRecepcionStep1 catalog loading contract", () => {
         catalogos={catalogos}
         catalogosStatus={{ loading: false, error: null }}
       />,
-    )
+    );
 
-    expect(
-      screen.getByRole("option", { name: "Proveedor Norte" }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole("option", { name: "Logística Veloz" }),
-    ).toBeInTheDocument()
-  })
+    expect(screen.getByRole("option", { name: "Proveedor Norte" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Logística Veloz" })).toBeInTheDocument();
+  });
 
   it("renders supplier and logistics selectors when entered directly with loaded catalogs", () => {
     render(
@@ -89,18 +85,14 @@ describe("NuevaRecepcionStep1 catalog loading contract", () => {
         catalogos={catalogos}
         catalogosStatus={{ loading: false }}
       />,
-    )
+    );
 
-    expect(
-      screen.getByRole("option", { name: "Proveedor Norte" }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole("option", { name: "Logística Veloz" }),
-    ).toBeInTheDocument()
-  })
+    expect(screen.getByRole("option", { name: "Proveedor Norte" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Logística Veloz" })).toBeInTheDocument();
+  });
 
   it("keeps the order choice and continue callback wired", () => {
-    const onContinue = vi.fn()
+    const onContinue = vi.fn();
 
     render(
       <NuevaRecepcionStep1
@@ -109,19 +101,17 @@ describe("NuevaRecepcionStep1 catalog loading contract", () => {
         catalogos={catalogos}
         catalogosStatus={{ loading: false, error: null }}
       />,
-    )
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: "No tengo OC" }))
-    expect(
-      screen.getByText(/Sin OC, la recepción se registrará sin folio/),
-    ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "No tengo OC" }));
+    expect(screen.getByText(/Sin OC, la recepción se registrará sin folio/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Continuar" }))
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
     expect(onContinue).toHaveBeenCalledWith(
       expect.objectContaining({
         hasOC: false,
         proveedor: "Proveedor Norte",
       }),
-    )
-  })
-})
+    );
+  });
+});

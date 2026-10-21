@@ -1,10 +1,10 @@
 interface StatusBadgeProps {
-  label: string
-  indicatorSrc: string
-  className?: string
-  labelClassName?: string
-  backgroundColor?: string
-  labelColor?: string
+  label: string;
+  indicatorSrc: string;
+  className?: string;
+  labelClassName?: string;
+  backgroundColor?: string;
+  labelColor?: string;
 }
 
 /** Consistent status treatment for cards and dashboard summaries. */
@@ -33,5 +33,5 @@ export function StatusBadge({
         {label}
       </p>
     </div>
-  )
+  );
 }

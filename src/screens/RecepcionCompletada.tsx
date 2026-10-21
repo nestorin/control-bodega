@@ -1,94 +1,83 @@
-import { useState, useEffect } from "react"
-import { isFeatureEnabled } from "@/config/featureFlags"
-import { useDocument, useCollection } from "@/hooks/useFirestore"
-import { db } from "@/lib/firebase"
-import { createFirestoreServices } from "@/services/firestore"
-import { useOfflineQueue } from "@/hooks/useFirestore"
-import { useAuthorization } from "@/hooks/useAuthorization"
+import { useState, useEffect } from "react";
+import { isFeatureEnabled } from "@/config/featureFlags";
+import { useDocument, useCollection } from "@/hooks/useFirestore";
+import { db } from "@/lib/firebase";
+import { createFirestoreServices } from "@/services/firestore";
+import { useOfflineQueue } from "@/hooks/useFirestore";
+import { useAuthorization } from "@/hooks/useAuthorization";
 
-const assetPathPrefix = "/assets"
-const imgWarehouse = `${assetPathPrefix}/8c4fa.svg`
-const imgIndicador = `${assetPathPrefix}/08d70.svg`
-const imgQrCode = `${assetPathPrefix}/60da5.svg`
-const imgQrCodeBtn = `${assetPathPrefix}/41680.svg`
-const imgPrinter = `${assetPathPrefix}/f1a67.svg`
-const imgEye = `${assetPathPrefix}/13d24.svg`
+const assetPathPrefix = "/assets";
+const imgWarehouse = `${assetPathPrefix}/8c4fa.svg`;
+const imgIndicador = `${assetPathPrefix}/08d70.svg`;
+const imgQrCode = `${assetPathPrefix}/60da5.svg`;
+const imgQrCodeBtn = `${assetPathPrefix}/41680.svg`;
+const imgPrinter = `${assetPathPrefix}/f1a67.svg`;
+const imgEye = `${assetPathPrefix}/13d24.svg`;
 
-const ORG_ID = "org_exepa_001"
+const ORG_ID = "org_exepa_001";
 
 interface Props {
-  onHome: () => void
-  onPrint: () => void
+  onHome: () => void;
+  onPrint: () => void;
   currentReception: {
-    ocFolio: string
-    tarimas: number
-    proveedor: string
-    proveedorLogistico: string
-    receptionId?: string
-  } | null
+    ocFolio: string;
+    tarimas: number;
+    proveedor: string;
+    proveedorLogistico: string;
+    receptionId?: string;
+  } | null;
 }
 
-export default function RecepcionCompletada({
-  onHome,
-  onPrint,
-  currentReception,
-}: Props) {
-  const { canQuery } = useAuthorization()
-  const useFirestore =
-    isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery
-  const [tarimasCount, setTarimasCount] = useState(
-    currentReception?.tarimas ?? 20,
-  )
-  const [incidencias, setIncidencias] = useState(0)
-  const [fsServices, setFsServices] =
-    useState<ReturnType<typeof createFirestoreServices> | null>(null)
-  const [firestoreReady, setFirestoreReady] = useState(false)
+export default function RecepcionCompletada({ onHome, onPrint, currentReception }: Props) {
+  const { canQuery } = useAuthorization();
+  const useFirestore = isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery;
+  const [tarimasCount, setTarimasCount] = useState(currentReception?.tarimas ?? 20);
+  const [incidencias, setIncidencias] = useState(0);
+  const [fsServices, setFsServices] = useState<ReturnType<typeof createFirestoreServices> | null>(
+    null,
+  );
+  const [firestoreReady, setFirestoreReady] = useState(false);
 
   // Offline queue
-  const { enqueue, isOnline } = useOfflineQueue(db, ORG_ID)
+  const { enqueue, isOnline } = useOfflineQueue(db, ORG_ID);
 
   // Initialize Firestore services
   useEffect(() => {
     if (useFirestore && db) {
-      const services = createFirestoreServices(db, ORG_ID)
-      setFsServices(services)
-      setFirestoreReady(true)
+      const services = createFirestoreServices(db, ORG_ID);
+      setFsServices(services);
+      setFirestoreReady(true);
     }
-  }, [useFirestore])
+  }, [useFirestore]);
 
   // Load reception from Firestore if enabled
-  const receptionId = currentReception?.receptionId
-  const docPath = receptionId
-    ? `organizations/${ORG_ID}/receptions/${receptionId}`
-    : null
+  const receptionId = currentReception?.receptionId;
+  const docPath = receptionId ? `organizations/${ORG_ID}/receptions/${receptionId}` : null;
 
   const { data: receptionDoc, loading } = useDocument(db, docPath || "", {
     enabled: useFirestore && !!receptionId,
     mapFn: (snap) => snap.data(),
-  })
+  });
 
   // Load pallets count
   const { data: pallets, loading: palletsLoading } = useCollection<any>(
     db,
-    receptionId
-      ? `organizations/${ORG_ID}/receptions/${receptionId}/pallets`
-      : "",
+    receptionId ? `organizations/${ORG_ID}/receptions/${receptionId}/pallets` : "",
     { enabled: useFirestore && !!receptionId },
-  )
+  );
 
   useEffect(() => {
-    setTarimasCount(pallets.length || currentReception?.tarimas || 20)
-    setIncidencias(pallets.filter((p) => p.status === "BLOCKED").length)
-  }, [pallets, currentReception?.tarimas])
+    setTarimasCount(pallets.length || currentReception?.tarimas || 20);
+    setIncidencias(pallets.filter((p) => p.status === "BLOCKED").length);
+  }, [pallets, currentReception?.tarimas]);
 
   // Fallback data
-  const ocFolio = currentReception?.ocFolio ?? "OC-24891"
-  const tarimasTotal = currentReception?.tarimas ?? 20
-  const proveedor = currentReception?.proveedor ?? "Distribuidora del Norte"
-  const proveedorLogistico =
-    currentReception?.proveedorLogistico ?? "Logística Veloz"
-  const fecha = "19 Sep 2026 · 09:42"
-  const evidencia = `orden_${ocFolio}.pdf`
+  const ocFolio = currentReception?.ocFolio ?? "OC-24891";
+  const tarimasTotal = currentReception?.tarimas ?? 20;
+  const proveedor = currentReception?.proveedor ?? "Distribuidora del Norte";
+  const proveedorLogistico = currentReception?.proveedorLogistico ?? "Logística Veloz";
+  const fecha = "19 Sep 2026 · 09:42";
+  const evidencia = `orden_${ocFolio}.pdf`;
 
   if (loading) {
     return (
@@ -102,7 +91,7 @@ export default function RecepcionCompletada({
           </p>
         </div>
       </div>
-    )
+    );
   }
 
   // If reception is IN_PROGRESS but not yet CONFIRMED, allow confirming from here
@@ -111,19 +100,15 @@ export default function RecepcionCompletada({
     firestoreReady &&
     fsServices &&
     receptionId &&
-    receptionDoc?.status === "IN_PROGRESS"
+    receptionDoc?.status === "IN_PROGRESS";
 
   async function handleConfirm() {
-    if (!canConfirm || !fsServices || !receptionId) return
+    if (!canConfirm || !fsServices || !receptionId) return;
     try {
-      await fsServices.receptions.confirmReception(
-        receptionId,
-        "user",
-        `op-${Date.now()}-confirm`,
-      )
+      await fsServices.receptions.confirmReception(receptionId, "user", `op-${Date.now()}-confirm`);
       // Refresh will happen via useDocument
     } catch (e) {
-      console.error("Firestore confirm reception failed:", e)
+      console.error("Firestore confirm reception failed:", e);
       // Queue for offline sync if not online
       if (!isOnline) {
         enqueue({
@@ -132,7 +117,7 @@ export default function RecepcionCompletada({
           docId: receptionId,
           data: { status: "CONFIRMED", receivedAt: Date.now() },
           operationId: `op-${Date.now()}-confirm`,
-        })
+        });
       }
     }
   }
@@ -142,11 +127,7 @@ export default function RecepcionCompletada({
       <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col items-center p-4 md:p-5 rounded-[20px] w-full">
         <div className="flex flex-col gap-[14px] items-center w-full">
           <div className="bg-[#fff5dd] flex flex-col gap-2 items-center justify-center rounded-[28px] w-full max-w-[190px] py-5">
-            <img
-              alt=""
-              style={{ width: "125.4px", height: "110.2px" }}
-              src={imgWarehouse}
-            />
+            <img alt="" style={{ width: "125.4px", height: "110.2px" }} src={imgWarehouse} />
             <p
               className="font-extrabold text-[#8e592e] text-[11px] whitespace-nowrap"
               style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
@@ -288,5 +269,5 @@ export default function RecepcionCompletada({
         </div>
       </div>
     </div>
-  )
+  );
 }

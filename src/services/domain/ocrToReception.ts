@@ -5,13 +5,8 @@
  * Esta es la frontera: OCR (externo) → Dominio (interno).
  */
 
-import type {
-  OcrProduct,
-  OcrResponse,
-  ReceptionLineState,
-  Producto,
-} from "@/types/domain"
-import { resolveCatalogProduct } from "./productMatching"
+import type { OcrProduct, OcrResponse, ReceptionLineState, Producto } from "@/types/domain";
+import { resolveCatalogProduct } from "./productMatching";
 
 /**
  * Convierte un OcrProduct crudo a ReceptionLineState
@@ -32,7 +27,7 @@ export function ocrProductToReceptionLine(ocr: OcrProduct): ReceptionLineState {
     precio: ocr.precio ?? 0,
     importe: ocr.importe ?? 0,
     estadoMatch: "sugerido", // Por defecto, requiere confirmación
-  }
+  };
 }
 
 /**
@@ -41,16 +36,14 @@ export function ocrProductToReceptionLine(ocr: OcrProduct): ReceptionLineState {
  * Filtra productos inválidos (cantidad <= 0 o nombre vacío).
  * Mantiene solo productos con datos mínimos útiles.
  */
-export function ocrResponseToReceptionLines(
-  ocr: OcrResponse,
-): ReceptionLineState[] {
+export function ocrResponseToReceptionLines(ocr: OcrResponse): ReceptionLineState[] {
   if (!ocr.success || !ocr.parsed?.productos?.length) {
-    return []
+    return [];
   }
 
   return ocr.parsed.productos
     .filter((p) => p.cantidad > 0 && p.nombre.trim().length > 0)
-    .map(ocrProductToReceptionLine)
+    .map(ocrProductToReceptionLine);
 }
 
 export function matchReceptionLinesToCatalog(
@@ -61,15 +54,15 @@ export function matchReceptionLinesToCatalog(
     const match = resolveCatalogProduct(catalog, {
       name: line.nombre,
       code: line.codigo,
-    })
+    });
     return {
       ...line,
       productId: match?.id ?? null,
       nombre: match?.nombre ?? line.nombre,
       unidad: match?.unidad ?? line.unidad,
       estadoMatch: match ? "confirmado" : "sugerido",
-    }
-  })
+    };
+  });
 }
 
 /**
@@ -79,8 +72,6 @@ export function isOcrValidForReception(ocr: OcrResponse): boolean {
   return (
     ocr.success === true &&
     ocr.parsed?.productos?.length > 0 &&
-    ocr.parsed.productos.some(
-      (p) => p.cantidad > 0 && p.nombre.trim().length > 0,
-    )
-  )
+    ocr.parsed.productos.some((p) => p.cantidad > 0 && p.nombre.trim().length > 0)
+  );
 }

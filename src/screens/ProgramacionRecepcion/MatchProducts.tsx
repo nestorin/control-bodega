@@ -12,17 +12,17 @@ import {
   Loader2,
   X,
   ChevronDown,
-} from "lucide-react"
-import { TouchTarget } from "@/components/ui/TouchTarget"
-import { useState, useMemo, useRef, useEffect } from "react"
+} from "lucide-react";
+import { TouchTarget } from "@/components/ui/TouchTarget";
+import { useState, useMemo, useRef, useEffect } from "react";
 
 interface Props {
-  state: any
-  matchedProducts: any[]
-  catalogProducts: any[]
-  onUpdateMatch: (index: number, updates: Partial<any>) => void
-  onPrev: () => void
-  onNext: () => void
+  state: any;
+  matchedProducts: any[];
+  catalogProducts: any[];
+  onUpdateMatch: (index: number, updates: Partial<any>) => void;
+  onPrev: () => void;
+  onNext: () => void;
 }
 
 export default function MatchProducts({
@@ -34,8 +34,7 @@ export default function MatchProducts({
   onNext,
 }: Props) {
   const allConfirmed =
-    matchedProducts.length > 0 &&
-    matchedProducts.every((p) => p.estadoMatch === "confirmado")
+    matchedProducts.length > 0 && matchedProducts.every((p) => p.estadoMatch === "confirmado");
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
@@ -44,17 +43,15 @@ export default function MatchProducts({
           Coincidir con catálogo
         </h2>
         <p className="text-[#607078] text-sm">
-          Verifica y corrige la coincidencia de cada producto. Los no
-          encontrados se pueden crear manualmente.
+          Verifica y corrige la coincidencia de cada producto. Los no encontrados se pueden crear
+          manualmente.
         </p>
       </div>
 
       {matchedProducts.length === 0 && (
         <div className="text-center py-12 bg-[#f8fafb] border border-[#dce4e7] rounded-[16px]">
           <AlertCircle className="w-12 h-12 mx-auto text-[#fca5a5] mb-3" />
-          <h3 className="text-lg font-medium text-[#16343f] mb-1">
-            Sin productos para coincidir
-          </h3>
+          <h3 className="text-lg font-medium text-[#16343f] mb-1">Sin productos para coincidir</h3>
           <p className="text-[#607078]">El OCR no detectó productos válidos.</p>
         </div>
       )}
@@ -95,7 +92,7 @@ export default function MatchProducts({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 function ProductMatchRow({
@@ -104,90 +101,85 @@ function ProductMatchRow({
   catalog,
   onUpdate,
 }: {
-  index: number
-  product: any
-  catalog: any[]
-  onUpdate: (index: number, updates: Partial<any>) => void
+  index: number;
+  product: any;
+  catalog: any[];
+  onUpdate: (index: number, updates: Partial<any>) => void;
 }) {
-  const isConfirmed = product.estadoMatch === "confirmado"
-  const isSuggested = product.estadoMatch === "sugerido"
-  const [searchTerm, setSearchTerm] = useState("")
-  const [showDropdown, setShowDropdown] = useState(false)
-  const [highlightedIndex, setHighlightedIndex] = useState(-1)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const dropdownRef = useRef<HTMLUListElement>(null)
+  const isConfirmed = product.estadoMatch === "confirmado";
+  const isSuggested = product.estadoMatch === "sugerido";
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLUListElement>(null);
 
   // Filtrar catálogo basado en searchTerm
   const filteredCatalog = useMemo(() => {
-    if (!searchTerm.trim()) return catalog
-    const term = searchTerm.toLowerCase()
+    if (!searchTerm.trim()) return catalog;
+    const term = searchTerm.toLowerCase();
     return catalog.filter(
       (p) =>
         p.nombre.toLowerCase().includes(term) ||
-        p.codigosProveedor?.some((c: string) =>
-          c.toLowerCase().includes(term),
-        ) ||
+        p.codigosProveedor?.some((c: string) => c.toLowerCase().includes(term)) ||
         p.sku?.toLowerCase().includes(term),
-    )
-  }, [catalog, searchTerm])
+    );
+  }, [catalog, searchTerm]);
 
   // Cerrar dropdown al hacer click fuera
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setShowDropdown(false)
-        setHighlightedIndex(-1)
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+        setHighlightedIndex(-1);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Navegación por teclado
   useEffect(() => {
-    if (!showDropdown) return
+    if (!showDropdown) return;
 
     function handleKeyDown(event: KeyboardEvent) {
-      const maxIndex = Math.min(filteredCatalog.length, 10) - 1
-      if (maxIndex < 0) return
+      const maxIndex = Math.min(filteredCatalog.length, 10) - 1;
+      if (maxIndex < 0) return;
 
       switch (event.key) {
         case "ArrowDown":
-          event.preventDefault()
-          setHighlightedIndex((prev) => (prev < maxIndex ? prev + 1 : 0))
-          break
+          event.preventDefault();
+          setHighlightedIndex((prev) => (prev < maxIndex ? prev + 1 : 0));
+          break;
         case "ArrowUp":
-          event.preventDefault()
-          setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : maxIndex))
-          break
+          event.preventDefault();
+          setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : maxIndex));
+          break;
         case "Enter":
-          event.preventDefault()
+          event.preventDefault();
           if (highlightedIndex >= 0) {
-            selectProduct(filteredCatalog[highlightedIndex])
+            selectProduct(filteredCatalog[highlightedIndex]);
           }
-          break
+          break;
         case "Escape":
-          setShowDropdown(false)
-          setHighlightedIndex(-1)
-          inputRef.current?.blur()
-          break
+          setShowDropdown(false);
+          setHighlightedIndex(-1);
+          inputRef.current?.blur();
+          break;
       }
     }
 
-    inputRef.current?.addEventListener("keydown", handleKeyDown)
-    return () => inputRef.current?.removeEventListener("keydown", handleKeyDown)
-  }, [showDropdown, filteredCatalog, highlightedIndex])
+    inputRef.current?.addEventListener("keydown", handleKeyDown);
+    return () => inputRef.current?.removeEventListener("keydown", handleKeyDown);
+  }, [showDropdown, filteredCatalog, highlightedIndex]);
 
   // Scroll a elemento destacado
   useEffect(() => {
     if (highlightedIndex >= 0 && dropdownRef.current) {
-      const item = dropdownRef.current.children[highlightedIndex] as HTMLElement
-      item?.scrollIntoView({ block: "nearest" })
+      const item = dropdownRef.current.children[highlightedIndex] as HTMLElement;
+      item?.scrollIntoView({ block: "nearest" });
     }
-  }, [highlightedIndex])
+  }, [highlightedIndex]);
 
   const selectProduct = (cat: any) => {
     onUpdate(index, {
@@ -196,39 +188,39 @@ function ProductMatchRow({
       codigo: cat.codigosProveedor?.[0] || cat.sku || product.codigo,
       nombre: cat.nombre, // Usar nombre del catálogo
       unidad: cat.unidad || product.unidad,
-    })
-    setSearchTerm("")
-    setShowDropdown(false)
-    setHighlightedIndex(-1)
-    inputRef.current?.blur()
-  }
+    });
+    setSearchTerm("");
+    setShowDropdown(false);
+    setHighlightedIndex(-1);
+    inputRef.current?.blur();
+  };
 
   const handleInputFocus = () => {
     if (!isConfirmed) {
-      setShowDropdown(true)
+      setShowDropdown(true);
     }
-  }
+  };
 
   const handleInputChange = (value: string) => {
-    setSearchTerm(value)
-    setShowDropdown(true)
-    setHighlightedIndex(-1)
-  }
+    setSearchTerm(value);
+    setShowDropdown(true);
+    setHighlightedIndex(-1);
+  };
 
   const handleClearSearch = () => {
-    setSearchTerm("")
-    setHighlightedIndex(-1)
-    inputRef.current?.focus()
-  }
+    setSearchTerm("");
+    setHighlightedIndex(-1);
+    inputRef.current?.focus();
+  };
 
   const handleCreateManual = () => {
     onUpdate(index, {
       estadoMatch: "manual",
       productId: null,
-    })
-    setSearchTerm("")
-    setShowDropdown(false)
-  }
+    });
+    setSearchTerm("");
+    setShowDropdown(false);
+  };
 
   return (
     <div
@@ -237,21 +229,15 @@ function ProductMatchRow({
       }`}
     >
       <div className="flex items-start gap-3">
-        <span className="w-8 text-center text-[#607078] font-medium mt-1">
-          {index + 1}
-        </span>
+        <span className="w-8 text-center text-[#607078] font-medium mt-1">{index + 1}</span>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-3 flex-wrap">
             <span className="font-mono text-sm text-[#16343f] bg-[#f0f4f5] px-2 py-1 rounded">
               {product.codigo || "—"}
             </span>
-            <span className="font-medium text-[#16343f] truncate">
-              {product.nombre}
-            </span>
-            <span className="text-sm text-[#607078]">
-              ({product.unidad || "cajas"})
-            </span>
+            <span className="font-medium text-[#16343f] truncate">{product.nombre}</span>
+            <span className="text-sm text-[#607078]">({product.unidad || "cajas"})</span>
             <span className="ml-auto font-mono text-[#16343f]">
               ${product.importe?.toFixed(2) || "0.00"}
             </span>
@@ -271,9 +257,7 @@ function ProductMatchRow({
               min="0"
               step="1"
               value={product.cantidad}
-              onChange={(e) =>
-                onUpdate(index, { cantidad: parseInt(e.target.value) || 0 })
-              }
+              onChange={(e) => onUpdate(index, { cantidad: parseInt(e.target.value) || 0 })}
               className="w-24 px-3 py-2 border border-[#dce4e7] rounded-[8px] text-center font-mono text-[#16343f] focus:border-[#3276a8] focus:outline-none focus:ring-1 focus:ring-[#3276a8] touch-target"
               inputMode="numeric"
             />
@@ -327,50 +311,42 @@ function ProductMatchRow({
                   role="listbox"
                 >
                   {filteredCatalog.length > 0 ? (
-                    filteredCatalog
-                      .slice(0, 15)
-                      .map((cat: any, catIdx: number) => (
-                        <li
-                          key={cat.id}
-                          role="option"
-                          aria-selected={catIdx === highlightedIndex}
-                          className={`px-3 py-3 cursor-pointer border-b border-[#dce4e7] last:border-0 transition-colors flex items-center justify-between gap-2 ${
-                            catIdx === highlightedIndex
-                              ? "bg-[#e7f0f2]"
-                              : "hover:bg-[#f8fafb]"
-                          }`}
-                          onClick={() => selectProduct(cat)}
-                          onMouseEnter={() => setHighlightedIndex(catIdx)}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p
-                              className={`font-medium text-[#16343f] ${
-                                catIdx === highlightedIndex
-                                  ? "text-[#16343f]"
-                                  : ""
-                              }`}
-                            >
-                              {cat.nombre}
-                            </p>
-                            <p className="text-xs text-[#607078] truncate">
-                              {cat.codigosProveedor?.join(", ") ||
-                                cat.sku ||
-                                "Sin código"}
-                              {cat.unidad && ` · ${cat.unidad}`}
-                            </p>
-                          </div>
-                          <TouchTarget
-                            as="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              selectProduct(cat)
-                            }}
-                            className="px-3 py-1.5 text-sm bg-[#16343f] text-white rounded-[6px] hover:bg-[#0d2630] touch-target whitespace-nowrap flex-shrink-0"
+                    filteredCatalog.slice(0, 15).map((cat: any, catIdx: number) => (
+                      <li
+                        key={cat.id}
+                        role="option"
+                        aria-selected={catIdx === highlightedIndex}
+                        className={`px-3 py-3 cursor-pointer border-b border-[#dce4e7] last:border-0 transition-colors flex items-center justify-between gap-2 ${
+                          catIdx === highlightedIndex ? "bg-[#e7f0f2]" : "hover:bg-[#f8fafb]"
+                        }`}
+                        onClick={() => selectProduct(cat)}
+                        onMouseEnter={() => setHighlightedIndex(catIdx)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className={`font-medium text-[#16343f] ${
+                              catIdx === highlightedIndex ? "text-[#16343f]" : ""
+                            }`}
                           >
-                            Seleccionar
-                          </TouchTarget>
-                        </li>
-                      ))
+                            {cat.nombre}
+                          </p>
+                          <p className="text-xs text-[#607078] truncate">
+                            {cat.codigosProveedor?.join(", ") || cat.sku || "Sin código"}
+                            {cat.unidad && ` · ${cat.unidad}`}
+                          </p>
+                        </div>
+                        <TouchTarget
+                          as="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            selectProduct(cat);
+                          }}
+                          className="px-3 py-1.5 text-sm bg-[#16343f] text-white rounded-[6px] hover:bg-[#0d2630] touch-target whitespace-nowrap flex-shrink-0"
+                        >
+                          Seleccionar
+                        </TouchTarget>
+                      </li>
+                    ))
                   ) : (
                     <li className="px-3 py-3 text-center text-[#ef4444] text-sm">
                       No hay coincidencias. Se creará como producto nuevo.
@@ -403,9 +379,7 @@ function ProductMatchRow({
               <CheckCircle className="w-5 h-5 text-[#166534] shrink-0" />
               <span className="text-sm text-[#166534]">
                 Confirmado:{" "}
-                {product.productId
-                  ? "ID " + product.productId.slice(0, 8)
-                  : "Producto existente"}
+                {product.productId ? "ID " + product.productId.slice(0, 8) : "Producto existente"}
               </span>
             </div>
           )}
@@ -420,13 +394,9 @@ function ProductMatchRow({
                 : "bg-[#fee2e2] text-[#991b1b]"
           }`}
         >
-          {isConfirmed ? (
-            <CheckCircle className="w-6 h-6" />
-          ) : (
-            <AlertCircle className="w-6 h-6" />
-          )}
+          {isConfirmed ? <CheckCircle className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />}
         </div>
       </div>
     </div>
-  )
+  );
 }

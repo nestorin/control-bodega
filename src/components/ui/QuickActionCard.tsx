@@ -1,11 +1,11 @@
-import type { MouseEventHandler } from "react"
+import type { MouseEventHandler } from "react";
 
 interface QuickActionCardProps {
-  title: string
-  description: string
-  iconSrc: string
-  iconBackgroundClassName: string
-  onClick?: MouseEventHandler<HTMLButtonElement>
+  title: string;
+  description: string;
+  iconSrc: string;
+  iconBackgroundClassName: string;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
 }
 
 /** Responsive dashboard action card; behavior remains owned by the screen. */
@@ -44,5 +44,5 @@ export function QuickActionCard({
         </div>
       </div>
     </button>
-  )
+  );
 }

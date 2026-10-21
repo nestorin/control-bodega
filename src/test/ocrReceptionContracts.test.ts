@@ -1,12 +1,12 @@
-import { readFileSync } from "node:fs"
-import { describe, expect, it } from "vitest"
-import { normalizeOcrResponse } from "@/services/domain/ocrMapper"
-import { WAREHOUSE_IDS } from "@/config/warehouses"
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import { normalizeOcrResponse } from "@/services/domain/ocrMapper";
+import { WAREHOUSE_IDS } from "@/config/warehouses";
 import {
   getReceptionOcrDocumentType,
   mapOcrProductsToReceptionForm,
   mapReceptionFormToPersistence,
-} from "@/services/receptionMappers"
+} from "@/services/receptionMappers";
 
 describe("OCR application contract", () => {
   it("normalizes backend and compatibility product fields once", () => {
@@ -41,22 +41,22 @@ describe("OCR application contract", () => {
         },
       },
       "oc",
-    )
+    );
 
-    expect(result.parsed.proveedor).toBe("Proveedor Norte")
+    expect(result.parsed.proveedor).toBe("Proveedor Norte");
     expect(result.parsed.productos).toMatchObject([
       { unidad: "cajas", cantidad: 12 },
       { unidad: "piezas", cantidad: 24 },
-    ])
-    expect(result.parsed.productos[0]).not.toHaveProperty("unidades")
-    expect(result.parsed.productos[0]).not.toHaveProperty("u_med")
-  })
+    ]);
+    expect(result.parsed.productos[0]).not.toHaveProperty("unidades");
+    expect(result.parsed.productos[0]).not.toHaveProperty("u_med");
+  });
 
   it("selects OC vs CFDI explicitly", () => {
-    expect(getReceptionOcrDocumentType(true)).toBe("oc")
-    expect(getReceptionOcrDocumentType(false)).toBe("cfdi")
-  })
-})
+    expect(getReceptionOcrDocumentType(true)).toBe("oc");
+    expect(getReceptionOcrDocumentType(false)).toBe("cfdi");
+  });
+});
 
 describe("reception UI/domain boundaries", () => {
   const catalog = [
@@ -67,7 +67,7 @@ describe("reception UI/domain boundaries", () => {
       unidad: "cajas",
       codigosProveedor: ["SUP-1"],
     },
-  ]
+  ];
 
   it("maps canonical OCR products to the reception form", () => {
     const [product] = mapOcrProductsToReceptionForm(
@@ -84,7 +84,7 @@ describe("reception UI/domain boundaries", () => {
         },
       ],
       catalog,
-    )
+    );
 
     expect(product).toEqual({
       productId: "product-1",
@@ -94,11 +94,11 @@ describe("reception UI/domain boundaries", () => {
       cantidad: 8,
       importe: 24,
       estadoMatch: "confirmado",
-    })
-  })
+    });
+  });
 
   it("creates a DRAFT persistence request without UI-only fields", () => {
-    const products = mapOcrProductsToReceptionForm([], catalog)
+    const products = mapOcrProductsToReceptionForm([], catalog);
     products.push({
       productId: "product-1",
       codigo: "SKU-1",
@@ -107,14 +107,14 @@ describe("reception UI/domain boundaries", () => {
       cantidad: 8,
       importe: 24,
       estadoMatch: "confirmado",
-    })
+    });
     const request = mapReceptionFormToPersistence({
       products,
       warehouseId: WAREHOUSE_IDS.NORTH,
       supplierId: "supplier-1",
       actorUserId: "user-1",
       operationId: "operation-1",
-    })
+    });
 
     expect(request.reception).toEqual({
       warehouseId: WAREHOUSE_IDS.NORTH,
@@ -122,7 +122,7 @@ describe("reception UI/domain boundaries", () => {
       status: "DRAFT",
       actorUserId: "user-1",
       operationId: "operation-1",
-    })
+    });
     expect(request.lines).toEqual([
       {
         productId: "product-1",
@@ -130,31 +130,27 @@ describe("reception UI/domain boundaries", () => {
         unit: "cajas",
         palletsCreated: 0,
       },
-    ])
-    expect(request.reception).not.toHaveProperty("proveedor")
-    expect(request.reception).not.toHaveProperty("productos")
-  })
-})
+    ]);
+    expect(request.reception).not.toHaveProperty("proveedor");
+    expect(request.reception).not.toHaveProperty("productos");
+  });
+});
 
 describe("reception preview rules contract", () => {
   it("limits DRAFT preview updates to validated metadata", () => {
-    const rules = readFileSync("firestore.rules", "utf8")
+    const rules = readFileSync("firestore.rules", "utf8");
     const previewRule = rules.match(
       /function isValidDraftPreviewUpdate\(\) \{([\s\S]*?)\n        \}/,
-    )?.[1]
+    )?.[1];
 
-    expect(previewRule).toContain("resource.data.status == 'DRAFT'")
-    expect(previewRule).toContain(
-      "request.auth.uid == resource.data.actorUserId",
-    )
+    expect(previewRule).toContain("resource.data.status == 'DRAFT'");
+    expect(previewRule).toContain("request.auth.uid == resource.data.actorUserId");
     expect(previewRule).toContain(
       ".hasOnly(['invoicePreviewPath', 'invoicePreviewUrl', 'updatedAt'])",
-    )
+    );
     expect(previewRule).toContain(
       "invoicePreviewPath.matches('^receptions/' + receptionId + '/invoice-preview\\\\.(jpg|jpeg)$')",
-    )
-    expect(
-      rules.match(/isValidReception\(request\.resource\.data\)/g),
-    ).toHaveLength(2)
-  })
-})
+    );
+    expect(rules.match(/isValidReception\(request\.resource\.data\)/g)).toHaveLength(2);
+  });
+});

@@ -1,43 +1,43 @@
-import type { DocTipo, OcrProduct } from "./paddleOcr"
-import type { ReceptionDoc, ReceptionLineDoc } from "./firestore/types"
+import type { DocTipo, OcrProduct } from "./paddleOcr";
+import type { ReceptionDoc, ReceptionLineDoc } from "./firestore/types";
 
 export interface CatalogProduct {
-  id: string
-  nombre: string
-  sku: string
-  unidad: string
-  codigosProveedor?: string[]
+  id: string;
+  nombre: string;
+  sku: string;
+  unidad: string;
+  codigosProveedor?: string[];
 }
 
 export interface ReceptionFormProduct {
-  productId: string | null
-  codigo: string | null
-  nombre: string
-  unidad: string | null
-  cantidad: number
-  importe: number
-  estadoMatch: "confirmado" | "sugerido" | "manual"
+  productId: string | null;
+  codigo: string | null;
+  nombre: string;
+  unidad: string | null;
+  cantidad: number;
+  importe: number;
+  estadoMatch: "confirmado" | "sugerido" | "manual";
 }
 
 export interface ReceptionPersistenceRequest {
-  reception: Omit<ReceptionDoc, "id" | "createdAt" | "updatedAt" | "organizationId">
-  lines: Array<Omit<ReceptionLineDoc, "id" | "createdAt" | "updatedAt" | "organizationId" | "receptionId">>
+  reception: Omit<ReceptionDoc, "id" | "createdAt" | "updatedAt" | "organizationId">;
+  lines: Array<
+    Omit<ReceptionLineDoc, "id" | "createdAt" | "updatedAt" | "organizationId" | "receptionId">
+  >;
 }
 
 function normalize(value: string): string {
-  if (!value) return ""
+  if (!value) return "";
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .replace(/\s+/g, " ")
-    .toUpperCase()
+    .toUpperCase();
 }
 
-export function getReceptionOcrDocumentType(
-  hasPurchaseOrder: boolean,
-): DocTipo {
-  return hasPurchaseOrder ? "oc" : "cfdi"
+export function getReceptionOcrDocumentType(hasPurchaseOrder: boolean): DocTipo {
+  return hasPurchaseOrder ? "oc" : "cfdi";
 }
 
 export function mapOcrProductsToReceptionForm(
@@ -47,8 +47,8 @@ export function mapOcrProductsToReceptionForm(
   return products
     .filter((line) => line.cantidad > 0)
     .map((line) => {
-      const code = line.codigo?.trim().toUpperCase() || null
-      const name = normalize(line.nombre)
+      const code = line.codigo?.trim().toUpperCase() || null;
+      const name = normalize(line.nombre);
       const match =
         catalog.find(
           (product) =>
@@ -59,7 +59,7 @@ export function mapOcrProductsToReceptionForm(
                 normalize(product.sku) === normalize(code))) ||
             normalize(product.nombre) === name ||
             normalize(product.sku) === name,
-        ) ?? null
+        ) ?? null;
 
       return {
         productId: match?.id ?? null,
@@ -69,16 +69,16 @@ export function mapOcrProductsToReceptionForm(
         cantidad: line.cantidad,
         importe: line.importe,
         estadoMatch: match ? "confirmado" : "sugerido",
-      }
-    })
+      };
+    });
 }
 
 export function mapReceptionFormToPersistence(input: {
-  products: ReceptionFormProduct[]
-  warehouseId: string
-  supplierId?: string
-  actorUserId: string
-  operationId: string
+  products: ReceptionFormProduct[];
+  warehouseId: string;
+  supplierId?: string;
+  actorUserId: string;
+  operationId: string;
 }): ReceptionPersistenceRequest {
   return {
     reception: {
@@ -104,5 +104,5 @@ export function mapReceptionFormToPersistence(input: {
         unit: product.unidad || "cajas",
         palletsCreated: 0,
       })),
-  }
+  };
 }

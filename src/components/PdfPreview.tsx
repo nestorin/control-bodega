@@ -2,64 +2,64 @@
  * PdfPreview - Componente reutilizable para vista previa de PDF
  */
 
-import { useEffect, useRef, useState } from "react"
-import * as pdfjsLib from "pdfjs-dist"
+import { useEffect, useRef, useState } from "react";
+import * as pdfjsLib from "pdfjs-dist";
 
 // Configurar worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs"
+pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 interface Props {
-  fileUrl: string
-  fileName?: string | null
-  className?: string
+  fileUrl: string;
+  fileName?: string | null;
+  className?: string;
 }
 
 export function PdfPreview({ fileUrl, fileName, className = "" }: Props) {
-  const [previewSrc, setPreviewSrc] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
     async function renderFirstPage() {
       try {
-        setLoading(true)
-        setError(false)
-        const pdf = await pdfjsLib.getDocument({ url: fileUrl }).promise
-        const page = await pdf.getPage(1)
-        const viewport = page.getViewport({ scale: 1.5 })
+        setLoading(true);
+        setError(false);
+        const pdf = await pdfjsLib.getDocument({ url: fileUrl }).promise;
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 1.5 });
 
-        const canvas = canvasRef.current
-        if (!canvas) return
-        const context = canvas.getContext("2d")
-        if (!context) return
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const context = canvas.getContext("2d");
+        if (!context) return;
 
-        canvas.width = viewport.width
-        canvas.height = viewport.height
-        canvas.style.width = "100%"
-        canvas.style.height = "auto"
-        canvas.style.maxWidth = "100%"
-        canvas.style.borderRadius = "12px"
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        canvas.style.width = "100%";
+        canvas.style.height = "auto";
+        canvas.style.maxWidth = "100%";
+        canvas.style.borderRadius = "12px";
 
-        await page.render({ canvas, canvasContext: context, viewport }).promise
+        await page.render({ canvas, canvasContext: context, viewport }).promise;
 
         if (!cancelled) {
-          const dataUrl = canvas.toDataURL("image/png")
-          setPreviewSrc(dataUrl)
+          const dataUrl = canvas.toDataURL("image/png");
+          setPreviewSrc(dataUrl);
         }
       } catch (err) {
-        console.error("Error rendering PDF preview:", err)
-        if (!cancelled) setError(true)
+        console.error("Error rendering PDF preview:", err);
+        if (!cancelled) setError(true);
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) setLoading(false);
       }
     }
-    renderFirstPage()
+    renderFirstPage();
     return () => {
-      cancelled = true
-    }
-  }, [fileUrl])
+      cancelled = true;
+    };
+  }, [fileUrl]);
 
   if (loading) {
     return (
@@ -69,7 +69,7 @@ export function PdfPreview({ fileUrl, fileName, className = "" }: Props) {
         <div className="w-12 h-12 border-3 border-[#3276a8] border-t-transparent rounded-full animate-spin" />
         <p className="text-[#607078] text-[11px]">Generando vista previa...</p>
       </div>
-    )
+    );
   }
 
   if (error || !previewSrc) {
@@ -100,7 +100,7 @@ export function PdfPreview({ fileUrl, fileName, className = "" }: Props) {
           Vista previa no disponible · Se procesará con OCR
         </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -109,5 +109,5 @@ export function PdfPreview({ fileUrl, fileName, className = "" }: Props) {
       alt={`Preview de ${fileName || "documento"}`}
       className={`${className} w-full h-auto object-cover rounded-[12px]`}
     />
-  )
+  );
 }

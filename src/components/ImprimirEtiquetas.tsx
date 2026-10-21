@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef } from "react"
-import { PrintJob, PrintEtiquetaData } from "@/types/documento"
-import { generarImpresion } from "@/services/embarques"
-import { useEmbarques } from "@/hooks/useEmbarques"
+import { useState, useEffect, useRef } from "react";
+import { PrintJob, PrintEtiquetaData } from "@/types/documento";
+import { generarImpresion } from "@/services/embarques";
+import { useEmbarques } from "@/hooks/useEmbarques";
 
 interface ImprimirEtiquetasProps {
-  embarqueId: string
-  onClose: () => void
-  onPrintComplete?: () => void
+  embarqueId: string;
+  onClose: () => void;
+  onPrintComplete?: () => void;
 }
 
 export function ImprimirEtiquetas({
@@ -14,92 +14,85 @@ export function ImprimirEtiquetas({
   onClose,
   onPrintComplete,
 }: ImprimirEtiquetasProps) {
-  const [printJob, setPrintJob] = useState<PrintJob | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [printRange, setPrintRange] = useState<"all" | "range">("all")
-  const [rangeStart, setRangeStart] = useState(1)
-  const [rangeEnd, setRangeEnd] = useState(1)
-  const [copiesPerTarima, setCopiesPerTarima] = useState(4)
+  const [printJob, setPrintJob] = useState<PrintJob | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [printRange, setPrintRange] = useState<"all" | "range">("all");
+  const [rangeStart, setRangeStart] = useState(1);
+  const [rangeEnd, setRangeEnd] = useState(1);
+  const [copiesPerTarima, setCopiesPerTarima] = useState(4);
 
-  const { cargarEmbarque } = useEmbarques()
-  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const { cargarEmbarque } = useEmbarques();
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
-    cargarPrintJob()
-  }, [embarqueId])
+    cargarPrintJob();
+  }, [embarqueId]);
 
   const cargarPrintJob = async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
-      const job = await generarImpresion(embarqueId)
-      setPrintJob(job)
+      const job = await generarImpresion(embarqueId);
+      setPrintJob(job);
       // Inicializar range end
       if (job.etiquetas.length > 0) {
-        setRangeEnd(job.etiquetas.length)
+        setRangeEnd(job.etiquetas.length);
       }
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Error al generar impresión",
-      )
+      setError(err instanceof Error ? err.message : "Error al generar impresión");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const etiquetasFiltradas =
     printJob?.etiquetas.filter((e) => {
-      if (printRange === "all") return true
-      return e.tarimaNumero >= rangeStart && e.tarimaNumero <= rangeEnd
-    }) ?? []
+      if (printRange === "all") return true;
+      return e.tarimaNumero >= rangeStart && e.tarimaNumero <= rangeEnd;
+    }) ?? [];
 
-  const totalStickers = etiquetasFiltradas.reduce(
-    (sum, e) => sum + copiesPerTarima,
-    0,
-  )
+  const totalStickers = etiquetasFiltradas.reduce((sum, e) => sum + copiesPerTarima, 0);
 
   const handlePrint = () => {
-    if (!iframeRef.current || !printJob) return
+    if (!iframeRef.current || !printJob) return;
 
-    const doc =
-      iframeRef.current.contentDocument ||
-      iframeRef.current.contentWindow?.document
-    if (!doc) return
+    const doc = iframeRef.current.contentDocument || iframeRef.current.contentWindow?.document;
+    if (!doc) return;
 
     // Generar HTML para impresión
-    const html = generarHTMLImpresion(etiquetasFiltradas, copiesPerTarima)
-    doc.open()
-    doc.write(html)
-    doc.close()
+    const html = generarHTMLImpresion(etiquetasFiltradas, copiesPerTarima);
+    doc.open();
+    doc.write(html);
+    doc.close();
 
     // Esperar a que cargue e imprimir
     iframeRef.current.onload = () => {
-      iframeRef.current?.contentWindow?.focus()
-      iframeRef.current?.contentWindow?.print()
-      onPrintComplete?.()
-    }
-  }
+      iframeRef.current?.contentWindow?.focus();
+      iframeRef.current?.contentWindow?.print();
+      onPrintComplete?.();
+    };
+  };
 
   const handleDownloadPDF = () => {
-    if (!printJob) return
+    if (!printJob) return;
 
-    const html = generarHTMLImpresion(etiquetasFiltradas, copiesPerTarima)
-    const blob = new Blob([html], { type: "text/html" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `etiquetas-${embarqueId}-${new Date().toISOString().split("T")[0]}.html`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+    const html = generarHTMLImpresion(etiquetasFiltradas, copiesPerTarima);
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `etiquetas-${embarqueId}-${new Date().toISOString().split("T")[0]}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   if (loading) {
     return (
       <div className="fixed inset-0 bg-white flex items-center justify-center z-50">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -110,7 +103,7 @@ export function ImprimirEtiquetas({
           Cerrar
         </button>
       </div>
-    )
+    );
   }
 
   return (
@@ -123,12 +116,7 @@ export function ImprimirEtiquetas({
             {etiquetasFiltradas.length} tarimas · {totalStickers} stickers
           </span>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded">
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -151,15 +139,11 @@ export function ImprimirEtiquetas({
             </div>
             <div>
               <p className="text-gray-500">Folio Pedido</p>
-              <p className="font-medium">
-                {printJob?.etiquetas[0]?.folioPedido ?? "-"}
-              </p>
+              <p className="font-medium">{printJob?.etiquetas[0]?.folioPedido ?? "-"}</p>
             </div>
             <div>
               <p className="text-gray-500">Producto</p>
-              <p className="font-medium">
-                {printJob?.etiquetas[0]?.productoNombre ?? "-"}
-              </p>
+              <p className="font-medium">{printJob?.etiquetas[0]?.productoNombre ?? "-"}</p>
             </div>
             <div>
               <p className="text-gray-500">Total Tarimas</p>
@@ -171,9 +155,7 @@ export function ImprimirEtiquetas({
         {/* Opciones de impresión */}
         <div className="bg-gray-50 rounded-lg p-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Rango de impresión
-            </label>
+            <label className="block text-sm font-medium mb-2">Rango de impresión</label>
             <div className="flex gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -203,36 +185,24 @@ export function ImprimirEtiquetas({
           {printRange === "range" && (
             <div className="flex gap-4">
               <div className="flex-1">
-                <label className="block text-sm text-gray-600 mb-1">
-                  Desde tarima
-                </label>
+                <label className="block text-sm text-gray-600 mb-1">Desde tarima</label>
                 <input
                   type="number"
                   min={1}
                   max={printJob?.etiquetas.length ?? 1}
                   value={rangeStart}
-                  onChange={(e) =>
-                    setRangeStart(
-                      Math.min(parseInt(e.target.value) || 1, rangeEnd),
-                    )
-                  }
+                  onChange={(e) => setRangeStart(Math.min(parseInt(e.target.value) || 1, rangeEnd))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div className="flex-1">
-                <label className="block text-sm text-gray-600 mb-1">
-                  Hasta tarima
-                </label>
+                <label className="block text-sm text-gray-600 mb-1">Hasta tarima</label>
                 <input
                   type="number"
                   min={1}
                   max={printJob?.etiquetas.length ?? 1}
                   value={rangeEnd}
-                  onChange={(e) =>
-                    setRangeEnd(
-                      Math.max(parseInt(e.target.value) || 1, rangeStart),
-                    )
-                  }
+                  onChange={(e) => setRangeEnd(Math.max(parseInt(e.target.value) || 1, rangeStart))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -258,13 +228,9 @@ export function ImprimirEtiquetas({
 
         {/* Preview */}
         <div className="bg-gray-50 rounded-lg p-4">
-          <label className="block text-sm font-medium mb-2">
-            Vista previa (primera etiqueta)
-          </label>
+          <label className="block text-sm font-medium mb-2">Vista previa (primera etiqueta)</label>
           <div className="border border-gray-300 rounded p-4 bg-white max-w-xs mx-auto">
-            {etiquetasFiltradas[0] && (
-              <EtiquetaPreview etiqueta={etiquetasFiltradas[0]} />
-            )}
+            {etiquetasFiltradas[0] && <EtiquetaPreview etiqueta={etiquetasFiltradas[0]} />}
           </div>
         </div>
 
@@ -314,15 +280,12 @@ export function ImprimirEtiquetas({
       {/* Iframe oculto para impresión */}
       <iframe ref={iframeRef} className="hidden" title="Print frame" />
     </div>
-  )
+  );
 }
 
 function EtiquetaPreview({ etiqueta }: { etiqueta: PrintEtiquetaData }) {
   return (
-    <div
-      className="font-mono text-xs space-y-1"
-      style={{ width: "100px", fontSize: "10px" }}
-    >
+    <div className="font-mono text-xs space-y-1" style={{ width: "100px", fontSize: "10px" }}>
       <div
         className="border-2 border-black p-2 mb-2 flex items-center justify-center"
         style={{ height: "60px" }}
@@ -337,13 +300,10 @@ function EtiquetaPreview({ etiqueta }: { etiqueta: PrintEtiquetaData }) {
         4 stickers por tarima (2 caras)
       </div>
     </div>
-  )
+  );
 }
 
-function generarHTMLImpresion(
-  etiquetas: PrintEtiquetaData[],
-  copies: number,
-): string {
+function generarHTMLImpresion(etiquetas: PrintEtiquetaData[], copies: number): string {
   const etiquetasHTML = etiquetas
     .flatMap((etiqueta) =>
       Array(copies)
@@ -365,7 +325,7 @@ function generarHTMLImpresion(
         )
         .join(""),
     )
-    .join("")
+    .join("");
 
   return `
     <!DOCTYPE html>
@@ -412,5 +372,5 @@ function generarHTMLImpresion(
       </script>
     </body>
     </html>
-  `
+  `;
 }

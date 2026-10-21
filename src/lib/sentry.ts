@@ -5,12 +5,12 @@
  * y provee logs estructurados para debugging.
  */
 
-import * as Sentry from "@sentry/react"
+import * as Sentry from "@sentry/react";
 
-const version = "1.0.0"
+const version = "1.0.0";
 
 // Configuración base de Sentry
-const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN || process.env.SENTRY_DSN
+const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN || process.env.SENTRY_DSN;
 
 // Solo inicializar si tenemos DSN
 if (SENTRY_DSN) {
@@ -25,12 +25,10 @@ if (SENTRY_DSN) {
       if (
         event.exception?.values?.some(
           (val) =>
-            val.type === "AbortError" ||
-            val.type === "TypeError" ||
-            val.type === "NetworkError",
+            val.type === "AbortError" || val.type === "TypeError" || val.type === "NetworkError",
         )
       ) {
-        return null // No enviar estos errores
+        return null; // No enviar estos errores
       }
 
       // Agregar contexto útil
@@ -39,15 +37,15 @@ if (SENTRY_DSN) {
         userAgent: navigator.userAgent,
         platform: navigator.platform,
         language: navigator.language,
-      }
+      };
 
-      return event
+      return event;
     },
-  })
+  });
 
-  console.info("Sentry initialized successfully")
+  console.info("Sentry initialized successfully");
 } else {
-  console.warn("Sentry DSN not found - monitoring disabled")
+  console.warn("Sentry DSN not found - monitoring disabled");
 }
 
 /**
@@ -63,13 +61,12 @@ export function captureError(error: Error, context?: Record<string, any>) {
         ...context,
         app: {
           version: version,
-          environment:
-            import.meta.env.MODE || process.env.NODE_ENV || "development",
+          environment: import.meta.env.MODE || process.env.NODE_ENV || "development",
         },
       },
-    })
+    });
   } else {
-    console.error("Sentry not configured:", error, context)
+    console.error("Sentry not configured:", error, context);
   }
 }
 
@@ -80,39 +77,30 @@ export function captureError(error: Error, context?: Record<string, any>) {
  * @param message - Mensaje a registrar
  * @param data - Datos adicionales
  */
-export function log(
-  level: "info" | "warn" | "error",
-  message: string,
-  data?: Record<string, any>,
-) {
+export function log(level: "info" | "warn" | "error", message: string, data?: Record<string, any>) {
   if (SENTRY_DSN) {
     const logEvent = {
       level,
       message,
       ...data,
       timestamp: new Date().toISOString(),
-    }
+    };
 
     // Enviar evento como breadcrumb o mensaje
     if (level === "error") {
-      captureError(new Error(message), data)
+      captureError(new Error(message), data);
     } else {
       Sentry.addBreadcrumb({
         message,
         data,
         level: level === "warn" ? "warning" : level,
         timestamp: Date.now() / 1000,
-      })
+      });
     }
   } else {
     // En modo desarrollo, solo console.log
-    const logFn =
-      level === "error"
-        ? console.error
-        : level === "warn"
-          ? console.warn
-          : console.log
-    logFn(`[${level.toUpperCase()}] ${message}`, data)
+    const logFn = level === "error" ? console.error : level === "warn" ? console.warn : console.log;
+    logFn(`[${level.toUpperCase()}] ${message}`, data);
   }
 }
 
@@ -127,9 +115,9 @@ export function startTransaction(name: string, op: string) {
     return Sentry.startInactiveSpan({
       name,
       op,
-    })
+    });
   }
-  return null
+  return null;
 }
 
 /**
@@ -143,6 +131,6 @@ export function setUserContext(userId: string, userData?: Record<string, any>) {
     Sentry.setUser({
       id: userId,
       ...userData,
-    })
+    });
   }
 }

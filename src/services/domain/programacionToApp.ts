@@ -10,7 +10,7 @@ import type {
   AppReceptionState,
   ReceptionLineState,
   ReceptionConversion,
-} from "@/types/domain"
+} from "@/types/domain";
 
 /**
  * Convierte salida del wizard a estado de App
@@ -20,9 +20,7 @@ import type {
  * - Conversiones: pasan tal cual (ya son ReceptionConversion)
  * - Calcula tarimasTotal desde conversiones
  */
-export function programacionToAppReception(
-  prog: ProgramacionRecepcionOutput,
-): AppReceptionState {
+export function programacionToAppReception(prog: ProgramacionRecepcionOutput): AppReceptionState {
   // Convertir productos del wizard a ReceptionLineState
   const lineas: ReceptionLineState[] = prog.productos.map((p) => ({
     productId: p.productId,
@@ -33,13 +31,13 @@ export function programacionToAppReception(
     precio: 0, // Se calcula en conversión o se edita manual
     importe: 0, // Se calcula: cantidad * precio
     estadoMatch: "confirmado", // Wizard ya validó coincidencias
-  }))
+  }));
 
   // Conversiones ya vienen como ReceptionConversion
-  const conversiones: ReceptionConversion[] = prog.conversionesTabla ?? []
+  const conversiones: ReceptionConversion[] = prog.conversionesTabla ?? [];
 
   // Total de tarimas desde conversiones (fuente de verdad)
-  const tarimasTotal = conversiones.reduce((sum, c) => sum + c.tarimas, 0)
+  const tarimasTotal = conversiones.reduce((sum, c) => sum + c.tarimas, 0);
 
   return {
     folio: prog.ocFolio || null,
@@ -52,16 +50,14 @@ export function programacionToAppReception(
     supplierId: null, // Se asigna en ReviewStep
     tarimasTotal,
     conversiones,
-  }
+  };
 }
 
 /**
  * Convierte AppReceptionState a ProgramacionRecepcionOutput (para edición)
  * Útil si se necesita re-editar una recepción existente.
  */
-export function appReceptionToProgramacion(
-  app: AppReceptionState,
-): ProgramacionRecepcionOutput {
+export function appReceptionToProgramacion(app: AppReceptionState): ProgramacionRecepcionOutput {
   return {
     hasOC: !!app.folio,
     ocFolio: app.folio || "",
@@ -78,5 +74,5 @@ export function appReceptionToProgramacion(
       tarimas: 0, // Se recalcula en CalculateConversions
     })),
     conversionesTabla: app.conversiones,
-  }
+  };
 }

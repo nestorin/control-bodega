@@ -1,25 +1,25 @@
-import { useState, useEffect, useCallback, useRef } from "react"
-import { isFeatureEnabled } from "@/config/featureFlags"
-import { db } from "@/lib/firebase"
-import { createFirestoreServices } from "@/services/firestore"
-import { useAuthorization, isPermissionDenied } from "@/hooks/useAuthorization"
-import type { LotCaducidadDoc } from "@/services/firestore/types"
-import { WAREHOUSE_IDS } from "@/config/warehouses"
+import { useState, useEffect, useCallback, useRef } from "react";
+import { isFeatureEnabled } from "@/config/featureFlags";
+import { db } from "@/lib/firebase";
+import { createFirestoreServices } from "@/services/firestore";
+import { useAuthorization, isPermissionDenied } from "@/hooks/useAuthorization";
+import type { LotCaducidadDoc } from "@/services/firestore/types";
+import { WAREHOUSE_IDS } from "@/config/warehouses";
 import {
   buildInventoryImportRows,
   parseInventoryImport,
   type InventoryImportPreview,
-} from "@/services/inventoryImport"
+} from "@/services/inventoryImport";
 
-const ORG_ID = "org_exepa_001"
+const ORG_ID = "org_exepa_001";
 
-type MesKey = string // "Dec-26"
-type SortField = "productName" | "lot" | "expiryDate" | "cajas" | "monthKey"
-type SortDir = "asc" | "desc"
+type MesKey = string; // "Dec-26"
+type SortField = "productName" | "lot" | "expiryDate" | "cajas" | "monthKey";
+type SortDir = "asc" | "desc";
 
 interface LoteRow extends LotCaducidadDoc {
-  diasParaCaducar: number
-  status: "ok" | "proximo" | "vencido"
+  diasParaCaducar: number;
+  status: "ok" | "proximo" | "vencido";
 }
 
 const MESES_LABELS: Record<number, string> = {
@@ -35,102 +35,96 @@ const MESES_LABELS: Record<number, string> = {
   9: "Oct",
   10: "Nov",
   11: "Dic",
-}
+};
 
 function formatMonthKey(ts: any): MesKey {
-  if (!ts) return ""
-  const d = ts.toDate ? ts.toDate() : new Date(ts)
-  return `${MESES_LABELS[d.getMonth()]}-${String(d.getFullYear()).slice(-2)}`
+  if (!ts) return "";
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return `${MESES_LABELS[d.getMonth()]}-${String(d.getFullYear()).slice(-2)}`;
 }
 
 function parseMonthKey(key: MesKey): Date | null {
-  const [mes, year] = key.split("-")
-  const mesNum = Object.entries(MESES_LABELS).find(([, v]) => v === mes)?.[0]
-  if (!mesNum) return null
-  return new Date(2000 + parseInt(year), parseInt(mesNum), 1)
+  const [mes, year] = key.split("-");
+  const mesNum = Object.entries(MESES_LABELS).find(([, v]) => v === mes)?.[0];
+  if (!mesNum) return null;
+  return new Date(2000 + parseInt(year), parseInt(mesNum), 1);
 }
 
 function getStatus(expiryDate: any): "ok" | "proximo" | "vencido" {
-  if (!expiryDate) return "ok"
-  const exp = expiryDate.toDate ? expiryDate.toDate() : new Date(expiryDate)
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0)
-  const diff = Math.ceil(
-    (exp.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24),
-  )
-  if (diff < 0) return "vencido"
-  if (diff <= 30) return "proximo"
-  return "ok"
+  if (!expiryDate) return "ok";
+  const exp = expiryDate.toDate ? expiryDate.toDate() : new Date(expiryDate);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const diff = Math.ceil((exp.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+  if (diff < 0) return "vencido";
+  if (diff <= 30) return "proximo";
+  return "ok";
 }
 
 function getDiasParaCaducar(expiryDate: any): number {
-  if (!expiryDate) return 9999
-  const exp = expiryDate.toDate ? expiryDate.toDate() : new Date(expiryDate)
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0)
-  return Math.ceil((exp.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24))
+  if (!expiryDate) return 9999;
+  const exp = expiryDate.toDate ? expiryDate.toDate() : new Date(expiryDate);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  return Math.ceil((exp.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-const assetPathPrefix = "/assets"
-const imgWarehouse = `${assetPathPrefix}/66fcc.svg`
-const imgAlert = `${assetPathPrefix}/c542a.svg`
-const imgCalendar = `${assetPathPrefix}/ba9e1.svg`
-const imgDownload = `${assetPathPrefix}/8a4b5.svg`
-const imgFilter = `${assetPathPrefix}/7f3a2.svg`
+const assetPathPrefix = "/assets";
+const imgWarehouse = `${assetPathPrefix}/66fcc.svg`;
+const imgAlert = `${assetPathPrefix}/c542a.svg`;
+const imgCalendar = `${assetPathPrefix}/ba9e1.svg`;
+const imgDownload = `${assetPathPrefix}/8a4b5.svg`;
+const imgFilter = `${assetPathPrefix}/7f3a2.svg`;
 
 export default function LotesCaducidades() {
-  const { user, canQuery } = useAuthorization()
-  const [lotes, setLotes] = useState<LoteRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState("")
-  const [filterStatus, setFilterStatus] =
-    useState<"all" | "ok" | "proximo" | "vencido">("all")
-  const [filterMonth, setFilterMonth] = useState<MesKey>("all")
-  const [sortField, setSortField] = useState<SortField>("expiryDate")
-  const [sortDir, setSortDir] = useState<SortDir>("asc")
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editCajas, setEditCajas] = useState("")
-  const [syncing, setSyncing] = useState(false)
-  const [lastSync, setLastSync] = useState<Date | null>(null)
-  const importInputRef = useRef<HTMLInputElement>(null)
-  const [importPreview, setImportPreview] =
-    useState<InventoryImportPreview | null>(null)
-  const [importFileName, setImportFileName] = useState("")
-  const [importing, setImporting] = useState(false)
-  const [importError, setImportError] = useState<string | null>(null)
+  const { user, canQuery } = useAuthorization();
+  const [lotes, setLotes] = useState<LoteRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"all" | "ok" | "proximo" | "vencido">("all");
+  const [filterMonth, setFilterMonth] = useState<MesKey>("all");
+  const [sortField, setSortField] = useState<SortField>("expiryDate");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editCajas, setEditCajas] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState<Date | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importPreview, setImportPreview] = useState<InventoryImportPreview | null>(null);
+  const [importFileName, setImportFileName] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
-  const useFirestore =
-    isFeatureEnabled("USE_FIRESTORE_LOTES") && !!db && canQuery
-  const [fsServices, setFsServices] =
-    useState<ReturnType<typeof createFirestoreServices> | null>(null)
+  const useFirestore = isFeatureEnabled("USE_FIRESTORE_LOTES") && !!db && canQuery;
+  const [fsServices, setFsServices] = useState<ReturnType<typeof createFirestoreServices> | null>(
+    null,
+  );
 
   useEffect(() => {
     if (useFirestore && db) {
-      const services = createFirestoreServices(db, ORG_ID)
-      setFsServices(services)
+      const services = createFirestoreServices(db, ORG_ID);
+      setFsServices(services);
     }
-  }, [useFirestore, db])
+  }, [useFirestore, db]);
 
   const loadLotes = useCallback(async () => {
     if (!fsServices) {
-      setLotes([])
-      setLoading(false)
-      return
+      setLotes([]);
+      setLoading(false);
+      return;
     }
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
-      const res = await fsServices.lotesCaducidades.getByWarehouse(
-        WAREHOUSE_IDS.NORTH,
-      )
+      const res = await fsServices.lotesCaducidades.getByWarehouse(WAREHOUSE_IDS.NORTH);
       const mapped: LoteRow[] = res.map((l) => ({
         ...l,
         diasParaCaducar: getDiasParaCaducar(l.expiryDate),
         status: getStatus(l.expiryDate),
-      }))
-      setLotes(mapped)
-      setLastSync(new Date())
+      }));
+      setLotes(mapped);
+      setLastSync(new Date());
     } catch (err) {
       setError(
         isPermissionDenied(err)
@@ -138,173 +132,149 @@ export default function LotesCaducidades() {
           : err instanceof Error
             ? err.message
             : "Error al cargar lotes",
-      )
-      console.error(err)
+      );
+      console.error(err);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [fsServices])
+  }, [fsServices]);
 
   useEffect(() => {
-    loadLotes()
-  }, [loadLotes])
+    loadLotes();
+  }, [loadLotes]);
 
   const filteredLotes = lotes
     .filter((l) => {
-      if (filterStatus !== "all" && l.status !== filterStatus) return false
-      if (filterMonth !== "all" && l.monthKey !== filterMonth) return false
+      if (filterStatus !== "all" && l.status !== filterStatus) return false;
+      if (filterMonth !== "all" && l.monthKey !== filterMonth) return false;
       if (search) {
-        const s = search.toLowerCase()
+        const s = search.toLowerCase();
         if (
           !l.productName.toLowerCase().includes(s) &&
           !l.lot.toLowerCase().includes(s) &&
           !l.monthKey.toLowerCase().includes(s)
         )
-          return false
+          return false;
       }
-      return true
+      return true;
     })
     .sort((a, b) => {
-      let av: any = a[sortField]
-      let bv: any = b[sortField]
+      let av: any = a[sortField];
+      let bv: any = b[sortField];
       if (sortField === "expiryDate") {
-        av = av?.toDate?.()?.getTime?.() ?? 0
-        bv = bv?.toDate?.()?.getTime?.() ?? 0
+        av = av?.toDate?.()?.getTime?.() ?? 0;
+        bv = bv?.toDate?.()?.getTime?.() ?? 0;
       }
-      if (typeof av === "string") av = av.toLowerCase()
-      if (typeof bv === "string") bv = bv.toLowerCase()
-      if (av < bv) return sortDir === "asc" ? -1 : 1
-      if (av > bv) return sortDir === "asc" ? 1 : -1
-      return 0
-    })
+      if (typeof av === "string") av = av.toLowerCase();
+      if (typeof bv === "string") bv = bv.toLowerCase();
+      if (av < bv) return sortDir === "asc" ? -1 : 1;
+      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
 
-  const monthsAvailable = Array.from(
-    new Set(lotes.map((l) => l.monthKey)),
-  ).sort((a, b) => {
-    const da = parseMonthKey(a)?.getTime() ?? 0
-    const db = parseMonthKey(b)?.getTime() ?? 0
-    return da - db
-  })
+  const monthsAvailable = Array.from(new Set(lotes.map((l) => l.monthKey))).sort((a, b) => {
+    const da = parseMonthKey(a)?.getTime() ?? 0;
+    const db = parseMonthKey(b)?.getTime() ?? 0;
+    return da - db;
+  });
 
   const handleEdit = (lote: LoteRow) => {
-    setEditingId(lote.id)
-    setEditCajas(String(lote.cajas))
-  }
+    setEditingId(lote.id);
+    setEditCajas(String(lote.cajas));
+  };
 
   const handleSave = async (lote: LoteRow) => {
-    if (!fsServices || !user) return
-    const nuevasCajas = parseInt(editCajas, 10)
-    if (isNaN(nuevasCajas) || nuevasCajas < 0) return
-    setSyncing(true)
+    if (!fsServices || !user) return;
+    const nuevasCajas = parseInt(editCajas, 10);
+    if (isNaN(nuevasCajas) || nuevasCajas < 0) return;
+    setSyncing(true);
     try {
       await fsServices.lotesCaducidades.update(
         lote.id,
         { cajas: nuevasCajas },
         user.uid,
         `edit-${Date.now()}`,
-      )
-      setLotes((prev) =>
-        prev.map((l) => (l.id === lote.id ? { ...l, cajas: nuevasCajas } : l)),
-      )
-      setEditingId(null)
-      setEditCajas("")
+      );
+      setLotes((prev) => prev.map((l) => (l.id === lote.id ? { ...l, cajas: nuevasCajas } : l)));
+      setEditingId(null);
+      setEditCajas("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al guardar")
+      setError(err instanceof Error ? err.message : "Error al guardar");
     } finally {
-      setSyncing(false)
+      setSyncing(false);
     }
-  }
+  };
 
   const handleCancel = () => {
-    setEditingId(null)
-    setEditCajas("")
-  }
+    setEditingId(null);
+    setEditCajas("");
+  };
 
   const handleSync = async () => {
-    await loadLotes()
-  }
+    await loadLotes();
+  };
 
-  const handleImportFile = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0]
-    event.target.value = ""
-    if (!file) return
-    setImportError(null)
-    setImportFileName(file.name)
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setImportError(null);
+    setImportFileName(file.name);
     try {
-      setImportPreview(
-        parseInventoryImport(await file.arrayBuffer(), file.name),
-      )
+      setImportPreview(parseInventoryImport(await file.arrayBuffer(), file.name));
     } catch {
-      setImportPreview(null)
-      setImportError("No se pudo leer el archivo. Usa XLS, XLSX o CSV.")
+      setImportPreview(null);
+      setImportError("No se pudo leer el archivo. Usa XLS, XLSX o CSV.");
     }
-  }
+  };
 
   const handleImportAction = async (mode: "REPLACE" | "ADD" | "DISCARD") => {
     if (mode === "DISCARD") {
-      setImportPreview(null)
-      setImportFileName("")
-      return
+      setImportPreview(null);
+      setImportFileName("");
+      return;
     }
-    if (!importPreview || !fsServices || !user) return
-    const rows = buildInventoryImportRows(importPreview)
-    if (!rows.length) return
-    setImporting(true)
-    setImportError(null)
+    if (!importPreview || !fsServices || !user) return;
+    const rows = buildInventoryImportRows(importPreview);
+    if (!rows.length) return;
+    setImporting(true);
+    setImportError(null);
     try {
       await fsServices.inventory.importInventory(
         rows,
         mode,
         `inventory-import-${crypto.randomUUID()}`,
-      )
-      setImportPreview(null)
-      setImportFileName("")
-      await loadLotes()
+      );
+      setImportPreview(null);
+      setImportFileName("");
+      await loadLotes();
     } catch (err) {
-      setImportError(
-        err instanceof Error
-          ? err.message
-          : "No se pudo importar el inventario.",
-      )
+      setImportError(err instanceof Error ? err.message : "No se pudo importar el inventario.");
     } finally {
-      setImporting(false)
+      setImporting(false);
     }
-  }
+  };
 
   const exportCSV = () => {
-    const headers = [
-      "Producto",
-      "Lote",
-      "Caducidad",
-      "Mes",
-      "Cajas",
-      "Estado",
-      "Días",
-    ]
+    const headers = ["Producto", "Lote", "Caducidad", "Mes", "Cajas", "Estado", "Días"];
     const rows = filteredLotes.map((l) => [
       l.productName,
       l.lot,
       l.expiryDate?.toDate?.().toLocaleDateString("es-MX") ?? "",
       l.monthKey,
       String(l.cajas),
-      l.status === "vencido"
-        ? "VENCIDO"
-        : l.status === "proximo"
-          ? "PRÓXIMO"
-          : "OK",
+      l.status === "vencido" ? "VENCIDO" : l.status === "proximo" ? "PRÓXIMO" : "OK",
       String(l.diasParaCaducar),
-    ])
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n")
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `lotes-caducidades-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+    ]);
+    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `lotes-caducidades-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const getStatusBadge = (status: LoteRow["status"]) => {
     switch (status) {
@@ -328,7 +298,7 @@ export default function LotesCaducidades() {
             </svg>
             VENCIDO
           </span>
-        )
+        );
       case "proximo":
         return (
           <span
@@ -349,7 +319,7 @@ export default function LotesCaducidades() {
             </svg>
             PRÓXIMO
           </span>
-        )
+        );
       default:
         return (
           <span
@@ -369,20 +339,20 @@ export default function LotesCaducidades() {
             </svg>
             OK
           </span>
-        )
+        );
     }
-  }
+  };
 
   const getStatusColor = (status: LoteRow["status"]) => {
     switch (status) {
       case "vencido":
-        return "bg-[#fee2e2] text-[#b91c1c]"
+        return "bg-[#fee2e2] text-[#b91c1c]";
       case "proximo":
-        return "bg-[#fef3c7] text-[#92400e]"
+        return "bg-[#fef3c7] text-[#92400e]";
       default:
-        return "bg-[#dcfce7] text-[#166534]"
+        return "bg-[#dcfce7] text-[#166534]";
     }
-  }
+  };
 
   return (
     <div className="flex flex-col size-full overflow-hidden bg-[#edf1f3]">
@@ -397,10 +367,7 @@ export default function LotesCaducidades() {
             >
               Lotes y Caducidades
             </h1>
-            <p
-              className="text-[12px] text-[#607078]"
-              style={{ fontFamily: "'Inter',sans-serif" }}
-            >
+            <p className="text-[12px] text-[#607078]" style={{ fontFamily: "'Inter',sans-serif" }}>
               Control de inventario por lote · Tehuacan-1
             </p>
           </div>
@@ -460,12 +427,10 @@ export default function LotesCaducidades() {
         >
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <h2 className="font-bold text-[#16343f]">
-                Vista previa: {importFileName}
-              </h2>
+              <h2 className="font-bold text-[#16343f]">Vista previa: {importFileName}</h2>
               <p className="text-sm text-[#607078]">
-                {importPreview.validRows.length} filas válidas ·{" "}
-                {importPreview.errors.length} con error
+                {importPreview.validRows.length} filas válidas · {importPreview.errors.length} con
+                error
               </p>
             </div>
             <div className="flex gap-2">
@@ -595,12 +560,12 @@ export default function LotesCaducidades() {
           {lotes.filter((l) => l.status === "ok").length}
         </span>
         <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-[#fef3c7] text-[#92400e]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#92400e]"></span>{" "}
-          Próximos: {lotes.filter((l) => l.status === "proximo").length}
+          <span className="w-1.5 h-1.5 rounded-full bg-[#92400e]"></span> Próximos:{" "}
+          {lotes.filter((l) => l.status === "proximo").length}
         </span>
         <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-[#fee2e2] text-[#b91c1c]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#b91c1c]"></span>{" "}
-          Vencidos: {lotes.filter((l) => l.status === "vencido").length}
+          <span className="w-1.5 h-1.5 rounded-full bg-[#b91c1c]"></span> Vencidos:{" "}
+          {lotes.filter((l) => l.status === "vencido").length}
         </span>
         <span className="text-[#607078]">Total: {lotes.length} lotes</span>
         {lastSync && (
@@ -642,17 +607,12 @@ export default function LotesCaducidades() {
           <div className="flex flex-col items-center justify-center h-64 text-center gap-3 text-[#607078]">
             <img src={imgCalendar} alt="" className="size-16 opacity-30" />
             <p className="font-medium">No hay lotes que coincidan</p>
-            <p className="text-[13px]">
-              Ajusta los filtros o busca otro término
-            </p>
+            <p className="text-[13px]">Ajusta los filtros o busca otro término</p>
           </div>
         ) : (
           <div className="rounded-[16px] bg-white shadow-[0px_4px_12px_rgba(22,52,63,0.07)] overflow-hidden">
             <div className="overflow-x-auto">
-              <table
-                className="w-full text-left"
-                style={{ fontFamily: "'Inter',sans-serif" }}
-              >
+              <table className="w-full text-left" style={{ fontFamily: "'Inter',sans-serif" }}>
                 <thead className="bg-[#f8fafb] border-b border-[#dce4e7]">
                   <tr>
                     {[
@@ -668,10 +628,10 @@ export default function LotesCaducidades() {
                         key={col.key}
                         onClick={() => {
                           if (sortField === col.key)
-                            setSortDir((d) => (d === "asc" ? "desc" : "asc"))
+                            setSortDir((d) => (d === "asc" ? "desc" : "asc"));
                           else {
-                            setSortField(col.key as SortField)
-                            setSortDir("asc")
+                            setSortField(col.key as SortField);
+                            setSortDir("asc");
                           }
                         }}
                         className={`px-4 py-3 text-[11px] font-bold uppercase text-[#607078] cursor-pointer select-none hover:bg-[#edf1f3] ${
@@ -735,17 +695,13 @@ export default function LotesCaducidades() {
                       >
                         {lote.productName}
                       </td>
-                      <td className="px-4 py-3 text-[13px] text-[#36434a] font-mono">
-                        {lote.lot}
-                      </td>
+                      <td className="px-4 py-3 text-[13px] text-[#36434a] font-mono">{lote.lot}</td>
                       <td className="px-4 py-3 text-[13px] text-[#36434a]">
-                        {lote.expiryDate
-                          ?.toDate?.()
-                          .toLocaleDateString("es-MX", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          }) ?? "—"}
+                        {lote.expiryDate?.toDate?.().toLocaleDateString("es-MX", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        }) ?? "—"}
                       </td>
                       <td className="px-4 py-3 text-[13px] text-[#36434a] font-medium">
                         {lote.monthKey}
@@ -757,9 +713,7 @@ export default function LotesCaducidades() {
                             min="0"
                             value={editCajas}
                             onChange={(e) => setEditCajas(e.target.value)}
-                            onKeyDown={(e) =>
-                              e.key === "Enter" && handleSave(lote)
-                            }
+                            onKeyDown={(e) => e.key === "Enter" && handleSave(lote)}
                             onBlur={() => handleCancel()}
                             autoFocus
                             className="w-20 px-2 py-1 border border-[#f2b84b] rounded-[6px] text-[13px] text-right focus:outline-none focus:ring-1 focus:ring-[#f2b84b]"
@@ -777,9 +731,7 @@ export default function LotesCaducidades() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        {getStatusBadge(lote.status)}
-                      </td>
+                      <td className="px-4 py-3">{getStatusBadge(lote.status)}</td>
                       <td className="px-4 py-3 text-right">
                         <span
                           className={`font-mono text-[13px] font-bold ${getStatusColor(lote.status)}`}
@@ -869,5 +821,5 @@ export default function LotesCaducidades() {
         )}
       </div>
     </div>
-  )
+  );
 }

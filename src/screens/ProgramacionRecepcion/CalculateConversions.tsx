@@ -9,23 +9,18 @@ import {
   AlertCircle,
   Package,
   Calculator,
-} from "lucide-react"
-import { TouchTarget } from "@/components/ui/TouchTarget"
+} from "lucide-react";
+import { TouchTarget } from "@/components/ui/TouchTarget";
 
 interface Props {
-  conversions: any[]
-  tarimasTotal: number
-  onPrev: () => void
-  onNext: () => void
+  conversions: any[];
+  tarimasTotal: number;
+  onPrev: () => void;
+  onNext: () => void;
 }
 
-export default function CalculateConversions({
-  conversions,
-  tarimasTotal,
-  onPrev,
-  onNext,
-}: Props) {
-  const totalStickers = conversions.reduce((sum, c) => sum + c.stickers, 0)
+export default function CalculateConversions({ conversions, tarimasTotal, onPrev, onNext }: Props) {
+  const totalStickers = conversions.reduce((sum, c) => sum + c.stickers, 0);
 
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto">
@@ -35,20 +30,16 @@ export default function CalculateConversions({
           Conversiones y Stickers
         </h2>
         <p className="text-[#607078]">
-          Cada tarima genera 4 stickers (2 caras × 2 copias). Verifica los
-          cálculos antes de continuar.
+          Cada tarima genera 4 stickers (2 caras × 2 copias). Verifica los cálculos antes de
+          continuar.
         </p>
       </div>
 
       {conversions.length === 0 ? (
         <div className="text-center py-12 bg-[#f8fafb] border border-[#dce4e7] rounded-[16px]">
           <AlertCircle className="w-12 h-12 mx-auto text-[#fca5a5] mb-3" />
-          <h3 className="text-lg font-medium text-[#16343f] mb-1">
-            Sin conversiones calculadas
-          </h3>
-          <p className="text-[#607078] mb-4">
-            No hay productos confirmados con catálogo.
-          </p>
+          <h3 className="text-lg font-medium text-[#16343f] mb-1">Sin conversiones calculadas</h3>
+          <p className="text-[#607078] mb-4">No hay productos confirmados con catálogo.</p>
           <TouchTarget
             as="button"
             onClick={onPrev}
@@ -92,35 +83,18 @@ export default function CalculateConversions({
             <table className="w-full text-sm">
               <thead className="bg-[#f5f8fa] border-b border-[#dce4e7]">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium text-[#607078]">
-                    Producto
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-[#607078]">
-                    Cajas
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-[#607078]">
-                    Cajas/Tarima
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-[#607078]">
-                    Tarimas
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-[#607078]">
-                    Stickers
-                  </th>
-                  <th className="px-4 py-3 text-center font-medium text-[#607078]">
-                    Conversión
-                  </th>
+                  <th className="px-4 py-3 text-left font-medium text-[#607078]">Producto</th>
+                  <th className="px-4 py-3 text-right font-medium text-[#607078]">Cajas</th>
+                  <th className="px-4 py-3 text-right font-medium text-[#607078]">Cajas/Tarima</th>
+                  <th className="px-4 py-3 text-right font-medium text-[#607078]">Tarimas</th>
+                  <th className="px-4 py-3 text-right font-medium text-[#607078]">Stickers</th>
+                  <th className="px-4 py-3 text-center font-medium text-[#607078]">Conversión</th>
                 </tr>
               </thead>
               <tbody>
                 {conversions.map((c, idx) => (
-                  <tr
-                    key={idx}
-                    className="border-b border-[#dce4e7] hover:bg-[#f8fafb]"
-                  >
-                    <td className="px-4 py-3 text-[#16343f] font-medium">
-                      {c.producto}
-                    </td>
+                  <tr key={idx} className="border-b border-[#dce4e7] hover:bg-[#f8fafb]">
+                    <td className="px-4 py-3 text-[#16343f] font-medium">{c.producto}</td>
                     <td className="px-4 py-3 text-right text-[#16343f] font-mono">
                       {c.cajas?.toLocaleString() || 0}
                     </td>
@@ -161,12 +135,10 @@ export default function CalculateConversions({
               <AlertCircle className="text-[#f59e0b] text-xl mt-0.5 shrink-0" />
               <div>
                 <p className="font-medium text-[#92400e] mb-1">
-                  Algunos productos usan conversión por defecto (10
-                  cajas/tarima)
+                  Algunos productos usan conversión por defecto (10 cajas/tarima)
                 </p>
                 <p className="text-sm text-[#92400e]">
-                  Agrega la conversión real en el catálogo para cálculos
-                  precisos.
+                  Agrega la conversión real en el catálogo para cálculos precisos.
                 </p>
               </div>
             </div>
@@ -191,7 +163,7 @@ export default function CalculateConversions({
         </>
       )}
     </div>
-  )
+  );
 }
 
 function StatCard({
@@ -200,10 +172,10 @@ function StatCard({
   value,
   color,
 }: {
-  icon: React.ReactNode
-  label: string
-  value: number
-  color: string
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  color: string;
 }) {
   return (
     <div className={`p-4 rounded-[12px] border border-[#dce4e7] ${color}`}>
@@ -215,5 +187,5 @@ function StatCard({
       </div>
       <p className="text-2xl md:text-3xl font-bold">{value}</p>
     </div>
-  )
+  );
 }

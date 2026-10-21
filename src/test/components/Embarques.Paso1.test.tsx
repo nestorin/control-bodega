@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react"
-import { describe, expect, it, vi } from "vitest"
-import { Paso1 } from "@/screens/Embarques"
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { Paso1 } from "@/screens/Embarques";
 
 vi.mock("@/hooks/useOcr", () => ({
   useOcr: () => ({
@@ -10,7 +10,7 @@ vi.mock("@/hooks/useOcr", () => ({
     error: null,
     clear: vi.fn(),
   }),
-}))
+}));
 
 const catalog = [
   {
@@ -21,7 +21,7 @@ const catalog = [
     unidad: "cajas" as const,
     activo: true,
   },
-]
+];
 
 function state() {
   return {
@@ -34,7 +34,7 @@ function state() {
     piezasPorCaja: "",
     cajasPorTarima: "",
     tarimasDeclaradas: 0,
-  }
+  };
 }
 
 describe("Embarques product selection", () => {
@@ -50,11 +50,11 @@ describe("Embarques product selection", () => {
       status: "programado" as const,
       paso: 1 as const,
       fechaCreacion: "2026-01-01",
-    }
+    };
     const onChange = vi.fn((next) => {
-      current = next
-    })
-    const onNext = vi.fn()
+      current = next;
+    });
+    const onNext = vi.fn();
     const view = render(
       <Paso1
         embarque={current}
@@ -64,15 +64,12 @@ describe("Embarques product selection", () => {
         catalogoConversiones={[]}
         conversionSource="fallback"
       />,
-    )
+    );
 
-    fireEvent.change(
-      screen.getByPlaceholderText("Buscar producto del catálogo…"),
-      {
-        target: { value: "Producto" },
-      },
-    )
-    fireEvent.mouseDown(screen.getByText("Producto canónico"))
+    fireEvent.change(screen.getByPlaceholderText("Buscar producto del catálogo…"), {
+      target: { value: "Producto" },
+    });
+    fireEvent.mouseDown(screen.getByText("Producto canónico"));
     view.rerender(
       <Paso1
         embarque={current}
@@ -82,16 +79,14 @@ describe("Embarques product selection", () => {
         catalogoConversiones={[]}
         conversionSource="fallback"
       />,
-    )
+    );
 
-    expect(
-      screen.getByPlaceholderText("Buscar producto del catálogo…"),
-    ).toHaveValue("Producto canónico")
-    expect(current.productos[0].productId).toBe("prod-1")
-    expect(
-      screen.getByRole("button", { name: /Continuar a carga/ }),
-    ).not.toBeDisabled()
-    fireEvent.click(screen.getByRole("button", { name: /Continuar a carga/ }))
-    expect(onNext).toHaveBeenCalledTimes(1)
-  })
-})
+    expect(screen.getByPlaceholderText("Buscar producto del catálogo…")).toHaveValue(
+      "Producto canónico",
+    );
+    expect(current.productos[0].productId).toBe("prod-1");
+    expect(screen.getByRole("button", { name: /Continuar a carga/ })).not.toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /Continuar a carga/ }));
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+});

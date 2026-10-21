@@ -1,7 +1,7 @@
-import type { HTMLAttributes, ReactNode } from "react"
+import type { HTMLAttributes, ReactNode } from "react";
 
 interface PanelProps extends HTMLAttributes<HTMLDivElement> {
-  children: ReactNode
+  children: ReactNode;
 }
 
 /** Shared surface used by dashboard cards while preserving the visual system. */
@@ -13,5 +13,5 @@ export function Panel({ children, className = "", ...props }: PanelProps) {
     >
       {children}
     </div>
-  )
+  );
 }

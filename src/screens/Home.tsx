@@ -1,24 +1,20 @@
-import { Panel, QuickActionCard, StatCard, StatusBadge } from "@/components/ui"
+import { Panel, QuickActionCard, StatCard, StatusBadge } from "@/components/ui";
 
-const assetPathPrefix = "/assets"
-const imgPlus = `${assetPathPrefix}/68eab.svg`
-const imgSquarePlus = `${assetPathPrefix}/76004.svg`
-const imgClipboardList = `${assetPathPrefix}/8ee97.svg`
-const imgScanQrCode = `${assetPathPrefix}/c42c6.svg`
-const imgIndicador = `${assetPathPrefix}/08d70.svg`
-const imgWarehouse = `${assetPathPrefix}/0d81c.svg`
+const assetPathPrefix = "/assets";
+const imgPlus = `${assetPathPrefix}/68eab.svg`;
+const imgSquarePlus = `${assetPathPrefix}/76004.svg`;
+const imgClipboardList = `${assetPathPrefix}/8ee97.svg`;
+const imgScanQrCode = `${assetPathPrefix}/c42c6.svg`;
+const imgIndicador = `${assetPathPrefix}/08d70.svg`;
+const imgWarehouse = `${assetPathPrefix}/0d81c.svg`;
 
 interface HomeProps {
-  onNewReception: () => void
-  onRecepciones: () => void
-  onEscanearQr: () => void
+  onNewReception: () => void;
+  onRecepciones: () => void;
+  onEscanearQr: () => void;
 }
 
-export default function Home({
-  onNewReception,
-  onRecepciones,
-  onEscanearQr,
-}: HomeProps) {
+export default function Home({ onNewReception, onRecepciones, onEscanearQr }: HomeProps) {
   return (
     <div className="flex flex-col gap-4 md:gap-5 p-4 md:p-7 size-full overflow-auto">
       {/* Header section */}
@@ -98,11 +94,7 @@ export default function Home({
           <div className="grid grid-cols-3 gap-3 md:gap-7 items-start w-full">
             <StatCard value="6" label="Recepciones" />
             <StatCard value="84" label="Tarimas" />
-            <StatCard
-              value="3"
-              label="Incidencias"
-              valueClassName="text-[#c54b45]"
-            />
+            <StatCard value="3" label="Incidencias" valueClassName="text-[#c54b45]" />
           </div>
           <div className="bg-[#e9eef0] flex flex-col md:flex-row md:items-center md:justify-between gap-2 p-3 md:p-[14px] rounded-[12px] w-full">
             <p
@@ -119,11 +111,7 @@ export default function Home({
         <Panel className="flex flex-col gap-3 md:gap-[18px] p-4 md:p-5 w-full">
           <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-[18px] w-full">
             <div className="bg-[#fff5dd] flex flex-col gap-2 items-center justify-center rounded-[28px] size-[140px] md:size-[170px] flex-shrink-0">
-              <img
-                alt=""
-                style={{ width: "90px", height: "80px" }}
-                src={imgWarehouse}
-              />
+              <img alt="" style={{ width: "90px", height: "80px" }} src={imgWarehouse} />
               <p
                 className="font-extrabold text-[#8e592e] text-[10px] md:text-[11px] whitespace-nowrap"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
@@ -132,10 +120,7 @@ export default function Home({
               </p>
             </div>
             <div className="flex flex-col gap-1 items-start md:items-center text-center md:text-left min-w-0 flex-1">
-              <StatusBadge
-                label="Operación estable"
-                indicatorSrc={imgIndicador}
-              />
+              <StatusBadge label="Operación estable" indicatorSrc={imgIndicador} />
               <p
                 className="text-[#172126] text-base md:text-lg truncate"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
@@ -153,5 +138,5 @@ export default function Home({
         </Panel>
       </div>
     </div>
-  )
+  );
 }

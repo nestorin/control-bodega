@@ -1,46 +1,44 @@
-import { useEffect, useRef, useState } from "react"
-import { BrowserMultiFormatReader } from "@zxing/browser"
+import { useEffect, useRef, useState } from "react";
+import { BrowserMultiFormatReader } from "@zxing/browser";
 
 interface Props {
-  onFound: (id: string) => void
-  onClose: () => void
+  onFound: (id: string) => void;
+  onClose: () => void;
 }
 
 export default function EscanearQR({ onFound, onClose }: Props) {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const readerRef = useRef<BrowserMultiFormatReader | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [scanning, setScanning] = useState(true)
-  const [manualId, setManualId] = useState("")
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(true);
+  const [manualId, setManualId] = useState("");
 
   useEffect(() => {
-    const reader = new BrowserMultiFormatReader()
-    readerRef.current = reader
+    const reader = new BrowserMultiFormatReader();
+    readerRef.current = reader;
 
     reader
       .decodeFromVideoDevice(undefined, videoRef.current!, (result, err) => {
         if (result) {
-          setScanning(false)
-          onFound(result.getText())
+          setScanning(false);
+          onFound(result.getText());
         }
         if (err && !err.message?.includes("No MultiFormat")) {
           // suppress continuous not-found errors
         }
       })
       .catch(() => {
-        setError(
-          "No se pudo acceder a la cámara. Verifica los permisos del navegador.",
-        )
-      })
+        setError("No se pudo acceder a la cámara. Verifica los permisos del navegador.");
+      });
 
     return () => {
-      BrowserMultiFormatReader.releaseAllStreams()
-    }
-  }, [onFound])
+      BrowserMultiFormatReader.releaseAllStreams();
+    };
+  }, [onFound]);
 
   function handleManual(e: React.FormEvent) {
-    e.preventDefault()
-    if (manualId.trim()) onFound(manualId.trim().toUpperCase())
+    e.preventDefault();
+    if (manualId.trim()) onFound(manualId.trim().toUpperCase());
   }
 
   return (
@@ -228,10 +226,7 @@ export default function EscanearQR({ onFound, onClose }: Props) {
         >
           ¿No funciona la cámara? Ingresa el ID manualmente
         </p>
-        <form
-          onSubmit={handleManual}
-          style={{ display: "flex", gap: "8px", width: "100%" }}
-        >
+        <form onSubmit={handleManual} style={{ display: "flex", gap: "8px", width: "100%" }}>
           <input
             value={manualId}
             onChange={(e) => setManualId(e.target.value)}
@@ -295,5 +290,5 @@ export default function EscanearQR({ onFound, onClose }: Props) {
         }
       `}</style>
     </div>
-  )
+  );
 }

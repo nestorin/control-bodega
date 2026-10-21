@@ -1,18 +1,18 @@
-import { useState } from "react"
+import { useState } from "react";
 
-const imgCheck = "/assets/3eae4.svg"
-const imgWarehouse = "/assets/ccb3f.svg"
+const imgCheck = "/assets/3eae4.svg";
+const imgWarehouse = "/assets/ccb3f.svg";
 
 interface Props {
-  recId: string
-  onBack: () => void
-  onSave: () => void
-  readOnly?: boolean
+  recId: string;
+  onBack: () => void;
+  onSave: () => void;
+  readOnly?: boolean;
   initialData?: {
-    tarimas?: number
-    proveedor?: string
-    proveedorLogistico?: string
-  }
+    tarimas?: number;
+    proveedor?: string;
+    proveedorLogistico?: string;
+  };
 }
 
 export default function EditarRecepcion({
@@ -22,20 +22,18 @@ export default function EditarRecepcion({
   readOnly = false,
   initialData,
 }: Props) {
-  const [tarimas, setTarimas] = useState(String(initialData?.tarimas ?? 20))
-  const [proveedor, setProveedor] = useState(
-    initialData?.proveedor ?? "Distribuidora del Norte",
-  )
+  const [tarimas, setTarimas] = useState(String(initialData?.tarimas ?? 20));
+  const [proveedor, setProveedor] = useState(initialData?.proveedor ?? "Distribuidora del Norte");
   const [proveedorLog, setProveedorLog] = useState(
     initialData?.proveedorLogistico ?? "Logística Veloz",
-  )
-  const [saved, setSaved] = useState(false)
+  );
+  const [saved, setSaved] = useState(false);
 
   function handleSave() {
-    setSaved(true)
+    setSaved(true);
     setTimeout(() => {
-      onSave()
-    }, 800)
+      onSave();
+    }, 800);
   }
 
   const fields = [
@@ -57,7 +55,7 @@ export default function EditarRecepcion({
       set: setProveedorLog,
       hint: null,
     },
-  ]
+  ];
 
   return (
     <div className="flex gap-6 items-start p-7 size-full">
@@ -80,10 +78,7 @@ export default function EditarRecepcion({
         </p>
 
         {fields.map(({ label, value, set, hint }) => (
-          <div
-            key={label}
-            className="flex flex-col gap-[7px] items-start w-full"
-          >
+          <div key={label} className="flex flex-col gap-[7px] items-start w-full">
             <p
               className="font-bold text-[#607078] text-[13px]"
               style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
@@ -94,7 +89,9 @@ export default function EditarRecepcion({
               value={value}
               onChange={(e) => set(e.target.value)}
               readOnly={readOnly}
-              className={`bg-white border border-[#dce4e7] min-h-12 px-[14px] py-3 rounded-lg w-full font-semibold text-[#172126] text-[15px] outline-none focus:border-[#3276a8] transition-colors ${readOnly ? "cursor-default bg-[#f4f7f8]" : ""}`}
+              className={`bg-white border border-[#dce4e7] min-h-12 px-[14px] py-3 rounded-lg w-full font-semibold text-[#172126] text-[15px] outline-none focus:border-[#3276a8] transition-colors ${
+                readOnly ? "cursor-default bg-[#f4f7f8]" : ""
+              }`}
               style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}
             />
             {hint && (
@@ -182,11 +179,7 @@ export default function EditarRecepcion({
 
       <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-1 flex-col items-center justify-center min-w-0 p-5 rounded-[20px] gap-4">
         <div className="bg-[#fff5dd] flex flex-col gap-2 items-center justify-center rounded-[28px] size-[200px]">
-          <img
-            alt=""
-            style={{ width: "130px", height: "114px" }}
-            src={imgWarehouse}
-          />
+          <img alt="" style={{ width: "130px", height: "114px" }} src={imgWarehouse} />
           <p
             className="font-extrabold text-[#8e592e] text-[11px]"
             style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
@@ -208,5 +201,5 @@ export default function EditarRecepcion({
         </p>
       </div>
     </div>
-  )
+  );
 }

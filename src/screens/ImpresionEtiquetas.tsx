@@ -1,34 +1,37 @@
-import { QRCodeSVG } from "qrcode.react"
+import { QRCodeSVG } from "qrcode.react";
 
 interface Tarima {
-  id: string
-  numero: number
-  total: number
-  ordenCompra: string
-  fechaRecepcion: string
-  producto: string
-  caducidad: string
-  cajas: number
-  unidadesPorCaja: number | null
-  lote: string
-  proveedor: string
-  proveedorLogistico: string
+  id: string;
+  numero: number;
+  total: number;
+  ordenCompra: string;
+  fechaRecepcion: string;
+  producto: string;
+  caducidad: string;
+  cajas: number;
+  unidadesPorCaja: number | null;
+  lote: string;
+  proveedor: string;
+  proveedorLogistico: string;
 }
 
 interface Props {
-  onClose: () => void
-  currentReception?: { ocFolio: string; tarimas: number } | null
+  onClose: () => void;
+  currentReception?: {
+    ocFolio: string;
+    tarimas: number;
+  } | null;
   conversionesTabla?: Array<{
-    producto: string
-    codigo: string
-    unidades: number
-    unidad: string
-    piezasPorCaja: number
-    cajasPorTarima: number
-    cajas: number
-    tarimas: number
-    stickers: number
-  }>
+    producto: string;
+    codigo: string;
+    unidades: number;
+    unidad: string;
+    piezasPorCaja: number;
+    cajasPorTarima: number;
+    cajas: number;
+    tarimas: number;
+    stickers: number;
+  }>;
 }
 
 function Etiqueta({
@@ -36,14 +39,14 @@ function Etiqueta({
   index,
 }: {
   tarima: Tarima & {
-    stickerIndex?: number
-    stickerFace?: string
-    stickerCopy?: string
-  }
-  index: number
+    stickerIndex?: number;
+    stickerFace?: string;
+    stickerCopy?: string;
+  };
+  index: number;
 }) {
-  const isLastRow = index >= 2
-  const isRightCol = index % 2 !== 0
+  const isLastRow = index >= 2;
+  const isRightCol = index % 2 !== 0;
 
   const row = (label: string, value: string, last = false) => (
     <div
@@ -80,11 +83,11 @@ function Etiqueta({
         {value}
       </span>
     </div>
-  )
+  );
 
   const stickerInfo = tarima.stickerFace
     ? `${tarima.stickerFace} · ${tarima.stickerCopy}`
-    : `Tarima ${tarima.numero} de ${tarima.total}`
+    : `Tarima ${tarima.numero} de ${tarima.total}`;
 
   return (
     <div
@@ -192,10 +195,7 @@ function Etiqueta({
             ["Cajas", `${tarima.cajas} cajas`],
             ["Proveedor", tarima.proveedor],
             ["Prov. logístico", tarima.proveedorLogistico],
-            [
-              "Unidades / caja",
-              tarima.unidadesPorCaja ? `${tarima.unidadesPorCaja} uds` : "—",
-            ],
+            ["Unidades / caja", tarima.unidadesPorCaja ? `${tarima.unidadesPorCaja} uds` : "—"],
           ].map(([label, value]) => (
             <div
               key={label}
@@ -232,7 +232,7 @@ function Etiqueta({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 export default function ImpresionEtiquetas({
@@ -240,8 +240,8 @@ export default function ImpresionEtiquetas({
   currentReception,
   conversionesTabla,
 }: Props) {
-  const ocFolio = currentReception?.ocFolio ?? "OC-24891"
-  const ocNumber = ocFolio.replace("OC-", "")
+  const ocFolio = currentReception?.ocFolio ?? "OC-24891";
+  const ocNumber = ocFolio.replace("OC-", "");
 
   // Si hay conversionesTabla, generar tarimas basadas en productos reales
   // Si no, usar datos de ejemplo
@@ -276,7 +276,7 @@ export default function ImpresionEtiquetas({
           lote: "LT-0926-A",
           proveedor: "Distribuidora del Norte",
           proveedorLogistico: "Logística Veloz",
-        }))
+        }));
 
   // NUEVO: Generar stickers - 4 por tarima (2 caras × 2 copias)
   const stickers = tarimas.flatMap((tarima) =>
@@ -286,11 +286,11 @@ export default function ImpresionEtiquetas({
       stickerFace: si < 2 ? "Cara A" : "Cara B",
       stickerCopy: si % 2 === 0 ? "Copia 1" : "Copia 2",
     })),
-  )
+  );
 
-  const pages: Array<typeof stickers[number][]> = []
+  const pages: Array<(typeof stickers)[number][]> = [];
   for (let i = 0; i < stickers.length; i += 4) {
-    pages.push(stickers.slice(i, i + 4))
+    pages.push(stickers.slice(i, i + 4));
   }
 
   return (
@@ -423,5 +423,5 @@ export default function ImpresionEtiquetas({
         }
       `}</style>
     </>
-  )
+  );
 }

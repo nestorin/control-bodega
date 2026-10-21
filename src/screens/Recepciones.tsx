@@ -1,34 +1,32 @@
-import { useState, useRef, useEffect } from "react"
-import { where } from "firebase/firestore"
-import { isFeatureEnabled } from "@/config/featureFlags"
-import { useCollection } from "@/hooks/useFirestore"
-import { db } from "@/lib/firebase"
-import { createFirestoreServices } from "@/services/firestore"
-import { useOfflineQueue } from "@/hooks/useFirestore"
-import type { ReceptionDoc } from "@/services/firestore/types"
-import { WAREHOUSE_IDS } from "@/config/warehouses"
-import { useAuthorization, isPermissionDenied } from "@/hooks/useAuthorization"
-import { Panel, StatusBadge, TouchTarget } from "@/components/ui"
+import { useState, useRef, useEffect } from "react";
+import { where } from "firebase/firestore";
+import { isFeatureEnabled } from "@/config/featureFlags";
+import { useCollection } from "@/hooks/useFirestore";
+import { db } from "@/lib/firebase";
+import { createFirestoreServices } from "@/services/firestore";
+import { useOfflineQueue } from "@/hooks/useFirestore";
+import type { ReceptionDoc } from "@/services/firestore/types";
+import { WAREHOUSE_IDS } from "@/config/warehouses";
+import { useAuthorization, isPermissionDenied } from "@/hooks/useAuthorization";
+import { Panel, StatusBadge, TouchTarget } from "@/components/ui";
 
-const imgIndicador = "/assets/08d70.svg"
-const imgIndicadorRed = "/assets/9d6fd.svg"
+const imgIndicador = "/assets/08d70.svg";
+const imgIndicadorRed = "/assets/9d6fd.svg";
 
-const ORG_ID = "org_exepa_001"
-const NORTH_RECEPTION_CONSTRAINTS = [
-  where("warehouseId", "==", WAREHOUSE_IDS.NORTH),
-]
+const ORG_ID = "org_exepa_001";
+const NORTH_RECEPTION_CONSTRAINTS = [where("warehouseId", "==", WAREHOUSE_IDS.NORTH)];
 
 interface ReceptionView {
-  id: string
-  proveedor: string
-  producto: string
-  tarimas: number
-  fecha: string
-  estado: string
-  incidencias: number
-  color: string
-  bg: string
-  img: string
+  id: string;
+  proveedor: string;
+  producto: string;
+  tarimas: number;
+  fecha: string;
+  estado: string;
+  incidencias: number;
+  color: string;
+  bg: string;
+  img: string;
 }
 
 // Fallback local data for when feature flag is OFF
@@ -105,7 +103,7 @@ const recepcionesLocal = [
     bg: "#fce9e7",
     img: imgIndicadorRed,
   },
-]
+];
 
 const menuItems = [
   {
@@ -168,52 +166,52 @@ const menuItems = [
     ),
     color: "#c54b45",
   },
-]
+];
 
 function RowMenu({
   recId,
   onEdit,
   onDelete,
 }: {
-  recId: string
-  onEdit: () => void
-  onDelete: () => void
+  recId: string;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [open])
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
 
   const items = [
     {
       ...menuItems[0],
       action: () => {
-        setOpen(false)
-        onEdit()
+        setOpen(false);
+        onEdit();
       },
     },
     {
       ...menuItems[1],
       action: () => {
-        setOpen(false)
-        alert(`Imprimiendo QRs de ${recId}`)
+        setOpen(false);
+        alert(`Imprimiendo QRs de ${recId}`);
       },
     },
     {
       ...menuItems[2],
       action: () => {
-        setOpen(false)
-        onDelete()
+        setOpen(false);
+        onDelete();
       },
     },
-  ]
+  ];
 
   return (
     <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
@@ -256,7 +254,7 @@ function RowMenu({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 function DeleteModal({
@@ -264,9 +262,9 @@ function DeleteModal({
   onConfirm,
   onCancel,
 }: {
-  id: string
-  onConfirm: () => void
-  onCancel: () => void
+  id: string;
+  onConfirm: () => void;
+  onCancel: () => void;
 }) {
   return (
     <div
@@ -319,8 +317,8 @@ function DeleteModal({
               lineHeight: 1.5,
             }}
           >
-            Se eliminará <strong style={{ color: "#172126" }}>{id}</strong> y
-            todas sus tarimas asociadas. Esta acción no se puede deshacer.
+            Se eliminará <strong style={{ color: "#172126" }}>{id}</strong> y todas sus tarimas
+            asociadas. Esta acción no se puede deshacer.
           </p>
         </div>
         <div className="flex gap-3 w-full">
@@ -354,42 +352,39 @@ function DeleteModal({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 export default function Recepciones({
   onSelectTarima,
   onEdit,
 }: {
-  onSelectTarima: (recId: string) => void
-  onEdit: (id: string) => void
+  onSelectTarima: (recId: string) => void;
+  onEdit: (id: string) => void;
 }) {
-  const { canQuery, canAccessWarehouse } = useAuthorization()
-  const useFirestore =
-    isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery
-  const canQueryNorthWarehouse =
-    useFirestore && canAccessWarehouse(WAREHOUSE_IDS.NORTH)
+  const { canQuery, canAccessWarehouse } = useAuthorization();
+  const useFirestore = isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery;
+  const canQueryNorthWarehouse = useFirestore && canAccessWarehouse(WAREHOUSE_IDS.NORTH);
 
   // Firestore services
   const [fsServices, setFsServices] = useState(() =>
     useFirestore && db ? createFirestoreServices(db, ORG_ID) : null,
-  )
+  );
 
   // Offline queue
-  const { enqueue, isOnline } = useOfflineQueue(db, ORG_ID)
+  const { enqueue, isOnline } = useOfflineQueue(db, ORG_ID);
 
   // Local state (fallback)
-  const [listaLocal, setListaLocal] = useState(recepcionesLocal)
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
-  const [loadingFs, setLoadingFs] = useState(false)
-  const [errorFs, setErrorFs] = useState<string | null>(null)
+  const [listaLocal, setListaLocal] = useState(recepcionesLocal);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [loadingFs, setLoadingFs] = useState(false);
+  const [errorFs, setErrorFs] = useState<string | null>(null);
 
   // Estados de filtro
-  const [searchText, setSearchText] = useState("")
-  const [filterEstado, setFilterEstado] =
-    useState<"todos" | "Completada" | "En proceso" | "Con incidencia" | "Borrador">(
-      "todos",
-    )
+  const [searchText, setSearchText] = useState("");
+  const [filterEstado, setFilterEstado] = useState<
+    "todos" | "Completada" | "En proceso" | "Con incidencia" | "Borrador"
+  >("todos");
 
   // Firestore hook
   const {
@@ -403,7 +398,7 @@ export default function Recepciones({
     constraints: NORTH_RECEPTION_CONSTRAINTS,
     enabled: canQueryNorthWarehouse,
     mapFn: (doc) => {
-      const d = doc.data()
+      const d = doc.data();
       return {
         id: d.operationId || doc.id,
         proveedor: d.supplierName || "Sin proveedor",
@@ -423,33 +418,25 @@ export default function Recepciones({
                 : "Borrador",
         incidencias: 0,
         color:
-          d.status === "CONFIRMED"
-            ? "#16845b"
-            : d.status === "IN_PROGRESS"
-              ? "#3276a8"
-              : "#c54b45",
+          d.status === "CONFIRMED" ? "#16845b" : d.status === "IN_PROGRESS" ? "#3276a8" : "#c54b45",
         bg:
-          d.status === "CONFIRMED"
-            ? "#e2f5ec"
-            : d.status === "IN_PROGRESS"
-              ? "#e7f0f2"
-              : "#fce9e7",
+          d.status === "CONFIRMED" ? "#e2f5ec" : d.status === "IN_PROGRESS" ? "#e7f0f2" : "#fce9e7",
         img:
           d.status === "CONFIRMED"
             ? imgIndicador
             : d.status === "IN_PROGRESS"
               ? imgIndicador
               : imgIndicadorRed,
-      }
+      };
     },
-  })
+  });
 
   // Load Firestore data when feature flag is enabled
   useEffect(() => {
-    if (!canQueryNorthWarehouse || !fsServices) return
+    if (!canQueryNorthWarehouse || !fsServices) return;
 
-    setLoadingFs(true)
-    setErrorFs(null)
+    setLoadingFs(true);
+    setErrorFs(null);
 
     fsServices.receptions
       .getByWarehouse(WAREHOUSE_IDS.NORTH)
@@ -490,23 +477,23 @@ export default function Recepciones({
               : r.status === "IN_PROGRESS"
                 ? imgIndicador
                 : imgIndicadorRed,
-        }))
-        setListaLocal(converted)
-        setLoadingFs(false)
+        }));
+        setListaLocal(converted);
+        setLoadingFs(false);
       })
       .catch((err: Error) => {
-        console.error("Error loading receptions:", err)
+        console.error("Error loading receptions:", err);
         setErrorFs(
           isPermissionDenied(err)
             ? "No tenés permisos para consultar las recepciones de este almacén."
             : err.message,
-        )
-        setLoadingFs(false)
-      })
-  }, [canQueryNorthWarehouse, fsServices])
+        );
+        setLoadingFs(false);
+      });
+  }, [canQueryNorthWarehouse, fsServices]);
 
   // Use Firestore data when enabled, otherwise local
-  const lista = useFirestore && !loadingFs ? listaLocal : listaLocal
+  const lista = useFirestore && !loadingFs ? listaLocal : listaLocal;
 
   // Lista filtrada
   const listaFiltrada = lista.filter((rec) => {
@@ -514,26 +501,25 @@ export default function Recepciones({
       searchText === "" ||
       rec.id.toLowerCase().includes(searchText.toLowerCase()) ||
       rec.proveedor.toLowerCase().includes(searchText.toLowerCase()) ||
-      rec.producto.toLowerCase().includes(searchText.toLowerCase())
-    const matchesEstado =
-      filterEstado === "todos" || rec.estado === filterEstado
-    return matchesSearch && matchesEstado
-  })
+      rec.producto.toLowerCase().includes(searchText.toLowerCase());
+    const matchesEstado = filterEstado === "todos" || rec.estado === filterEstado;
+    return matchesSearch && matchesEstado;
+  });
 
   function confirmDelete() {
-    if (!deleteTarget) return
+    if (!deleteTarget) return;
 
     // Delete from local
-    setListaLocal((prev) => prev.filter((r) => r.id !== deleteTarget))
+    setListaLocal((prev) => prev.filter((r) => r.id !== deleteTarget));
 
     // Delete from Firestore
     if (useFirestore && fsServices) {
       fsServices.receptions
         .deleteReception(deleteTarget, "user", `op-${Date.now()}`)
         .catch((err: Error) => {
-          console.error("Error deleting reception:", err)
-          setErrorFs(err.message)
-        })
+          console.error("Error deleting reception:", err);
+          setErrorFs(err.message);
+        });
     }
 
     // Queue for offline sync if not online
@@ -543,10 +529,10 @@ export default function Recepciones({
         collectionPath: `organizations/{orgId}/receptions`,
         docId: deleteTarget,
         operationId: `op-${Date.now()}-delete`,
-      })
+      });
     }
 
-    setDeleteTarget(null)
+    setDeleteTarget(null);
   }
 
   return (
@@ -577,8 +563,12 @@ export default function Recepciones({
                 value={filterEstado}
                 onChange={(e) =>
                   setFilterEstado(
-                    e.target
-                      .value as "todos" | "Completada" | "En proceso" | "Con incidencia" | "Borrador",
+                    e.target.value as
+                      | "todos"
+                      | "Completada"
+                      | "En proceso"
+                      | "Con incidencia"
+                      | "Borrador",
                   )
                 }
                 className="bg-transparent outline-none text-[13px] text-[#172126] appearance-none pr-8 cursor-pointer"
@@ -596,16 +586,10 @@ export default function Recepciones({
             </div>
           </div>
           <div className="bg-[#16343f] text-white rounded-[10px] px-4 py-[6px] flex items-center gap-2">
-            <span
-              className="text-[13px] font-bold"
-              style={{ fontFamily: "'Inter', sans-serif" }}
-            >
+            <span className="text-[13px] font-bold" style={{ fontFamily: "'Inter', sans-serif" }}>
               {listaFiltrada.length}
             </span>
-            <span
-              className="text-[13px] font-medium"
-              style={{ fontFamily: "'Inter', sans-serif" }}
-            >
+            <span className="text-[13px] font-medium" style={{ fontFamily: "'Inter', sans-serif" }}>
               recepciones
             </span>
             {useFirestore && (
@@ -657,8 +641,8 @@ export default function Recepciones({
             Error: {errorFs}
             <button
               onClick={() => {
-                setLoadingFs(true)
-                setErrorFs(null)
+                setLoadingFs(true);
+                setErrorFs(null);
                 fsServices?.receptions
                   .getByWarehouse(WAREHOUSE_IDS.NORTH)
                   .then((r: any[]) => {
@@ -668,12 +652,8 @@ export default function Recepciones({
                       producto: rec.productName || "Sin producto",
                       tarimas: rec.palletCount || 0,
                       fecha:
-                        rec.receivedAt
-                          ?.toDate?.()
-                          ?.toLocaleDateString?.("es-ES") ||
-                        rec.createdAt
-                          ?.toDate?.()
-                          ?.toLocaleDateString?.("es-ES") ||
+                        rec.receivedAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
+                        rec.createdAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
                         "",
                       estado:
                         rec.status === "CONFIRMED"
@@ -702,14 +682,14 @@ export default function Recepciones({
                           : rec.status === "IN_PROGRESS"
                             ? imgIndicador
                             : imgIndicadorRed,
-                    }))
-                    setListaLocal(converted)
-                    setLoadingFs(false)
+                    }));
+                    setListaLocal(converted);
+                    setLoadingFs(false);
                   })
                   .catch((e: Error) => {
-                    setErrorFs(e.message)
-                    setLoadingFs(false)
-                  })
+                    setErrorFs(e.message);
+                    setLoadingFs(false);
+                  });
               }}
               className="ml-2 underline text-[11px]"
             >
@@ -729,8 +709,8 @@ export default function Recepciones({
               onClick={() => onSelectTarima(rec.id)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault()
-                  onSelectTarima(rec.id)
+                  event.preventDefault();
+                  onSelectTarima(rec.id);
                 }
               }}
             >
@@ -816,5 +796,5 @@ export default function Recepciones({
         </div>
       </div>
     </>
-  )
+  );
 }

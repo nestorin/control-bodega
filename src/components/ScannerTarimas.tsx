@@ -1,17 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from "react"
-import { Tarima, TarimaScanInput, TarimaStatus } from "@/types/embarque"
-import { useScanner } from "@/hooks/useScanner"
-import {
-  escanearTarima,
-  getAutoFillData,
-  confirmarEmbarque,
-} from "@/services/embarques"
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Tarima, TarimaScanInput, TarimaStatus } from "@/types/embarque";
+import { useScanner } from "@/hooks/useScanner";
+import { escanearTarima, getAutoFillData, confirmarEmbarque } from "@/services/embarques";
 
 interface ScannerTarimasProps {
-  embarqueId: string
-  onClose: () => void
-  onTarimaEscaneada?: (tarima: Tarima) => void
-  onEmbarqueCompletado?: () => void
+  embarqueId: string;
+  onClose: () => void;
+  onTarimaEscaneada?: (tarima: Tarima) => void;
+  onEmbarqueCompletado?: () => void;
 }
 
 export function ScannerTarimas({
@@ -20,20 +16,20 @@ export function ScannerTarimas({
   onTarimaEscaneada,
   onEmbarqueCompletado,
 }: ScannerTarimasProps) {
-  const [tarimas, setTarimas] = useState<Tarima[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [scanning, setScanning] = useState(false)
-  const [currentInput, setCurrentInput] = useState("")
+  const [tarimas, setTarimas] = useState<Tarima[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [currentInput, setCurrentInput] = useState("");
   const [showResult, setShowResult] = useState<{
-    tarima: Tarima
-    isNew: boolean
-    autoFilled: boolean
-  } | null>(null)
+    tarima: Tarima;
+    isNew: boolean;
+    autoFilled: boolean;
+  } | null>(null);
 
-  const inputRef = useRef<HTMLInputElement>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const streamRef = useRef<MediaStream | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const {
     escanear: escanearHook,
@@ -41,85 +37,85 @@ export function ScannerTarimas({
     error: hookError,
     autoFillData,
     limpiar: clearError,
-  } = useScanner(embarqueId)
+  } = useScanner(embarqueId);
 
   useEffect(() => {
-    cargarTarimas()
-    iniciarCamara()
+    cargarTarimas();
+    iniciarCamara();
 
     return () => {
-      detenerCamara()
-    }
-  }, [embarqueId])
+      detenerCamara();
+    };
+  }, [embarqueId]);
 
   const cargarTarimas = async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
       // En producción: fetch desde Firestore
       // const tarimas = await getTarimas(embarqueId);
       // setTarimas(tarimas);
 
       // Mock para desarrollo
-      setTarimas([])
+      setTarimas([]);
     } catch (err) {
-      setError("Error cargando tarimas")
+      setError("Error cargando tarimas");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const iniciarCamara = async () => {
-    if (!videoRef.current) return
+    if (!videoRef.current) return;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
-      })
-      streamRef.current = stream
-      videoRef.current.srcObject = stream
-      await videoRef.current.play()
+      });
+      streamRef.current = stream;
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
     } catch (err) {
-      console.warn("No se pudo acceder a la cámara:", err)
+      console.warn("No se pudo acceder a la cámara:", err);
       // Fallback a input manual
     }
-  }
+  };
 
   const detenerCamara = () => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop())
-      streamRef.current = null
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
     }
-  }
+  };
 
   const handleScan = useCallback(
     async (qrCode: string) => {
-      if (scanning) return
+      if (scanning) return;
 
-      setScanning(true)
-      setError(null)
-      clearError()
+      setScanning(true);
+      setError(null);
+      clearError();
 
       try {
         // Parsear QR: embarqueId|tarimaIndex
-        const [qrEmbarqueId, tarimaIndexStr] = qrCode.split("|")
-        const tarimaIndex = parseInt(tarimaIndexStr, 10)
+        const [qrEmbarqueId, tarimaIndexStr] = qrCode.split("|");
+        const tarimaIndex = parseInt(tarimaIndexStr, 10);
 
         if (qrEmbarqueId !== embarqueId) {
-          throw new Error("QR no pertenece a este embarque")
+          throw new Error("QR no pertenece a este embarque");
         }
 
         // Buscar si ya existe
-        let tarimaExistente = tarimas.find((t) => t.tarimaIndex === tarimaIndex)
-        let isNew = false
+        let tarimaExistente = tarimas.find((t) => t.tarimaIndex === tarimaIndex);
+        let isNew = false;
 
         if (!tarimaExistente) {
           // Tarima nueva - obtener auto-fill
-          isNew = true
-          const autoFill = await getAutoFillData(embarqueId)
+          isNew = true;
+          const autoFill = await getAutoFillData(embarqueId);
 
           // Crear tarima temporal para el formulario
-          tarimaExistente = ({
+          tarimaExistente = {
             id: qrCode,
             embarqueId,
             tarimaIndex,
@@ -134,117 +130,107 @@ export function ScannerTarimas({
             createdAt: new Date(),
             lastKnownLote: autoFill.lote,
             lastKnownCaducidad: autoFill.caducidad,
-          } as Tarima)
+          } as Tarima;
         }
 
         // Mostrar formulario con datos pre-llenados
         setShowResult({
           tarima: tarimaExistente,
           isNew,
-          autoFilled:
-            isNew && !!(tarimaExistente.lote || tarimaExistente.caducidad),
-        })
+          autoFilled: isNew && !!(tarimaExistente.lote || tarimaExistente.caducidad),
+        });
 
         // Focus en lote si es nuevo, sino en caducidad
         setTimeout(() => {
           const focusEl = isNew
             ? document.getElementById("input-lote")
-            : document.getElementById("input-caducidad")
-          focusEl?.focus()
-        }, 100)
+            : document.getElementById("input-caducidad");
+          focusEl?.focus();
+        }, 100);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Error escaneando QR")
+        setError(err instanceof Error ? err.message : "Error escaneando QR");
       } finally {
-        setScanning(false)
+        setScanning(false);
       }
     },
     [embarqueId, tarimas, getAutoFillData, clearError, scanning],
-  )
+  );
 
   const handleManualInput = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (currentInput.trim()) {
-      handleScan(currentInput.trim())
-      setCurrentInput("")
+      handleScan(currentInput.trim());
+      setCurrentInput("");
     }
-  }
+  };
 
-  const handleSave = async (data: {
-    lote: string
-    caducidad: string
-    observaciones?: string
-  }) => {
-    if (!showResult) return
+  const handleSave = async (data: { lote: string; caducidad: string; observaciones?: string }) => {
+    if (!showResult) return;
 
-    setScanning(true)
-    setError(null)
+    setScanning(true);
+    setError(null);
 
     try {
       const input: TarimaScanInput = {
         lote: data.lote,
         caducidad: new Date(data.caducidad),
         observaciones: data.observaciones,
-      }
+      };
 
-      const tarimaActualizada = await escanearHook(showResult.tarima.id, input)
+      const tarimaActualizada = await escanearHook(showResult.tarima.id, input);
       if (!tarimaActualizada) {
-        throw new Error("No se pudo actualizar la tarima")
+        throw new Error("No se pudo actualizar la tarima");
       }
 
       // Actualizar lista local
       setTarimas((prev) => {
-        const idx = prev.findIndex((t) => t.id === tarimaActualizada.id)
+        const idx = prev.findIndex((t) => t.id === tarimaActualizada.id);
         if (idx >= 0) {
-          const next = [...prev]
-          next[idx] = tarimaActualizada
-          return next
+          const next = [...prev];
+          next[idx] = tarimaActualizada;
+          return next;
         }
-        return [...prev, tarimaActualizada]
-      })
+        return [...prev, tarimaActualizada];
+      });
 
-      onTarimaEscaneada?.(tarimaActualizada)
-      setShowResult(null)
+      onTarimaEscaneada?.(tarimaActualizada);
+      setShowResult(null);
 
       // Verificar si completó el embarque
-      const embarqueCompleto = tarimas.length + 1 >= getTotalTarimas()
+      const embarqueCompleto = tarimas.length + 1 >= getTotalTarimas();
       if (embarqueCompleto) {
-        await confirmarEmbarque(embarqueId)
-        onEmbarqueCompletado?.()
-        setTimeout(() => onClose(), 2000)
+        await confirmarEmbarque(embarqueId);
+        onEmbarqueCompletado?.();
+        setTimeout(() => onClose(), 2000);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error guardando")
+      setError(err instanceof Error ? err.message : "Error guardando");
     } finally {
-      setScanning(false)
+      setScanning(false);
     }
-  }
+  };
 
   const handleSkip = () => {
-    setShowResult(null)
-    setCurrentInput("")
-    inputRef.current?.focus()
-  }
+    setShowResult(null);
+    setCurrentInput("");
+    inputRef.current?.focus();
+  };
 
   const getTotalTarimas = () => {
     // En producción: desde embarque
-    return tarimas.length > 0
-      ? Math.max(...tarimas.map((t) => t.tarimaIndex)) + 1
-      : 0
-  }
+    return tarimas.length > 0 ? Math.max(...tarimas.map((t) => t.tarimaIndex)) + 1 : 0;
+  };
 
-  const tarimasCompletadas = tarimas.filter(
-    (t) => t.status === "scanned",
-  ).length
-  const totalTarimas = getTotalTarimas()
-  const progreso =
-    totalTarimas > 0 ? (tarimasCompletadas / totalTarimas) * 100 : 0
+  const tarimasCompletadas = tarimas.filter((t) => t.status === "scanned").length;
+  const totalTarimas = getTotalTarimas();
+  const progreso = totalTarimas > 0 ? (tarimasCompletadas / totalTarimas) * 100 : 0;
 
   if (loading) {
     return (
       <div className="fixed inset-0 bg-white flex items-center justify-center z-50">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
       </div>
-    )
+    );
   }
 
   return (
@@ -252,17 +238,8 @@ export function ScannerTarimas({
       {/* Header */}
       <header className="sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between z-10">
         <div className="flex items-center gap-3">
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded"
-            disabled={scanning}
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded" disabled={scanning}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -296,10 +273,7 @@ export function ScannerTarimas({
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center justify-between">
             <span>{error}</span>
-            <button
-              onClick={() => setError(null)}
-              className="text-red-500 hover:text-red-700"
-            >
+            <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
               ×
             </button>
           </div>
@@ -309,12 +283,7 @@ export function ScannerTarimas({
         <div className="mb-6">
           <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
             {videoRef.current && (
-              <video
-                ref={videoRef}
-                className="w-full h-full object-cover"
-                playsInline
-                muted
-              />
+              <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
             )}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="w-3/4 h-3/4 border-2 border-blue-500 rounded-lg relative">
@@ -417,9 +386,7 @@ export function ScannerTarimas({
                         {tarima.tarimaIndex + 1}
                       </span>
                       <div>
-                        <p className="font-medium text-gray-900">
-                          Tarima {tarima.tarimaIndex + 1}
-                        </p>
+                        <p className="font-medium text-gray-900">Tarima {tarima.tarimaIndex + 1}</p>
                         {tarima.status === "scanned" && (
                           <p className="text-xs text-gray-500">
                             Lote: {tarima.lote} · Cad:{" "}
@@ -466,7 +433,7 @@ export function ScannerTarimas({
         )}
       </main>
     </div>
-  )
+  );
 }
 
 // Sub-componente: Formulario captura tarima
@@ -478,24 +445,18 @@ function TarimaForm({
   onSkip,
   loading,
 }: {
-  tarima: Tarima
-  isNew: boolean
-  autoFilled: boolean
-  onSave: (data: {
-    lote: string
-    caducidad: string
-    observaciones?: string
-  }) => void
-  onSkip: () => void
-  loading: boolean
+  tarima: Tarima;
+  isNew: boolean;
+  autoFilled: boolean;
+  onSave: (data: { lote: string; caducidad: string; observaciones?: string }) => void;
+  onSkip: () => void;
+  loading: boolean;
 }) {
-  const [lote, setLote] = useState(tarima.lote || "")
+  const [lote, setLote] = useState(tarima.lote || "");
   const [caducidad, setCaducidad] = useState(
-    tarima.caducidad
-      ? new Date(tarima.caducidad).toISOString().split("T")[0]
-      : "",
-  )
-  const [observaciones, setObservaciones] = useState(tarima.observaciones || "")
+    tarima.caducidad ? new Date(tarima.caducidad).toISOString().split("T")[0] : "",
+  );
+  const [observaciones, setObservaciones] = useState(tarima.observaciones || "");
 
   return (
     <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 animate-slide-up">
@@ -540,9 +501,7 @@ function TarimaForm({
       {/* Captura datos */}
       <div className="space-y-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Lote *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Lote *</label>
           <input
             id="input-lote"
             type="text"
@@ -554,9 +513,7 @@ function TarimaForm({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Fecha caducidad *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Fecha caducidad *</label>
           <input
             id="input-caducidad"
             type="date"
@@ -567,9 +524,7 @@ function TarimaForm({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Observaciones
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
           <textarea
             value={observaciones}
             onChange={(e) => setObservaciones(e.target.value)}
@@ -597,16 +552,16 @@ function TarimaForm({
         </button>
       </div>
     </div>
-  )
+  );
 }
 
 // CSS animation
-const style = document.createElement("style")
+const style = document.createElement("style");
 style.textContent = `
   @keyframes slide-up {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
   }
   .animate-slide-up { animation: slide-up 0.3s ease-out; }
-`
-if (typeof document !== "undefined") document.head.appendChild(style)
+`;
+if (typeof document !== "undefined") document.head.appendChild(style);

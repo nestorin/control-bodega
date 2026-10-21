@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vitest";
 import {
   canTransitionReception,
   transitionReception,
   type ReceptionSession,
-} from "@/domains/reception/useReceptionSession"
+} from "@/domains/reception/useReceptionSession";
 
 const session: ReceptionSession = {
   phase: "PROGRAMMING",
@@ -16,24 +16,22 @@ const session: ReceptionSession = {
     productIds: ["prod-1"],
     totalPallets: 1,
   },
-}
+};
 
 describe("ReceptionSession state machine", () => {
   it("allows the agreed happy path and blocks jumps", () => {
-    expect(canTransitionReception("PROGRAMMING", "REVIEW")).toBe(true)
-    expect(canTransitionReception("EVIDENCE", "PALLETS")).toBe(true)
-    expect(canTransitionReception("PROGRAMMING", "PALLETS")).toBe(false)
-    expect(
-      transitionReception({ ...session, phase: "EVIDENCE" }, "PALLETS").phase,
-    ).toBe("PALLETS")
-    expect(canTransitionReception("PALLETS", "CONFIRMED")).toBe(true)
-    expect(canTransitionReception("CONFIRMED", "COMPLETED")).toBe(true)
-    expect(canTransitionReception("COMPLETED", "EVIDENCE")).toBe(false)
-  })
+    expect(canTransitionReception("PROGRAMMING", "REVIEW")).toBe(true);
+    expect(canTransitionReception("EVIDENCE", "PALLETS")).toBe(true);
+    expect(canTransitionReception("PROGRAMMING", "PALLETS")).toBe(false);
+    expect(transitionReception({ ...session, phase: "EVIDENCE" }, "PALLETS").phase).toBe("PALLETS");
+    expect(canTransitionReception("PALLETS", "CONFIRMED")).toBe(true);
+    expect(canTransitionReception("CONFIRMED", "COMPLETED")).toBe(true);
+    expect(canTransitionReception("COMPLETED", "EVIDENCE")).toBe(false);
+  });
 
   it("rejects a transition without a stable session", () => {
-    expect(() =>
-      transitionReception({ phase: "PROGRAMMING", data: null }, "REVIEW"),
-    ).toThrow("Invalid reception transition")
-  })
-})
+    expect(() => transitionReception({ phase: "PROGRAMMING", data: null }, "REVIEW")).toThrow(
+      "Invalid reception transition",
+    );
+  });
+});

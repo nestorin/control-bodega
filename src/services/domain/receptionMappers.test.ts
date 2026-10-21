@@ -1,9 +1,6 @@
-import { describe, expect, it } from "vitest"
-import {
-  matchReceptionLinesToCatalog,
-  ocrResponseToReceptionLines,
-} from "./ocrToReception"
-import { programacionToAppReception } from "./programacionToApp"
+import { describe, expect, it } from "vitest";
+import { matchReceptionLinesToCatalog, ocrResponseToReceptionLines } from "./ocrToReception";
+import { programacionToAppReception } from "./programacionToApp";
 
 describe("reception boundary mappers", () => {
   it("normalizes OCR products into UI lines and matches catalog products", () => {
@@ -30,16 +27,16 @@ describe("reception boundary mappers", () => {
         lineas_detectadas: [],
       },
       tipo: "oc" as const,
-    }
-    const lines = ocrResponseToReceptionLines(response)
+    };
+    const lines = ocrResponseToReceptionLines(response);
     const matched = matchReceptionLinesToCatalog(lines, [
       { id: "p1", nombre: "Azucar", sku: "SKU-1", codigosProveedor: ["SKU-1"] },
-    ])
+    ]);
     expect(matched[0]).toMatchObject({
       productId: "p1",
       estadoMatch: "confirmado",
-    })
-  })
+    });
+  });
 
   it("maps wizard output to App state with a derived pallet total", () => {
     const state = programacionToAppReception({
@@ -61,8 +58,8 @@ describe("reception boundary mappers", () => {
           conversionMatch: true,
         },
       ],
-    })
-    expect(state.tarimasTotal).toBe(1)
-    expect(state.conversiones).toHaveLength(1)
-  })
-})
+    });
+    expect(state.tarimasTotal).toBe(1);
+    expect(state.conversiones).toHaveLength(1);
+  });
+});

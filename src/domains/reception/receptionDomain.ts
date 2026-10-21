@@ -16,9 +16,9 @@ import type {
   CATALOGO_CONVERSIONES_DEFAULT,
   OcrProduct,
   Producto,
-} from "@/types/domain"
+} from "@/types/domain";
 
-import { CATALOGO_CONVERSIONES_DEFAULT as CATALOGO } from "@/types/domain"
+import { CATALOGO_CONVERSIONES_DEFAULT as CATALOGO } from "@/types/domain";
 
 // Re-exportar tipos compartidos para compatibilidad
 export type {
@@ -29,9 +29,9 @@ export type {
   ConversionProp,
   OcrProduct,
   Producto,
-} from "@/types/domain"
+} from "@/types/domain";
 
-export { CATALOGO_CONVERSIONES_DEFAULT } from "@/types/domain"
+export { CATALOGO_CONVERSIONES_DEFAULT } from "@/types/domain";
 
 // ===== MAPPER OCR → ReceptionLineState =====
 
@@ -55,7 +55,7 @@ export function ocrProductsToMatchedProducts(
             (cat.codigosProveedor ?? []).some(
               (cp) => cp.toUpperCase() === ocrProduct.codigo!.toUpperCase(),
             )),
-      )
+      );
 
       return {
         productId: match?.id ?? null,
@@ -66,17 +66,15 @@ export function ocrProductsToMatchedProducts(
         precio: ocrProduct.precio,
         importe: ocrProduct.importe,
         estadoMatch: match ? "confirmado" : "sugerido",
-      }
-    })
+      };
+    });
 }
 
 /**
  * Convierte productos OCR crudos (sin catálogo) a líneas de recepción
  * Usado cuando no hay catálogo disponible.
  */
-export function ocrProductsToReceptionLines(
-  ocrProducts: OcrProduct[],
-): ReceptionLineState[] {
+export function ocrProductsToReceptionLines(ocrProducts: OcrProduct[]): ReceptionLineState[] {
   return ocrProducts
     .filter((p) => p.cantidad > 0 && p.nombre.trim().length > 0)
     .map((ocrProduct) => ({
@@ -88,7 +86,7 @@ export function ocrProductsToReceptionLines(
       precio: ocrProduct.precio,
       importe: ocrProduct.importe,
       estadoMatch: "sugerido",
-    }))
+    }));
 }
 
 // ===== CÁLCULOS DE CONVERSIÓN =====
@@ -105,15 +103,13 @@ export function calculateConversions(
     .map((product) => {
       // Buscar conversión por nombre de producto (defensivo contra undefined)
       const conversion = conversionCatalog.find(
-        (c) =>
-          c?.producto?.trim?.().toUpperCase() ===
-          product.nombre?.trim?.().toUpperCase(),
-      )
+        (c) => c?.producto?.trim?.().toUpperCase() === product.nombre?.trim?.().toUpperCase(),
+      );
 
-      const cajasPorTarima = conversion?.cajasPorTarima ?? 10
-      const cajas = product.cantidad // asumimos cantidad ya está en cajas
-      const tarimas = Math.ceil(cajas / cajasPorTarima)
-      const stickers = tarimas * 4 // 4 stickers por tarima
+      const cajasPorTarima = conversion?.cajasPorTarima ?? 10;
+      const cajas = product.cantidad; // asumimos cantidad ya está en cajas
+      const tarimas = Math.ceil(cajas / cajasPorTarima);
+      const stickers = tarimas * 4; // 4 stickers por tarima
 
       return {
         producto: product.nombre,
@@ -124,17 +120,15 @@ export function calculateConversions(
         tarimas,
         stickers,
         conversionMatch: !!conversion,
-      }
-    })
+      };
+    });
 }
 
 /**
  * Calcula total de tarimas
  */
-export function calculateTotalTarimas(
-  conversions: ReceptionConversion[],
-): number {
-  return conversions.reduce((sum, c) => sum + c.tarimas, 0)
+export function calculateTotalTarimas(conversions: ReceptionConversion[]): number {
+  return conversions.reduce((sum, c) => sum + c.tarimas, 0);
 }
 
 // ===== CONSTRUCCIÓN DE DRAFT =====
@@ -147,35 +141,35 @@ export function calculateTotalTarimas(
  */
 export function buildReceptionDraft(
   state: {
-    folio: string | null
-    fecha: string | null
-    proveedor: string | null
-    total: string | null
-    productos: OcrProduct[] | ReceptionLineState[]
-    warehouseId: string | null
-    supplierId: string | null
-    tarimasTotal: number
-    conversiones: ReceptionConversion[]
+    folio: string | null;
+    fecha: string | null;
+    proveedor: string | null;
+    total: string | null;
+    productos: OcrProduct[] | ReceptionLineState[];
+    warehouseId: string | null;
+    supplierId: string | null;
+    tarimasTotal: number;
+    conversiones: ReceptionConversion[];
   },
   catalogProductsOrConversions?: Producto[] | ConversionProp[],
   conversionCatalog?: ConversionProp[],
 ): ReceptionDraft {
-  const catalog = conversionCatalog ?? CATALOGO
-  const products = state.productos
+  const catalog = conversionCatalog ?? CATALOGO;
+  const products = state.productos;
   const catalogProducts =
     Array.isArray(catalogProductsOrConversions) &&
     catalogProductsOrConversions.length > 0 &&
     "nombre" in catalogProductsOrConversions[0]
-      ? catalogProductsOrConversions as Producto[]
-      : []
+      ? (catalogProductsOrConversions as Producto[])
+      : [];
   const lines: ReceptionLineState[] =
     products.length > 0 && "linea" in products[0]
       ? ocrProductsToMatchedProducts(products as OcrProduct[], catalogProducts)
-      : products as ReceptionLineState[]
+      : (products as ReceptionLineState[]);
 
   // Calcular conversiones a partir de líneas confirmadas
-  const conversions = calculateConversions(lines, catalog)
-  const tarimasTotal = calculateTotalTarimas(conversions)
+  const conversions = calculateConversions(lines, catalog);
+  const tarimasTotal = calculateTotalTarimas(conversions);
 
   return {
     folio: state.folio,
@@ -187,47 +181,45 @@ export function buildReceptionDraft(
     supplierId: state.supplierId,
     tarimasTotal,
     conversiones: conversions,
-  }
+  };
 }
 
 // ===== VALIDACIONES DE DOMINIO =====
 
-export function validateReceptionDraft(
-  draft: ReceptionDraft,
-): ValidationResult {
-  const errors: string[] = []
+export function validateReceptionDraft(draft: ReceptionDraft): ValidationResult {
+  const errors: string[] = [];
 
   if (!draft.folio || draft.folio.trim() === "") {
-    errors.push("Folio es requerido")
+    errors.push("Folio es requerido");
   }
 
   if (!draft.fecha || draft.fecha.trim() === "") {
-    errors.push("Fecha es requerida")
+    errors.push("Fecha es requerida");
   }
 
   if (!draft.proveedor || draft.proveedor.trim() === "") {
-    errors.push("Proveedor es requerido")
+    errors.push("Proveedor es requerido");
   }
 
   if (!draft.warehouseId) {
-    errors.push("Almacén es requerido")
+    errors.push("Almacén es requerido");
   }
 
   if (!draft.supplierId) {
-    errors.push("Proveedor logístico es requerido")
+    errors.push("Proveedor logístico es requerido");
   }
 
   if (draft.lineas.length === 0) {
-    errors.push("Debe haber al menos un producto")
+    errors.push("Debe haber al menos un producto");
   }
 
-  const productosSinCantidad = draft.lineas.filter((l) => l.cantidad <= 0)
+  const productosSinCantidad = draft.lineas.filter((l) => l.cantidad <= 0);
   if (productosSinCantidad.length > 0) {
-    errors.push(`${productosSinCantidad.length} producto(s) sin cantidad`)
+    errors.push(`${productosSinCantidad.length} producto(s) sin cantidad`);
   }
 
   return {
     valid: errors.length === 0,
     errors,
-  }
+  };
 }

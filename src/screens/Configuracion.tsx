@@ -1,61 +1,61 @@
-import { useState, useEffect } from "react"
-import { isFeatureEnabled } from "@/config/featureFlags"
-import { createFirestoreServices } from "@/services/firestore"
-import { db } from "@/lib/firebase"
-import { useAuthorization, isPermissionDenied } from "@/hooks/useAuthorization"
-import { WAREHOUSE_IDS } from "@/config/warehouses"
+import { useState, useEffect } from "react";
+import { isFeatureEnabled } from "@/config/featureFlags";
+import { createFirestoreServices } from "@/services/firestore";
+import { db } from "@/lib/firebase";
+import { useAuthorization, isPermissionDenied } from "@/hooks/useAuthorization";
+import { WAREHOUSE_IDS } from "@/config/warehouses";
 import {
   CANONICAL_SUPPLIER_LOCAL,
   mergeSupplierCatalog,
   normalizeSupplierType,
-} from "@/config/supplierCatalog"
+} from "@/config/supplierCatalog";
 import type {
   ProductDoc,
   SupplierDoc,
   WarehouseDoc,
   ConversionDoc,
-} from "@/services/firestore/types"
+} from "@/services/firestore/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface Almacen {
-  id: string
-  nombre: string
-  ubicacion: string
-  responsable: string
-  activo: boolean
-  creadoEn: string
+  id: string;
+  nombre: string;
+  ubicacion: string;
+  responsable: string;
+  activo: boolean;
+  creadoEn: string;
 }
 
 export interface Conversion {
-  id: string
-  producto: string
-  piezasPorCaja: number
-  cajasPorTarima: number
-  pesoKgCaja: string
+  id: string;
+  producto: string;
+  piezasPorCaja: number;
+  cajasPorTarima: number;
+  pesoKgCaja: string;
 }
 
 export interface Proveedor {
-  id: string
-  nombre: string
-  contacto: string
-  telefono: string
-  email: string
-  tipo: "mercancia" | "logistica"
+  id: string;
+  nombre: string;
+  contacto: string;
+  telefono: string;
+  email: string;
+  tipo: "mercancia" | "logistica";
 }
 
 export interface Producto {
-  id: string
-  nombre: string
-  sku: string
-  categoria: string
-  unidad: "cajas" | "piezas" | "kg"
-  activo: boolean
+  id: string;
+  nombre: string;
+  sku: string;
+  categoria: string;
+  unidad: "cajas" | "piezas" | "kg";
+  activo: boolean;
   /** Codes printed by suppliers on invoices, normalized to uppercase. */
-  codigosProveedor?: string[]
+  codigosProveedor?: string[];
 }
 
-export { Select }
+export { Select };
 
 // ─── Seed data ────────────────────────────────────────────────────────────────
 
@@ -76,7 +76,7 @@ export const ALMACENES_INIT: Almacen[] = [
     activo: false,
     creadoEn: "2024-06-01",
   },
-]
+];
 
 export const CONVERSIONES_INIT: Conversion[] = [
   {
@@ -121,12 +121,12 @@ export const CONVERSIONES_INIT: Conversion[] = [
     cajasPorTarima: 50,
     pesoKgCaja: "10.8",
   },
-]
+];
 
 // Firestore is authoritative in production. Keep local fixtures only for the
 // explicit mock-auth flow so nonexistent logistics providers are not shown.
 export const PROVEEDORES_INIT: Proveedor[] =
-  import.meta.env.VITE_USE_MOCK_AUTH === "true" ? CANONICAL_SUPPLIER_LOCAL : []
+  import.meta.env.VITE_USE_MOCK_AUTH === "true" ? CANONICAL_SUPPLIER_LOCAL : [];
 
 export const PRODUCTOS_INIT: Producto[] = [
   {
@@ -256,18 +256,18 @@ export const PRODUCTOS_INIT: Producto[] = [
     activo: true,
   },
   */
-]
+];
 
 // ─── Helpers / shared UI ──────────────────────────────────────────────────────
 
-type Tab = "almacenes" | "conversiones" | "mercancias" | "logistica" | "productos"
+type Tab = "almacenes" | "conversiones" | "mercancias" | "logistica" | "productos";
 
 function SectionCard({
   children,
   className = "",
 }: {
-  children: React.ReactNode
-  className?: string
+  children: React.ReactNode;
+  className?: string;
 }) {
   return (
     <div
@@ -275,7 +275,7 @@ function SectionCard({
     >
       {children}
     </div>
-  )
+  );
 }
 
 function Label({ children }: { children: React.ReactNode }) {
@@ -286,7 +286,7 @@ function Label({ children }: { children: React.ReactNode }) {
     >
       {children}
     </p>
-  )
+  );
 }
 
 function Input({
@@ -295,10 +295,10 @@ function Input({
   placeholder,
   type = "text",
 }: {
-  value: string | number
-  onChange: (v: string) => void
-  placeholder?: string
-  type?: string
+  value: string | number;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  type?: string;
 }) {
   return (
     <input
@@ -309,7 +309,7 @@ function Input({
       className="border border-[#dce4e7] rounded-[10px] px-3 py-[8px] text-[13px] text-[#172126] w-full outline-none focus:border-[#3276a8] transition-colors bg-white"
       style={{ fontFamily: "'Inter',sans-serif" }}
     />
-  )
+  );
 }
 
 function Btn({
@@ -320,22 +320,20 @@ function Btn({
   disabled = false,
   className = "",
 }: {
-  children: React.ReactNode
-  onClick?: () => void
-  variant?: "primary" | "secondary" | "danger" | "ghost"
-  small?: boolean
-  disabled?: boolean
-  className?: string
+  children: React.ReactNode;
+  onClick?: () => void;
+  variant?: "primary" | "secondary" | "danger" | "ghost";
+  small?: boolean;
+  disabled?: boolean;
+  className?: string;
 }) {
-  const sz = small ? "px-3 py-[5px] text-[11px]" : "px-4 py-[9px] text-[13px]"
+  const sz = small ? "px-3 py-[5px] text-[11px]" : "px-4 py-[9px] text-[13px]";
   const styles: Record<string, string> = {
     primary: "bg-[#16343f] text-white hover:bg-[#1e4655]",
-    secondary:
-      "bg-white border border-[#dce4e7] text-[#16343f] hover:bg-[#f4f7f8]",
-    danger:
-      "bg-[#fdecea] text-[#c0392b] border border-[#f5c6c2] hover:bg-[#fbd5d1]",
+    secondary: "bg-white border border-[#dce4e7] text-[#16343f] hover:bg-[#f4f7f8]",
+    danger: "bg-[#fdecea] text-[#c0392b] border border-[#f5c6c2] hover:bg-[#fbd5d1]",
     ghost: "bg-transparent text-[#607078] hover:bg-[#f4f7f8]",
-  }
+  };
   return (
     <button
       onClick={onClick}
@@ -347,7 +345,7 @@ function Btn({
     >
       {children}
     </button>
-  )
+  );
 }
 
 function Badge({
@@ -355,17 +353,23 @@ function Badge({
   color,
   className = "",
 }: {
-  label: string
-  color: string
-  className?: string
+  label: string;
+  color: string;
+  className?: string;
 }) {
-  const map: Record<string, { bg: string; text: string }> = {
+  const map: Record<
+    string,
+    {
+      bg: string;
+      text: string;
+    }
+  > = {
     green: { bg: "#e2f5ec", text: "#16845b" },
     gray: { bg: "#f0f4f5", text: "#607078" },
     blue: { bg: "#e8eef6", text: "#3276a8" },
     amber: { bg: "#fff3cd", text: "#856404" },
-  }
-  const c = map[color] ?? map.gray
+  };
+  const c = map[color] ?? map.gray;
   return (
     <span
       className={`text-[11px] font-bold px-[9px] py-[3px] rounded-full ${className}`}
@@ -377,7 +381,7 @@ function Badge({
     >
       {label}
     </span>
-  )
+  );
 }
 
 function Select({
@@ -390,14 +394,17 @@ function Select({
   name,
   "aria-label": ariaLabel,
 }: {
-  value: string
-  onChange: (v: string) => void
-  options: { value: string; label: string }[]
-  placeholder?: string
-  disabled?: boolean
-  id?: string
-  name?: string
-  "aria-label"?: string
+  value: string;
+  onChange: (v: string) => void;
+  options: {
+    value: string;
+    label: string;
+  }[];
+  placeholder?: string;
+  disabled?: boolean;
+  id?: string;
+  name?: string;
+  "aria-label"?: string;
 }) {
   return (
     <select
@@ -421,7 +428,7 @@ function Select({
         </option>
       ))}
     </select>
-  )
+  );
 }
 
 function PlusIcon() {
@@ -439,7 +446,7 @@ function PlusIcon() {
       <line x1="12" y1="5" x2="12" y2="19" />
       <line x1="5" y1="12" x2="19" y2="12" />
     </svg>
-  )
+  );
 }
 
 function TrashIcon() {
@@ -460,7 +467,7 @@ function TrashIcon() {
       <path d="M14 11v6" />
       <path d="M9 6V4h6v2" />
     </svg>
-  )
+  );
 }
 
 function EditIcon() {
@@ -478,7 +485,7 @@ function EditIcon() {
       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
     </svg>
-  )
+  );
 }
 
 // ─── Modal shell ──────────────────────────────────────────────────────────────
@@ -488,9 +495,9 @@ function Modal({
   onClose,
   children,
 }: {
-  title: string
-  onClose: () => void
-  children: React.ReactNode
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
 }) {
   return (
     <div
@@ -524,12 +531,10 @@ function Modal({
             </svg>
           </button>
         </div>
-        <div className="overflow-y-auto flex-1 px-5 lg:px-6 py-5">
-          {children}
-        </div>
+        <div className="overflow-y-auto flex-1 px-5 lg:px-6 py-5">{children}</div>
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Almacenes tab ────────────────────────────────────────────────────────────
@@ -543,78 +548,77 @@ function TabAlmacenes({
   onDelete,
   firestoreReady,
 }: {
-  almacenes: Almacen[]
-  setAlmacenes: React.Dispatch<React.SetStateAction<Almacen[]>>
-  onActivarAlmacen: (id: string) => void
-  onCreate: (form: {
-    nombre: string
-    ubicacion: string
-    responsable: string
-  }) => Promise<void>
+  almacenes: Almacen[];
+  setAlmacenes: React.Dispatch<React.SetStateAction<Almacen[]>>;
+  onActivarAlmacen: (id: string) => void;
+  onCreate: (form: { nombre: string; ubicacion: string; responsable: string }) => Promise<void>;
   onUpdate: (
     editing: Almacen,
-    form: { nombre: string; ubicacion: string; responsable: string },
-  ) => Promise<void>
-  onDelete: (id: string) => Promise<void>
-  firestoreReady: boolean
+    form: {
+      nombre: string;
+      ubicacion: string;
+      responsable: string;
+    },
+  ) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  firestoreReady: boolean;
 }) {
-  const [modal, setModal] = useState(false)
-  const [editing, setEditing] = useState<Almacen | null>(null)
+  const [modal, setModal] = useState(false);
+  const [editing, setEditing] = useState<Almacen | null>(null);
   const [form, setForm] = useState({
     nombre: "",
     ubicacion: "",
     responsable: "",
-  })
-  const [deleteTarget, setDeleteTarget] = useState<Almacen | null>(null)
-  const [deleteConfirmation, setDeleteConfirmation] = useState("")
+  });
+  const [deleteTarget, setDeleteTarget] = useState<Almacen | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
 
   function openNew() {
-    setEditing(null)
-    setForm({ nombre: "", ubicacion: "", responsable: "" })
-    setModal(true)
+    setEditing(null);
+    setForm({ nombre: "", ubicacion: "", responsable: "" });
+    setModal(true);
   }
 
   function openEdit(a: Almacen) {
-    setEditing(a)
+    setEditing(a);
     setForm({
       nombre: a.nombre,
       ubicacion: a.ubicacion,
       responsable: a.responsable,
-    })
-    setModal(true)
+    });
+    setModal(true);
   }
 
   async function save() {
     if (editing) {
-      await onUpdate(editing, form)
+      await onUpdate(editing, form);
     } else {
-      await onCreate(form)
+      await onCreate(form);
     }
-    setForm({ nombre: "", ubicacion: "", responsable: "" })
-    setModal(false)
-    setEditing(null)
+    setForm({ nombre: "", ubicacion: "", responsable: "" });
+    setModal(false);
+    setEditing(null);
   }
 
   function toggleActivo(id: string) {
-    setAlmacenes((prev) => prev.map((a) => ({ ...a, activo: a.id === id })))
-    onActivarAlmacen(id)
+    setAlmacenes((prev) => prev.map((a) => ({ ...a, activo: a.id === id })));
+    onActivarAlmacen(id);
   }
 
   function openDelete(a: Almacen) {
-    setDeleteTarget(a)
-    setDeleteConfirmation("")
+    setDeleteTarget(a);
+    setDeleteConfirmation("");
   }
 
   function confirmDelete() {
     if (deleteConfirmation.trim() !== deleteTarget?.nombre) {
-      return
+      return;
     }
-    onDelete(deleteTarget!.id)
-    setDeleteTarget(null)
+    onDelete(deleteTarget!.id);
+    setDeleteTarget(null);
   }
 
-  const canSave =
-    form.nombre.trim() && form.ubicacion.trim() && form.responsable.trim()
+  const canSave = form.nombre.trim() && form.ubicacion.trim() && form.responsable.trim();
 
   return (
     <div className="flex flex-col gap-4">
@@ -630,8 +634,7 @@ function TabAlmacenes({
             className="text-[13px] text-[#607078] mt-[2px]"
             style={{ fontFamily: "'Inter',sans-serif" }}
           >
-            El almacén activo es el destino de todas las operaciones de
-            inventario.
+            El almacén activo es el destino de todas las operaciones de inventario.
           </p>
         </div>
         <Btn onClick={openNew}>
@@ -676,12 +679,8 @@ function TabAlmacenes({
                   >
                     {a.nombre}
                   </p>
-                  {a.activo && (
-                    <Badge label="Activo" color="green" className="shrink-0" />
-                  )}
-                  {!a.activo && (
-                    <Badge label="Inactivo" color="gray" className="shrink-0" />
-                  )}
+                  {a.activo && <Badge label="Activo" color="green" className="shrink-0" />}
+                  {!a.activo && <Badge label="Inactivo" color="gray" className="shrink-0" />}
                 </div>
                 <p
                   className="text-[11px] lg:text-[12px] text-[#607078] mt-[2px] truncate"
@@ -741,8 +740,8 @@ function TabAlmacenes({
         <Modal
           title={editing ? "Editar almacén" : "Nuevo almacén"}
           onClose={() => {
-            setModal(false)
-            setEditing(null)
+            setModal(false);
+            setEditing(null);
           }}
         >
           <div className="flex flex-col gap-4">
@@ -790,17 +789,16 @@ function TabAlmacenes({
                 className="text-[12px] text-[#3276a8]"
                 style={{ fontFamily: "'Inter',sans-serif" }}
               >
-                Al dar de alta este almacén se creará un inventario
-                independiente para él. Para activarlo, selecciónalo después en
-                la lista.
+                Al dar de alta este almacén se creará un inventario independiente para él. Para
+                activarlo, selecciónalo después en la lista.
               </p>
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <Btn
                 variant="secondary"
                 onClick={() => {
-                  setModal(false)
-                  setEditing(null)
+                  setModal(false);
+                  setEditing(null);
                 }}
               >
                 Cancelar
@@ -844,8 +842,7 @@ function TabAlmacenes({
                   className="text-[12px] text-[#c0392b] mt-[2px]"
                   style={{ fontFamily: "'Inter',sans-serif" }}
                 >
-                  Esta acción eliminará el almacén y su inventario asociado de
-                  forma permanente.
+                  Esta acción eliminará el almacén y su inventario asociado de forma permanente.
                 </p>
               </div>
             </div>
@@ -877,7 +874,7 @@ function TabAlmacenes({
         </Modal>
       )}
     </div>
-  )
+  );
 }
 
 // ─── Conversiones tab ─────────────────────────────────────────────────────────
@@ -889,75 +886,74 @@ function TabConversiones({
   onUpdate,
   onDelete,
 }: {
-  conversiones: Conversion[]
-  setConversiones: React.Dispatch<React.SetStateAction<Conversion[]>>
+  conversiones: Conversion[];
+  setConversiones: React.Dispatch<React.SetStateAction<Conversion[]>>;
   onCreate: (form: {
-    producto: string
-    piezasPorCaja: string
-    cajasPorTarima: string
-    pesoKgCaja: string
-  }) => Promise<void>
+    producto: string;
+    piezasPorCaja: string;
+    cajasPorTarima: string;
+    pesoKgCaja: string;
+  }) => Promise<void>;
   onUpdate: (
     editing: Conversion,
     form: {
-      producto: string
-      piezasPorCaja: string
-      cajasPorTarima: string
-      pesoKgCaja: string
+      producto: string;
+      piezasPorCaja: string;
+      cajasPorTarima: string;
+      pesoKgCaja: string;
     },
-  ) => Promise<void>
-  onDelete: (id: string) => Promise<void>
+  ) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
-  const [modal, setModal] = useState(false)
-  const [editing, setEditing] = useState<Conversion | null>(null)
+  const [modal, setModal] = useState(false);
+  const [editing, setEditing] = useState<Conversion | null>(null);
   const [form, setForm] = useState({
     producto: "",
     piezasPorCaja: "",
     cajasPorTarima: "",
     pesoKgCaja: "",
-  })
-  const [search, setSearch] = useState("")
+  });
+  const [search, setSearch] = useState("");
 
   function openNew() {
-    setEditing(null)
+    setEditing(null);
     setForm({
       producto: "",
       piezasPorCaja: "",
       cajasPorTarima: "",
       pesoKgCaja: "",
-    })
-    setModal(true)
+    });
+    setModal(true);
   }
 
   function openEdit(c: Conversion) {
-    setEditing(c)
+    setEditing(c);
     setForm({
       producto: c.producto,
       piezasPorCaja: String(c.piezasPorCaja),
       cajasPorTarima: String(c.cajasPorTarima),
       pesoKgCaja: c.pesoKgCaja,
-    })
-    setModal(true)
+    });
+    setModal(true);
   }
 
   async function save() {
     if (editing) {
-      await onUpdate(editing, form)
+      await onUpdate(editing, form);
     } else {
-      await onCreate(form)
+      await onCreate(form);
     }
-    setModal(false)
+    setModal(false);
   }
 
   async function eliminar(id: string) {
-    await onDelete(id)
+    await onDelete(id);
   }
 
   const filtered = conversiones.filter((c) =>
     c.producto.toLowerCase().includes(search.toLowerCase()),
-  )
-  const canSave =
-    form.producto.trim() && form.piezasPorCaja && form.cajasPorTarima
+  );
+  const canSave = form.producto.trim() && form.piezasPorCaja && form.cajasPorTarima;
 
   return (
     <div className="flex flex-col gap-4">
@@ -973,8 +969,7 @@ function TabConversiones({
             className="text-[13px] text-[#607078] mt-[2px]"
             style={{ fontFamily: "'Inter',sans-serif" }}
           >
-            Estas equivalencias se usan en Embarques para calcular tarimas
-            automáticamente.
+            Estas equivalencias se usan en Embarques para calcular tarimas automáticamente.
           </p>
         </div>
         <Btn onClick={openNew}>
@@ -1011,13 +1006,7 @@ function TabConversiones({
           <table className="w-full text-left responsive-table">
             <thead>
               <tr className="border-b border-[#dce4e7]">
-                {[
-                  "Producto",
-                  "Piezas / caja",
-                  "Cajas / tarima",
-                  "Peso kg/caja",
-                  "",
-                ].map((h) => (
+                {["Producto", "Piezas / caja", "Cajas / tarima", "Peso kg/caja", ""].map((h) => (
                   <th
                     key={h}
                     className="px-4 py-3 text-[11px] font-bold uppercase text-[#607078]"
@@ -1055,10 +1044,7 @@ function TabConversiones({
                   >
                     {c.cajasPorTarima}
                   </td>
-                  <td
-                    className="px-4 py-3 text-[13px] text-[#607078]"
-                    data-label="Peso kg/caja"
-                  >
+                  <td className="px-4 py-3 text-[13px] text-[#607078]" data-label="Peso kg/caja">
                     {c.pesoKgCaja ? `${c.pesoKgCaja} kg` : "—"}
                   </td>
                   <td className="px-4 py-3" data-label="Acciones">
@@ -1066,11 +1052,7 @@ function TabConversiones({
                       <Btn variant="ghost" small onClick={() => openEdit(c)}>
                         <EditIcon />
                       </Btn>
-                      <Btn
-                        variant="danger"
-                        small
-                        onClick={() => eliminar(c.id)}
-                      >
+                      <Btn variant="danger" small onClick={() => eliminar(c.id)}>
                         <TrashIcon />
                       </Btn>
                     </div>
@@ -1121,9 +1103,7 @@ function TabConversiones({
                 <Label>Cajas por tarima</Label>
                 <Input
                   value={form.cajasPorTarima}
-                  onChange={(v) =>
-                    setForm((f) => ({ ...f, cajasPorTarima: v }))
-                  }
+                  onChange={(v) => setForm((f) => ({ ...f, cajasPorTarima: v }))}
                   type="number"
                   placeholder="60"
                 />
@@ -1149,7 +1129,7 @@ function TabConversiones({
         </Modal>
       )}
     </div>
-  )
+  );
 }
 
 // ─── Proveedores tab ──────────────────────────────────────────────────────────
@@ -1162,72 +1142,74 @@ function TabProveedores({
   onUpdate,
   onDelete,
 }: {
-  tipo: "mercancia" | "logistica"
-  proveedores: Proveedor[]
-  setProveedores: React.Dispatch<React.SetStateAction<Proveedor[]>>
+  tipo: "mercancia" | "logistica";
+  proveedores: Proveedor[];
+  setProveedores: React.Dispatch<React.SetStateAction<Proveedor[]>>;
   onCreate: (form: {
-    nombre: string
-    contacto: string
-    telefono: string
-    email: string
-  }) => Promise<void>
+    nombre: string;
+    contacto: string;
+    telefono: string;
+    email: string;
+  }) => Promise<void>;
   onUpdate: (
     editing: Proveedor,
-    form: { nombre: string; contacto: string; telefono: string; email: string },
-  ) => Promise<void>
-  onDelete: (id: string) => Promise<void>
+    form: {
+      nombre: string;
+      contacto: string;
+      telefono: string;
+      email: string;
+    },
+  ) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
-  const [modal, setModal] = useState(false)
-  const [editing, setEditing] = useState<Proveedor | null>(null)
+  const [modal, setModal] = useState(false);
+  const [editing, setEditing] = useState<Proveedor | null>(null);
   const [form, setForm] = useState({
     nombre: "",
     contacto: "",
     telefono: "",
     email: "",
-  })
+  });
 
-  const lista = proveedores.filter((p) => p.tipo === tipo)
+  const lista = proveedores.filter((p) => p.tipo === tipo);
 
   function openNew() {
-    setEditing(null)
-    setForm({ nombre: "", contacto: "", telefono: "", email: "" })
-    setModal(true)
+    setEditing(null);
+    setForm({ nombre: "", contacto: "", telefono: "", email: "" });
+    setModal(true);
   }
 
   function openEdit(p: Proveedor) {
-    setEditing(p)
+    setEditing(p);
     setForm({
       nombre: p.nombre,
       contacto: p.contacto,
       telefono: p.telefono,
       email: p.email,
-    })
-    setModal(true)
+    });
+    setModal(true);
   }
 
   async function save() {
     if (editing) {
-      await onUpdate(editing, form)
+      await onUpdate(editing, form);
     } else {
-      await onCreate(form)
+      await onCreate(form);
     }
-    setModal(false)
+    setModal(false);
   }
 
   async function eliminar(id: string) {
-    await onDelete(id)
+    await onDelete(id);
   }
 
-  const canSave = form.nombre.trim() && form.contacto.trim()
+  const canSave = form.nombre.trim() && form.contacto.trim();
 
-  const label =
-    tipo === "mercancia"
-      ? "Proveedores de mercancía"
-      : "Proveedores de logística"
+  const label = tipo === "mercancia" ? "Proveedores de mercancía" : "Proveedores de logística";
   const desc =
     tipo === "mercancia"
       ? "Empresas que suministran productos al almacén."
-      : "Empresas de transporte y distribución que realizan los embarques."
+      : "Empresas de transporte y distribución que realizan los embarques.";
 
   return (
     <div className="flex flex-col gap-4">
@@ -1408,7 +1390,7 @@ function TabProveedores({
         </Modal>
       )}
     </div>
-  )
+  );
 }
 
 // ─── Productos tab ────────────────────────────────────────────────────────────
@@ -1421,78 +1403,78 @@ function TabProductos({
   onDelete,
   onToggleActivo,
 }: {
-  productos: Producto[]
-  setProductos: React.Dispatch<React.SetStateAction<Producto[]>>
+  productos: Producto[];
+  setProductos: React.Dispatch<React.SetStateAction<Producto[]>>;
   onCreate: (form: {
-    nombre: string
-    sku: string
-    categoria: string
-    unidad: Producto["unidad"]
-    codigosProveedor: string
-  }) => Promise<void>
+    nombre: string;
+    sku: string;
+    categoria: string;
+    unidad: Producto["unidad"];
+    codigosProveedor: string;
+  }) => Promise<void>;
   onUpdate: (
     editing: Producto,
     form: {
-      nombre: string
-      sku: string
-      categoria: string
-      unidad: Producto["unidad"]
-      codigosProveedor: string
+      nombre: string;
+      sku: string;
+      categoria: string;
+      unidad: Producto["unidad"];
+      codigosProveedor: string;
     },
-  ) => Promise<void>
-  onDelete: (id: string) => Promise<void>
-  onToggleActivo: (id: string) => Promise<void>
+  ) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  onToggleActivo: (id: string) => Promise<void>;
 }) {
-  const [modal, setModal] = useState(false)
-  const [editing, setEditing] = useState<Producto | null>(null)
+  const [modal, setModal] = useState(false);
+  const [editing, setEditing] = useState<Producto | null>(null);
   const [form, setForm] = useState({
     nombre: "",
     sku: "",
     categoria: "",
     unidad: "cajas" as Producto["unidad"],
     codigosProveedor: "",
-  })
-  const [search, setSearch] = useState("")
+  });
+  const [search, setSearch] = useState("");
 
   function openNew() {
-    setEditing(null)
+    setEditing(null);
     setForm({
       nombre: "",
       sku: "",
       categoria: "",
       unidad: "cajas",
       codigosProveedor: "",
-    })
-    setModal(true)
+    });
+    setModal(true);
   }
 
   function openEdit(p: Producto) {
-    setEditing(p)
+    setEditing(p);
     setForm({
       nombre: p.nombre,
       sku: p.sku,
       categoria: p.categoria,
       unidad: p.unidad,
       codigosProveedor: (p.codigosProveedor || []).join(", "),
-    })
-    setModal(true)
+    });
+    setModal(true);
   }
 
   async function save() {
     if (editing) {
-      await onUpdate(editing, form)
+      await onUpdate(editing, form);
     } else {
-      await onCreate(form)
+      await onCreate(form);
     }
-    setModal(false)
+    setModal(false);
   }
 
   async function toggleActivo(id: string) {
-    await onToggleActivo(id)
+    await onToggleActivo(id);
   }
 
   async function eliminar(id: string) {
-    await onDelete(id)
+    await onDelete(id);
   }
 
   const filtered = productos.filter(
@@ -1500,8 +1482,8 @@ function TabProductos({
       p.nombre.toLowerCase().includes(search.toLowerCase()) ||
       p.sku.toLowerCase().includes(search.toLowerCase()) ||
       p.categoria.toLowerCase().includes(search.toLowerCase()),
-  )
-  const canSave = form.nombre.trim() && form.sku.trim()
+  );
+  const canSave = form.nombre.trim() && form.sku.trim();
 
   return (
     <div className="flex flex-col gap-4">
@@ -1554,23 +1536,17 @@ function TabProductos({
           <table className="w-full text-left responsive-table">
             <thead>
               <tr className="border-b border-[#dce4e7]">
-                {[
-                  "Producto",
-                  "SKU",
-                  "Código factura",
-                  "Categoría",
-                  "Unidad",
-                  "Estado",
-                  "",
-                ].map((h) => (
-                  <th
-                    key={h}
-                    className="px-4 py-3 text-[11px] font-bold uppercase text-[#607078]"
-                    style={{ fontFamily: "'Inter',sans-serif" }}
-                  >
-                    {h}
-                  </th>
-                ))}
+                {["Producto", "SKU", "Código factura", "Categoría", "Unidad", "Estado", ""].map(
+                  (h) => (
+                    <th
+                      key={h}
+                      className="px-4 py-3 text-[11px] font-bold uppercase text-[#607078]"
+                      style={{ fontFamily: "'Inter',sans-serif" }}
+                    >
+                      {h}
+                    </th>
+                  ),
+                )}
               </tr>
             </thead>
             <tbody>
@@ -1588,10 +1564,7 @@ function TabProductos({
                   >
                     {p.nombre}
                   </td>
-                  <td
-                    className="px-4 py-3 text-[12px] text-[#607078] font-mono"
-                    data-label="SKU"
-                  >
+                  <td className="px-4 py-3 text-[12px] text-[#607078] font-mono" data-label="SKU">
                     {p.sku}
                   </td>
                   <td
@@ -1600,10 +1573,7 @@ function TabProductos({
                   >
                     {(p.codigosProveedor || []).join(", ") || "—"}
                   </td>
-                  <td
-                    className="px-4 py-3 text-[12px] text-[#607078]"
-                    data-label="Categoría"
-                  >
+                  <td className="px-4 py-3 text-[12px] text-[#607078]" data-label="Categoría">
                     {p.categoria || "—"}
                   </td>
                   <td
@@ -1623,18 +1593,10 @@ function TabProductos({
                       <Btn variant="ghost" small onClick={() => openEdit(p)}>
                         <EditIcon />
                       </Btn>
-                      <Btn
-                        variant="secondary"
-                        small
-                        onClick={() => toggleActivo(p.id)}
-                      >
+                      <Btn variant="secondary" small onClick={() => toggleActivo(p.id)}>
                         {p.activo ? "Desactivar" : "Activar"}
                       </Btn>
-                      <Btn
-                        variant="danger"
-                        small
-                        onClick={() => eliminar(p.id)}
-                      >
+                      <Btn variant="danger" small onClick={() => eliminar(p.id)}>
                         <TrashIcon />
                       </Btn>
                     </div>
@@ -1693,9 +1655,7 @@ function TabProductos({
               <Label>Códigos de factura del proveedor</Label>
               <Input
                 value={form.codigosProveedor}
-                onChange={(v) =>
-                  setForm((f) => ({ ...f, codigosProveedor: v }))
-                }
+                onChange={(v) => setForm((f) => ({ ...f, codigosProveedor: v }))}
                 placeholder="CB0401, CB0401-MX (separados por coma)"
               />
             </div>
@@ -1729,12 +1689,16 @@ function TabProductos({
         </Modal>
       )}
     </div>
-  )
+  );
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+const TABS: {
+  id: Tab;
+  label: string;
+  icon: React.ReactNode;
+}[] = [
   {
     id: "almacenes",
     label: "Almacenes",
@@ -1835,21 +1799,21 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
       </svg>
     ),
   },
-]
+];
 
 interface ConfiguracionProps {
-  productos: Producto[]
-  setProductos: React.Dispatch<React.SetStateAction<Producto[]>>
-  proveedores: Proveedor[]
-  setProveedores: React.Dispatch<React.SetStateAction<Proveedor[]>>
-  conversiones: Conversion[]
-  setConversiones: React.Dispatch<React.SetStateAction<Conversion[]>>
-  almacenes: Almacen[]
-  setAlmacenes: React.Dispatch<React.SetStateAction<Almacen[]>>
-  onActivarAlmacen: (id: string) => void
+  productos: Producto[];
+  setProductos: React.Dispatch<React.SetStateAction<Producto[]>>;
+  proveedores: Proveedor[];
+  setProveedores: React.Dispatch<React.SetStateAction<Proveedor[]>>;
+  conversiones: Conversion[];
+  setConversiones: React.Dispatch<React.SetStateAction<Conversion[]>>;
+  almacenes: Almacen[];
+  setAlmacenes: React.Dispatch<React.SetStateAction<Almacen[]>>;
+  onActivarAlmacen: (id: string) => void;
 }
 
-const ORG_ID = "org_exepa_001"
+const ORG_ID = "org_exepa_001";
 
 export default function Configuracion({
   productos,
@@ -1862,24 +1826,25 @@ export default function Configuracion({
   setAlmacenes,
   onActivarAlmacen,
 }: ConfiguracionProps) {
-  const { canQuery } = useAuthorization()
-  const [tab, setTab] = useState<Tab>("almacenes")
-  const [firestoreReady, setFirestoreReady] = useState(false)
-  const [fsServices, setFsServices] =
-    useState<ReturnType<typeof createFirestoreServices> | null>(null)
+  const { canQuery } = useAuthorization();
+  const [tab, setTab] = useState<Tab>("almacenes");
+  const [firestoreReady, setFirestoreReady] = useState(false);
+  const [fsServices, setFsServices] = useState<ReturnType<typeof createFirestoreServices> | null>(
+    null,
+  );
 
   // Initialize Firestore services when feature flag is enabled
   useEffect(() => {
     if (canQuery && isFeatureEnabled("USE_FIRESTORE_CATALOGOS") && db) {
-      const services = createFirestoreServices(db, ORG_ID)
-      setFsServices(services)
-      setFirestoreReady(true)
+      const services = createFirestoreServices(db, ORG_ID);
+      setFsServices(services);
+      setFirestoreReady(true);
     }
-  }, [canQuery])
+  }, [canQuery]);
 
   // Sync local state with Firestore (read)
   useEffect(() => {
-    if (!canQuery || !firestoreReady || !fsServices) return
+    if (!canQuery || !firestoreReady || !fsServices) return;
 
     // Load almacenes
     fsServices.warehouses
@@ -1896,15 +1861,11 @@ export default function Configuracion({
               w.createdAt?.toDate?.()?.toISOString?.().slice(0, 10) ||
               new Date().toISOString().slice(0, 10),
           })),
-        )
+        );
       })
       .catch((error: unknown) => {
-        console.error(
-          isPermissionDenied(error)
-            ? "No autorizado para leer almacenes"
-            : error,
-        )
-      })
+        console.error(isPermissionDenied(error) ? "No autorizado para leer almacenes" : error);
+      });
 
     // Load productos
     fsServices.products
@@ -1920,15 +1881,11 @@ export default function Configuracion({
             activo: true,
             codigosProveedor: p.supplierCodes || [],
           })),
-        )
+        );
       })
       .catch((error: unknown) => {
-        console.error(
-          isPermissionDenied(error)
-            ? "No autorizado para leer productos"
-            : error,
-        )
-      })
+        console.error(isPermissionDenied(error) ? "No autorizado para leer productos" : error);
+      });
 
     // Load proveedores
     fsServices.suppliers
@@ -1944,21 +1901,15 @@ export default function Configuracion({
               email: p.email || "",
               tipo: normalizeSupplierType(
                 p.tipo,
-                CANONICAL_SUPPLIER_LOCAL.find(
-                  (supplier) => supplier.id === p.id,
-                )?.tipo,
+                CANONICAL_SUPPLIER_LOCAL.find((supplier) => supplier.id === p.id)?.tipo,
               ),
             })),
           ),
-        )
+        );
       })
       .catch((error: unknown) => {
-        console.error(
-          isPermissionDenied(error)
-            ? "No autorizado para leer proveedores"
-            : error,
-        )
-      })
+        console.error(isPermissionDenied(error) ? "No autorizado para leer proveedores" : error);
+      });
 
     // Load conversiones
     fsServices.conversions
@@ -1972,24 +1923,20 @@ export default function Configuracion({
             cajasPorTarima: c.boxesPerPallet,
             pesoKgCaja: c.weightKgPerBox || "",
           })),
-        )
+        );
       })
       .catch((error: unknown) => {
-        console.error(
-          isPermissionDenied(error)
-            ? "No autorizado para leer conversiones"
-            : error,
-        )
-      })
-  }, [canQuery, firestoreReady, fsServices])
+        console.error(isPermissionDenied(error) ? "No autorizado para leer conversiones" : error);
+      });
+  }, [canQuery, firestoreReady, fsServices]);
 
-  const almacenActivo = almacenes.find((a) => a.activo)
+  const almacenActivo = almacenes.find((a) => a.activo);
 
   // Dual-write handlers
   const handleCreateAlmacen = async (form: {
-    nombre: string
-    ubicacion: string
-    responsable: string
+    nombre: string;
+    ubicacion: string;
+    responsable: string;
   }) => {
     const nuevo: Almacen = {
       id: `ALM-${String(almacenes.length + 1).padStart(3, "0")}`,
@@ -1998,8 +1945,8 @@ export default function Configuracion({
       responsable: form.responsable,
       activo: false,
       creadoEn: new Date().toISOString().slice(0, 10),
-    }
-    setAlmacenes((prev) => [...prev, nuevo])
+    };
+    setAlmacenes((prev) => [...prev, nuevo]);
 
     if (firestoreReady && fsServices) {
       try {
@@ -2010,20 +1957,22 @@ export default function Configuracion({
           },
           "user",
           `op-${Date.now()}`,
-        )
+        );
       } catch (e) {
-        console.error("Firestore create almacén failed:", e)
+        console.error("Firestore create almacén failed:", e);
       }
     }
-  }
+  };
 
   const handleUpdateAlmacen = async (
     editing: Almacen,
-    form: { nombre: string; ubicacion: string; responsable: string },
+    form: {
+      nombre: string;
+      ubicacion: string;
+      responsable: string;
+    },
   ) => {
-    setAlmacenes((prev) =>
-      prev.map((a) => (a.id === editing.id ? { ...a, ...form } : a)),
-    )
+    setAlmacenes((prev) => prev.map((a) => (a.id === editing.id ? { ...a, ...form } : a)));
 
     if (firestoreReady && fsServices) {
       try {
@@ -2032,36 +1981,36 @@ export default function Configuracion({
           { name: form.nombre },
           "user",
           `op-${Date.now()}`,
-        )
+        );
       } catch (e) {
-        console.error("Firestore update almacén failed:", e)
+        console.error("Firestore update almacén failed:", e);
       }
     }
-  }
+  };
 
   const handleDeleteAlmacen = async (id: string) => {
-    setAlmacenes((prev) => prev.filter((a) => a.id !== id))
+    setAlmacenes((prev) => prev.filter((a) => a.id !== id));
 
     if (firestoreReady && fsServices) {
       try {
-        await fsServices.warehouses.delete(id, "user", `op-${Date.now()}`)
+        await fsServices.warehouses.delete(id, "user", `op-${Date.now()}`);
       } catch (e) {
-        console.error("Firestore delete almacén failed:", e)
+        console.error("Firestore delete almacén failed:", e);
       }
     }
-  }
+  };
 
   const handleCreateProducto = async (form: {
-    nombre: string
-    sku: string
-    categoria: string
-    unidad: Producto["unidad"]
-    codigosProveedor: string
+    nombre: string;
+    sku: string;
+    categoria: string;
+    unidad: Producto["unidad"];
+    codigosProveedor: string;
   }) => {
     const codigosProveedor = form.codigosProveedor
       .split(",")
       .map((code) => code.trim().toUpperCase())
-      .filter(Boolean)
+      .filter(Boolean);
     const nuevo: Producto = {
       id: `PRD-${String(productos.length + 1).padStart(3, "0")}`,
       nombre: form.nombre.trim().toUpperCase(),
@@ -2070,8 +2019,8 @@ export default function Configuracion({
       unidad: form.unidad,
       activo: true,
       codigosProveedor,
-    }
-    setProductos((prev) => [...prev, nuevo])
+    };
+    setProductos((prev) => [...prev, nuevo]);
 
     if (firestoreReady && fsServices) {
       try {
@@ -2086,36 +2035,34 @@ export default function Configuracion({
           },
           "user",
           `op-${Date.now()}`,
-        )
+        );
       } catch (e) {
-        console.error("Firestore create producto failed:", e)
+        console.error("Firestore create producto failed:", e);
       }
     }
-  }
+  };
 
   const handleUpdateProducto = async (
     editing: Producto,
     form: {
-      nombre: string
-      sku: string
-      categoria: string
-      unidad: Producto["unidad"]
-      codigosProveedor: string
+      nombre: string;
+      sku: string;
+      categoria: string;
+      unidad: Producto["unidad"];
+      codigosProveedor: string;
     },
   ) => {
     const codigosProveedor = form.codigosProveedor
       .split(",")
       .map((code) => code.trim().toUpperCase())
-      .filter(Boolean)
+      .filter(Boolean);
     const normalized = {
       ...form,
       nombre: form.nombre.trim().toUpperCase(),
       sku: form.sku.trim().toUpperCase(),
       codigosProveedor,
-    }
-    setProductos((prev) =>
-      prev.map((p) => (p.id === editing.id ? { ...p, ...normalized } : p)),
-    )
+    };
+    setProductos((prev) => prev.map((p) => (p.id === editing.id ? { ...p, ...normalized } : p)));
 
     if (firestoreReady && fsServices) {
       try {
@@ -2128,36 +2075,39 @@ export default function Configuracion({
           },
           "user",
           `op-${Date.now()}`,
-        )
+        );
       } catch (e) {
-        console.error("Firestore update producto failed:", e)
+        console.error("Firestore update producto failed:", e);
       }
     }
-  }
+  };
 
   const handleDeleteProducto = async (id: string) => {
     if (!firestoreReady || !fsServices) {
-      setProductos((prev) => prev.filter((p) => p.id !== id))
-      return
+      setProductos((prev) => prev.filter((p) => p.id !== id));
+      return;
     }
 
     try {
-      await fsServices.products.delete(id, "user", `op-${Date.now()}`)
-      setProductos((prev) => prev.filter((p) => p.id !== id))
+      await fsServices.products.delete(id, "user", `op-${Date.now()}`);
+      setProductos((prev) => prev.filter((p) => p.id !== id));
     } catch (e) {
-      console.error("Firestore delete producto failed:", e)
+      console.error("Firestore delete producto failed:", e);
     }
-  }
+  };
 
   const handleToggleProductoActivo = async (id: string) => {
-    setProductos((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, activo: !p.activo } : p)),
-    )
-  }
+    setProductos((prev) => prev.map((p) => (p.id === id ? { ...p, activo: !p.activo } : p)));
+  };
 
   const handleCreateProveedor = async (
     tipo: "mercancia" | "logistica",
-    form: { nombre: string; contacto: string; telefono: string; email: string },
+    form: {
+      nombre: string;
+      contacto: string;
+      telefono: string;
+      email: string;
+    },
   ) => {
     const nuevo: Proveedor = {
       id: `P-${String(proveedores.length + 1).padStart(3, "0")}`,
@@ -2166,8 +2116,8 @@ export default function Configuracion({
       contacto: form.contacto,
       telefono: form.telefono,
       email: form.email,
-    }
-    setProveedores((prev) => [...prev, nuevo])
+    };
+    setProveedores((prev) => [...prev, nuevo]);
 
     if (firestoreReady && fsServices) {
       try {
@@ -2182,20 +2132,23 @@ export default function Configuracion({
           },
           "user",
           `op-${Date.now()}`,
-        )
+        );
       } catch (e) {
-        console.error("Firestore create proveedor failed:", e)
+        console.error("Firestore create proveedor failed:", e);
       }
     }
-  }
+  };
 
   const handleUpdateProveedor = async (
     editing: Proveedor,
-    form: { nombre: string; contacto: string; telefono: string; email: string },
+    form: {
+      nombre: string;
+      contacto: string;
+      telefono: string;
+      email: string;
+    },
   ) => {
-    setProveedores((prev) =>
-      prev.map((p) => (p.id === editing.id ? { ...p, ...form } : p)),
-    )
+    setProveedores((prev) => prev.map((p) => (p.id === editing.id ? { ...p, ...form } : p)));
 
     if (firestoreReady && fsServices) {
       try {
@@ -2210,32 +2163,32 @@ export default function Configuracion({
           },
           "user",
           `op-${Date.now()}`,
-        )
+        );
       } catch (e) {
-        console.error("Firestore update proveedor failed:", e)
+        console.error("Firestore update proveedor failed:", e);
       }
     }
-  }
+  };
 
   const handleDeleteProveedor = async (id: string) => {
     if (!firestoreReady || !fsServices) {
-      setProveedores((prev) => prev.filter((p) => p.id !== id))
-      return
+      setProveedores((prev) => prev.filter((p) => p.id !== id));
+      return;
     }
 
     try {
-      await fsServices.suppliers.delete(id, "user", `op-${Date.now()}`)
-      setProveedores((prev) => prev.filter((p) => p.id !== id))
+      await fsServices.suppliers.delete(id, "user", `op-${Date.now()}`);
+      setProveedores((prev) => prev.filter((p) => p.id !== id));
     } catch (e) {
-      console.error("Firestore delete proveedor failed:", e)
+      console.error("Firestore delete proveedor failed:", e);
     }
-  }
+  };
 
   const handleCreateConversion = async (form: {
-    producto: string
-    piezasPorCaja: string
-    cajasPorTarima: string
-    pesoKgCaja: string
+    producto: string;
+    piezasPorCaja: string;
+    cajasPorTarima: string;
+    pesoKgCaja: string;
   }) => {
     const nuevo: Conversion = {
       id: `C-${String(conversiones.length + 1).padStart(3, "0")}`,
@@ -2243,8 +2196,8 @@ export default function Configuracion({
       piezasPorCaja: Number(form.piezasPorCaja),
       cajasPorTarima: Number(form.cajasPorTarima),
       pesoKgCaja: form.pesoKgCaja,
-    }
-    setConversiones((prev) => [...prev, nuevo])
+    };
+    setConversiones((prev) => [...prev, nuevo]);
 
     if (firestoreReady && fsServices) {
       try {
@@ -2257,20 +2210,20 @@ export default function Configuracion({
           },
           "user",
           `op-${Date.now()}`,
-        )
+        );
       } catch (e) {
-        console.error("Firestore create conversion failed:", e)
+        console.error("Firestore create conversion failed:", e);
       }
     }
-  }
+  };
 
   const handleUpdateConversion = async (
     editing: Conversion,
     form: {
-      producto: string
-      piezasPorCaja: string
-      cajasPorTarima: string
-      pesoKgCaja: string
+      producto: string;
+      piezasPorCaja: string;
+      cajasPorTarima: string;
+      pesoKgCaja: string;
     },
   ) => {
     setConversiones((prev) =>
@@ -2285,7 +2238,7 @@ export default function Configuracion({
             }
           : c,
       ),
-    )
+    );
 
     if (firestoreReady && fsServices) {
       try {
@@ -2299,24 +2252,24 @@ export default function Configuracion({
           },
           "user",
           `op-${Date.now()}`,
-        )
+        );
       } catch (e) {
-        console.error("Firestore update conversion failed:", e)
+        console.error("Firestore update conversion failed:", e);
       }
     }
-  }
+  };
 
   const handleDeleteConversion = async (id: string) => {
-    setConversiones((prev) => prev.filter((c) => c.id !== id))
+    setConversiones((prev) => prev.filter((c) => c.id !== id));
 
     if (firestoreReady && fsServices) {
       try {
-        await fsServices.conversions.delete(id, "user", `op-${Date.now()}`)
+        await fsServices.conversions.delete(id, "user", `op-${Date.now()}`);
       } catch (e) {
-        console.error("Firestore delete conversion failed:", e)
+        console.error("Firestore delete conversion failed:", e);
       }
     }
-  }
+  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -2327,7 +2280,7 @@ export default function Configuracion({
         aria-label="Módulos de configuración"
       >
         {TABS.map((t) => {
-          const active = tab === t.id
+          const active = tab === t.id;
           return (
             <button
               key={t.id}
@@ -2346,7 +2299,7 @@ export default function Configuracion({
               <span style={{ opacity: active ? 1 : 0.6 }}>{t.icon}</span>
               {t.label}
             </button>
-          )
+          );
         })}
       </div>
 
@@ -2429,5 +2382,5 @@ export default function Configuracion({
         )}
       </div>
     </div>
-  )
+  );
 }

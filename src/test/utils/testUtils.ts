@@ -2,14 +2,14 @@
  * Test Utilities - Helpers for consistent testing across the project
  */
 
-import { vi } from "vitest"
-import type { User } from "firebase/auth"
-import { createElement, type ReactElement } from "react"
-import type { Firestore } from "firebase/firestore"
-import { WAREHOUSE_IDS } from "@/config/warehouses"
-import { AuthProvider, useAuth } from "@/context/AuthContext"
-import type { Producto, Proveedor } from "@/screens/Configuracion"
-import type { OcrProduct } from "@/types/domain"
+import { vi } from "vitest";
+import type { User } from "firebase/auth";
+import { createElement, type ReactElement } from "react";
+import type { Firestore } from "firebase/firestore";
+import { WAREHOUSE_IDS } from "@/config/warehouses";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
+import type { Producto, Proveedor } from "@/screens/Configuracion";
+import type { OcrProduct } from "@/types/domain";
 
 /**
  * Creates a mock Firebase User
@@ -33,7 +33,7 @@ export function createMockUser(overrides: Partial<User> = {}): User {
     reload: vi.fn(),
     toJSON: vi.fn(),
     ...overrides,
-  } as User
+  } as User;
 }
 
 /**
@@ -49,15 +49,15 @@ export function createMockProfile(
     warehouseId: WAREHOUSE_IDS.NORTH,
     status: "ACTIVE",
     ...overrides,
-  }
+  };
 }
 
 /**
  * Creates a mock auth state for useAuth hook
  */
 export function createMockAuthState(overrides: Record<string, unknown> = {}) {
-  const profile = createMockProfile()
-  const user = createMockUser()
+  const profile = createMockProfile();
+  const user = createMockUser();
 
   return {
     user,
@@ -70,11 +70,9 @@ export function createMockAuthState(overrides: Record<string, unknown> = {}) {
     loginWithGoogle: vi.fn(),
     logout: vi.fn(),
     hasRole: vi.fn((roles: string[]) => roles.includes(profile.role)),
-    canAccessWarehouse: vi.fn(
-      (warehouseId: string) => warehouseId === profile.warehouseId,
-    ),
+    canAccessWarehouse: vi.fn((warehouseId: string) => warehouseId === profile.warehouseId),
     ...overrides,
-  }
+  };
 }
 
 /**
@@ -84,9 +82,7 @@ export function createMockFirestore() {
   return {
     collection: vi.fn().mockReturnThis(),
     doc: vi.fn().mockReturnThis(),
-    get: vi
-      .fn()
-      .mockResolvedValue({ exists: true, data: () => ({}), id: "doc-1" }),
+    get: vi.fn().mockResolvedValue({ exists: true, data: () => ({}), id: "doc-1" }),
     getDocs: vi.fn().mockResolvedValue({ docs: [], empty: true, size: 0 }),
     add: vi.fn().mockResolvedValue({ id: "new-doc-1" }),
     set: vi.fn().mockResolvedValue(undefined),
@@ -97,15 +93,13 @@ export function createMockFirestore() {
     limit: vi.fn().mockReturnThis(),
     startAfter: vi.fn().mockReturnThis(),
     onSnapshot: vi.fn(),
-  } as unknown as Firestore
+  } as unknown as Firestore;
 }
 
 /**
  * Creates mock Producto for testing
  */
-export function createMockProducto(
-  overrides: Partial<Producto> = {},
-): Producto {
+export function createMockProducto(overrides: Partial<Producto> = {}): Producto {
   return {
     id: "prod-1",
     nombre: "Producto Test",
@@ -115,15 +109,13 @@ export function createMockProducto(
     tipo: "materia_prima",
     status: "ACTIVE",
     ...overrides,
-  }
+  };
 }
 
 /**
  * Creates mock Proveedor for testing
  */
-export function createMockProveedor(
-  overrides: Partial<Proveedor> = {},
-): Proveedor {
+export function createMockProveedor(overrides: Partial<Proveedor> = {}): Proveedor {
   return {
     id: "prov-1",
     nombre: "Proveedor Test",
@@ -136,15 +128,13 @@ export function createMockProveedor(
     contacto: "Juan Test",
     status: "ACTIVE",
     ...overrides,
-  }
+  };
 }
 
 /**
  * Creates mock OcrProduct for testing
  */
-export function createMockOcrProduct(
-  overrides: Partial<OcrProduct> = {},
-): OcrProduct {
+export function createMockOcrProduct(overrides: Partial<OcrProduct> = {}): OcrProduct {
   return {
     linea: 1,
     codigo: "ABC-123",
@@ -155,7 +145,7 @@ export function createMockOcrProduct(
     importe: 1000,
     confianza: 0.95,
     ...overrides,
-  }
+  };
 }
 
 /**
@@ -165,7 +155,7 @@ export function createMockCatalog(
   productos: Producto[] = [createMockProducto()],
   proveedores: Proveedor[] = [createMockProveedor()],
 ) {
-  return { productos, proveedores }
+  return { productos, proveedores };
 }
 
 /**
@@ -173,14 +163,14 @@ export function createMockCatalog(
  */
 export function createMockOcrResponse(
   overrides: Partial<{
-    success: boolean
+    success: boolean;
     parsed: {
-      folio: string | null
-      fecha: string | null
-      proveedor: string | null
-      total: string | null
-      productos: OcrProduct[]
-    }
+      folio: string | null;
+      fecha: string | null;
+      proveedor: string | null;
+      total: string | null;
+      productos: OcrProduct[];
+    };
   }> = {},
 ) {
   return {
@@ -201,29 +191,25 @@ export function createMockOcrResponse(
     },
     tipo: "oc",
     ...overrides,
-  }
+  };
 }
 
 /**
  * Render utilities for component testing
  */
-import {
-  render,
-  type RenderOptions,
-  type RenderResult,
-} from "@testing-library/react"
-import { MemoryRouter, Routes, Route } from "react-router-dom"
+import { render, type RenderOptions, type RenderResult } from "@testing-library/react";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
 
 interface RenderWithProvidersOptions extends Omit<RenderOptions, "wrapper"> {
-  authState?: ReturnType<typeof createMockAuthState>
-  routes?: ReactElement[]
+  authState?: ReturnType<typeof createMockAuthState>;
+  routes?: ReactElement[];
 }
 
 export function renderWithProviders(
   ui: ReactElement,
   options: RenderWithProvidersOptions = {},
 ): RenderResult {
-  const { authState, routes = [], ...renderOptions } = options
+  const { authState, routes = [], ...renderOptions } = options;
 
   const wrapper = ({ children }: { children: React.ReactNode }) =>
     createElement(
@@ -235,35 +221,33 @@ export function renderWithProviders(
         createElement(
           Routes,
           null,
-          ...routes.map((route, i) =>
-            createElement(Route, { key: i, ...route.props }),
-          ),
+          ...routes.map((route, i) => createElement(Route, { key: i, ...route.props })),
           createElement(Route, { path: "/*", element: children }),
         ),
       ),
-    )
+    );
 
   if (authState) {
-    vi.mocked(useAuth).mockReturnValue(authState)
+    vi.mocked(useAuth).mockReturnValue(authState);
   }
 
-  return render(ui, { wrapper, ...renderOptions })
+  return render(ui, { wrapper, ...renderOptions });
 }
 
 /**
  * Wait for async operations to complete
  */
 export async function waitForAsync() {
-  await new Promise((resolve) => setTimeout(resolve, 0))
-  await vi.runAllTimersAsync()
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await vi.runAllTimersAsync();
 }
 
 /**
  * Mock timers for async operations
  */
 export function setupFakeTimers() {
-  vi.useFakeTimers()
-  return () => vi.useRealTimers()
+  vi.useFakeTimers();
+  return () => vi.useRealTimers();
 }
 
 /**
@@ -323,7 +307,7 @@ export function createReceptionTestScenario() {
         status: "ACTIVE",
       },
     ],
-  }
+  };
 
   const ocrProducts = [
     {
@@ -356,7 +340,7 @@ export function createReceptionTestScenario() {
       importe: 2500,
       confianza: 0.88,
     },
-  ]
+  ];
 
-  return { catalog, ocrProducts }
+  return { catalog, ocrProducts };
 }

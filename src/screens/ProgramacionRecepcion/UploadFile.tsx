@@ -2,22 +2,16 @@
  * Paso 2: Subir archivo (PDF/Imagen)
  */
 
-import {
-  FileText,
-  Image,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-} from "lucide-react"
-import { TouchTarget } from "@/components/ui/TouchTarget"
+import { FileText, Image, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { TouchTarget } from "@/components/ui/TouchTarget";
 
 interface Props {
-  state: any
-  onUpload: (file: File) => Promise<void>
-  onRunOCR: () => Promise<void>
-  onPrev: () => void
-  ocrLoading: boolean
-  ocrError: string | null
+  state: any;
+  onUpload: (file: File) => Promise<void>;
+  onRunOCR: () => Promise<void>;
+  onPrev: () => void;
+  ocrLoading: boolean;
+  ocrError: string | null;
 }
 
 export default function UploadFile({
@@ -28,8 +22,8 @@ export default function UploadFile({
   ocrLoading,
   ocrError,
 }: Props) {
-  const isPdf = state.fileType === "application/pdf"
-  const file = state.file
+  const isPdf = state.fileType === "application/pdf";
+  const file = state.file;
 
   return (
     <div className="p-6 md:p-8 max-w-3xl mx-auto">
@@ -49,9 +43,7 @@ export default function UploadFile({
           // Dropzone
           <div
             className={`border-2 border-dashed rounded-[16px] p-8 md:p-12 text-center transition-all ${
-              isPdf
-                ? "border-[#3276a8] bg-[#e7f0f2]"
-                : "border-[#dce4e7] hover:border-[#3276a8]"
+              isPdf ? "border-[#3276a8] bg-[#e7f0f2]" : "border-[#dce4e7] hover:border-[#3276a8]"
             }`}
           >
             <div
@@ -69,16 +61,14 @@ export default function UploadFile({
               {isPdf ? "PDF detectado" : "Arrastra tu archivo aquí"}
             </p>
             <p className="text-[#607078] mb-6">
-              {isPdf
-                ? "El PDF se procesará automáticamente"
-                : "PDF o imagen (JPG/PNG), máx 10MB"}
+              {isPdf ? "El PDF se procesará automáticamente" : "PDF o imagen (JPG/PNG), máx 10MB"}
             </p>
             <input
               type="file"
               accept={state.hasOC ? ".pdf,image/*" : ".pdf,image/*"}
               onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) onUpload(f)
+                const f = e.target.files?.[0];
+                if (f) onUpload(f);
               }}
               className="sr-only"
               id="file-upload"
@@ -110,12 +100,8 @@ export default function UploadFile({
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-[#16343f] truncate">
-                  {file.name}
-                </p>
-                <p className="text-sm text-[#607078]">
-                  {(file.size / 1024 / 1024).toFixed(2)} MB
-                </p>
+                <p className="font-medium text-[#16343f] truncate">{file.name}</p>
+                <p className="text-sm text-[#607078]">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
               </div>
               <TouchTarget
                 as="button"
@@ -169,5 +155,5 @@ export default function UploadFile({
         </div>
       </div>
     </div>
-  )
+  );
 }

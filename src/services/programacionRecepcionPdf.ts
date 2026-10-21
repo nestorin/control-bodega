@@ -3,31 +3,29 @@
  * Usa el servicio compartido pdfGenerator.ts
  */
 
-import {
-  generateStructuredPdf,
-  openWhatsAppWithMessage,
-  downloadBlob,
-} from "./pdfGenerator"
+import { generateStructuredPdf, openWhatsAppWithMessage, downloadBlob } from "./pdfGenerator";
 
 export interface ProgramacionRecepcionData {
-  folio: string
-  fechaRecepcion: string
-  proveedor: string
-  proveedorLogistico: string
-  almacenaId?: string
+  folio: string;
+  fechaRecepcion: string;
+  proveedor: string;
+  proveedorLogistico: string;
+  almacenaId?: string;
   productos: Array<{
-    nombre: string
-    cantidad: number
-    tarimas: number
-    conversionMatch: boolean
-    codigo?: string
-  }>
-  totalTarimas: number
+    nombre: string;
+    cantidad: number;
+    tarimas: number;
+    conversionMatch: boolean;
+    codigo?: string;
+  }>;
+  totalTarimas: number;
 }
 
-export async function generateProgramacionRecepcionPdf(
-  data: ProgramacionRecepcionData,
-): Promise<{ blob: Blob; dataUrl: string; filename: string }> {
+export async function generateProgramacionRecepcionPdf(data: ProgramacionRecepcionData): Promise<{
+  blob: Blob;
+  dataUrl: string;
+  filename: string;
+}> {
   const sections = [
     {
       title: "INFORMACIÓN GENERAL",
@@ -48,7 +46,7 @@ export async function generateProgramacionRecepcionPdf(
         }`,
       })),
     },
-  ]
+  ];
 
   return generateStructuredPdf(
     {
@@ -62,7 +60,7 @@ export async function generateProgramacionRecepcionPdf(
       orientation: "portrait",
       format: "a4",
     },
-  )
+  );
 }
 
 export function buildWhatsAppMessage(data: ProgramacionRecepcionData): string {
@@ -75,23 +73,19 @@ export function buildWhatsAppMessage(data: ProgramacionRecepcionData): string {
     `🚚 Proveedor Logístico: ${data.proveedorLogistico || "—"}`,
     "",
     "📦 *PRODUCTOS PROGRAMADOS:*",
-  ]
+  ];
 
   data.productos.forEach((p, i) => {
-    lines.push(`${i + 1}. ${p.nombre}`)
-    lines.push(
-      `   Cajas: ${p.cantidad} | Tarimas: ${p.tarimas}${
-        !p.conversionMatch ? " ⚠" : ""
-      }`,
-    )
-  })
+    lines.push(`${i + 1}. ${p.nombre}`);
+    lines.push(`   Cajas: ${p.cantidad} | Tarimas: ${p.tarimas}${!p.conversionMatch ? " ⚠" : ""}`);
+  });
 
-  lines.push("")
-  lines.push(`📊 Total Tarimas: ${data.totalTarimas}`)
-  lines.push("━━━━━━━━━━━━━━━━━━━━")
-  lines.push("_Generado desde TarimaQR_")
+  lines.push("");
+  lines.push(`📊 Total Tarimas: ${data.totalTarimas}`);
+  lines.push("━━━━━━━━━━━━━━━━━━━━");
+  lines.push("_Generado desde TarimaQR_");
 
-  return lines.join("\n")
+  return lines.join("\n");
 }
 
 export async function handleEnviarWhatsApp(
@@ -100,22 +94,22 @@ export async function handleEnviarWhatsApp(
 ): Promise<void> {
   try {
     // 1. Generar PDF
-    const { blob, filename } = await generateProgramacionRecepcionPdf(data)
+    const { blob, filename } = await generateProgramacionRecepcionPdf(data);
 
     // 2. Descargar PDF localmente (UX: usuario tiene el archivo)
-    downloadBlob(blob, filename)
+    downloadBlob(blob, filename);
 
     // 3. Abrir WhatsApp con mensaje de referencia
     // Nota: WhatsApp Web API no permite adjuntar archivos via URL
     // La mejor UX: descargar PDF + mensaje con referencia al archivo
     const message =
       buildWhatsAppMessage(data) +
-      "\n\n📎 *PDF generado y descargado en tu dispositivo. Adjúntalo manualmente en WhatsApp.*"
-    openWhatsAppWithMessage(phoneNumber, message)
+      "\n\n📎 *PDF generado y descargado en tu dispositivo. Adjúntalo manualmente en WhatsApp.*";
+    openWhatsAppWithMessage(phoneNumber, message);
   } catch (error) {
-    console.error("Error generando PDF para WhatsApp:", error)
+    console.error("Error generando PDF para WhatsApp:", error);
     // Fallback: solo mensaje de texto
-    const message = buildWhatsAppMessage(data)
-    openWhatsAppWithMessage(phoneNumber, message)
+    const message = buildWhatsAppMessage(data);
+    openWhatsAppWithMessage(phoneNumber, message);
   }
 }

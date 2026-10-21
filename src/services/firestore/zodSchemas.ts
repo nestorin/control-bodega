@@ -5,7 +5,7 @@
  * cumplan con el contrato esperado antes de procesarlos.
  */
 
-import { z } from "zod"
+import { z } from "zod";
 
 // ===== SCHEMA PARA DOCUMENTO DE RECEPCIÓN =====
 export const ReceptionDocSchema = z.object({
@@ -19,7 +19,7 @@ export const ReceptionDocSchema = z.object({
   total: z.string().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
-})
+});
 
 // ===== SCHEMA PARA LÍNEA DE RECEPCIÓN =====
 export const ReceptionLineSchema = z.object({
@@ -34,7 +34,7 @@ export const ReceptionLineSchema = z.object({
   estadoMatch: z.enum(["confirmado", "sugerido", "manual"]),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
-})
+});
 
 // ===== SCHEMA PARA DATOS DE CONVERSIÓN =====
 export const ConversionSchema = z.object({
@@ -46,7 +46,7 @@ export const ConversionSchema = z.object({
   tarimas: z.number().min(0, "Tarimas debe ser mayor o igual a 0"),
   stickers: z.number().min(0, "Stickers debe ser mayor o igual a 0"),
   conversionMatch: z.boolean(),
-})
+});
 
 // ===== SCHEMA PARA DATOS DE RECEPCIÓN COMPLETOS =====
 export const ReceptionDataSchema = z.object({
@@ -60,13 +60,13 @@ export const ReceptionDataSchema = z.object({
   lineas: z.array(ReceptionLineSchema).min(1, "Debe haber al menos una línea"),
   tarimasTotal: z.number().min(1, "Total de tarimas debe ser mayor a 0"),
   conversiones: z.array(ConversionSchema),
-})
+});
 
 // ===== VALIDADORES DE TIPO =====
-export type ReceptionDoc = z.infer<typeof ReceptionDocSchema>
-export type ReceptionLine = z.infer<typeof ReceptionLineSchema>
-export type Conversion = z.infer<typeof ConversionSchema>
-export type ReceptionData = z.infer<typeof ReceptionDataSchema>
+export type ReceptionDoc = z.infer<typeof ReceptionDocSchema>;
+export type ReceptionLine = z.infer<typeof ReceptionLineSchema>;
+export type Conversion = z.infer<typeof ConversionSchema>;
+export type ReceptionData = z.infer<typeof ReceptionDataSchema>;
 
 /**
  * Validación de datos de recepción
@@ -74,20 +74,19 @@ export type ReceptionData = z.infer<typeof ReceptionDataSchema>
  * @param data - Datos a validar
  * @returns Resultado de validación
  */
-export function validateReceptionData(
-  data: any,
-): { valid: boolean; errors?: string[] } {
+export function validateReceptionData(data: any): {
+  valid: boolean;
+  errors?: string[];
+} {
   try {
-    const parsed = ReceptionDataSchema.parse(data)
-    return { valid: true }
+    const parsed = ReceptionDataSchema.parse(data);
+    return { valid: true };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const errors = error.issues.map(
-        (err) => `${err.path.join(".")}: ${err.message}`,
-      )
-      return { valid: false, errors }
+      const errors = error.issues.map((err) => `${err.path.join(".")}: ${err.message}`);
+      return { valid: false, errors };
     }
-    return { valid: false, errors: ["Error de validación desconocido"] }
+    return { valid: false, errors: ["Error de validación desconocido"] };
   }
 }
 
@@ -97,20 +96,19 @@ export function validateReceptionData(
  * @param data - Datos del documento
  * @returns Resultado de validación
  */
-export function validateReceptionDoc(
-  data: any,
-): { valid: boolean; errors?: string[] } {
+export function validateReceptionDoc(data: any): {
+  valid: boolean;
+  errors?: string[];
+} {
   try {
-    const parsed = ReceptionDocSchema.parse(data)
-    return { valid: true }
+    const parsed = ReceptionDocSchema.parse(data);
+    return { valid: true };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const errors = error.issues.map(
-        (err) => `${err.path.join(".")}: ${err.message}`,
-      )
-      return { valid: false, errors }
+      const errors = error.issues.map((err) => `${err.path.join(".")}: ${err.message}`);
+      return { valid: false, errors };
     }
-    return { valid: false, errors: ["Error de validación desconocido"] }
+    return { valid: false, errors: ["Error de validación desconocido"] };
   }
 }
 
@@ -120,19 +118,18 @@ export function validateReceptionDoc(
  * @param data - Datos de la línea
  * @returns Resultado de validación
  */
-export function validateReceptionLine(
-  data: any,
-): { valid: boolean; errors?: string[] } {
+export function validateReceptionLine(data: any): {
+  valid: boolean;
+  errors?: string[];
+} {
   try {
-    const parsed = ReceptionLineSchema.parse(data)
-    return { valid: true }
+    const parsed = ReceptionLineSchema.parse(data);
+    return { valid: true };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const errors = error.issues.map(
-        (err) => `${err.path.join(".")}: ${err.message}`,
-      )
-      return { valid: false, errors }
+      const errors = error.issues.map((err) => `${err.path.join(".")}: ${err.message}`);
+      return { valid: false, errors };
     }
-    return { valid: false, errors: ["Error de validación desconocido"] }
+    return { valid: false, errors: ["Error de validación desconocido"] };
   }
 }

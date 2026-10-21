@@ -1,43 +1,43 @@
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
-import { useAuth } from "@/context/AuthContext"
-import { isFeatureEnabled } from "@/config/featureFlags"
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
+import { isFeatureEnabled } from "@/config/featureFlags";
 
-const assetPathPrefix = "/assets"
-const imgLogo = `${assetPathPrefix}/4cca0.svg`
+const assetPathPrefix = "/assets";
+const imgLogo = `${assetPathPrefix}/4cca0.svg`;
 
 export default function Login() {
-  const { login, register, loginWithGoogle, loading: authLoading } = useAuth()
-  const navigate = useNavigate()
-  const [mode, setMode] = useState<"login" | "register">("login")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [displayName, setDisplayName] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
+  const { login, register, loginWithGoogle, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setSubmitting(true)
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
 
     try {
       if (mode === "login") {
-        await login(email, password)
-        navigate("/", { replace: true })
+        await login(email, password);
+        navigate("/", { replace: true });
       } else {
         if (password !== confirmPassword) {
-          setError("Las contraseñas no coinciden")
-          setSubmitting(false)
-          return
+          setError("Las contraseñas no coinciden");
+          setSubmitting(false);
+          return;
         }
         if (!displayName.trim()) {
-          setError("El nombre es requerido")
-          setSubmitting(false)
-          return
+          setError("El nombre es requerido");
+          setSubmitting(false);
+          return;
         }
-        await register(email, password, displayName)
+        await register(email, password, displayName);
       }
     } catch (err: any) {
       const message =
@@ -51,25 +51,25 @@ export default function Login() {
                 ? "La contraseña debe tener al menos 6 caracteres"
                 : err.code === "auth/invalid-email"
                   ? "Email inválido"
-                  : "Error al autenticar"
-      setError(message)
+                  : "Error al autenticar";
+      setError(message);
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   const handleGoogleLogin = async () => {
-    setError(null)
-    setSubmitting(true)
+    setError(null);
+    setSubmitting(true);
     try {
-      await loginWithGoogle()
-      navigate("/", { replace: true })
+      await loginWithGoogle();
+      navigate("/", { replace: true });
     } catch (err: any) {
-      setError("Error al iniciar sesión con Google")
+      setError("Error al iniciar sesión con Google");
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   return (
     <div className="flex items-center justify-center h-screen bg-[#edf1f3] p-4">
@@ -260,8 +260,8 @@ export default function Login() {
           <button
             type="button"
             onClick={() => {
-              setMode(mode === "login" ? "register" : "login")
-              setError(null)
+              setMode(mode === "login" ? "register" : "login");
+              setError(null);
             }}
             className="text-[#3276a8] font-bold underline"
             style={{ fontFamily: "'Inter', sans-serif" }}
@@ -281,5 +281,5 @@ export default function Login() {
         )}
       </div>
     </div>
-  )
+  );
 }

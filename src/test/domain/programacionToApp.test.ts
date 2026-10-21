@@ -2,15 +2,12 @@
  * Tests for programacionToApp mapper
  */
 
-import { describe, it, expect } from "vitest"
+import { describe, it, expect } from "vitest";
 import {
   programacionToAppReception,
   appReceptionToProgramacion,
-} from "@/services/domain/programacionToApp"
-import type {
-  ProgramacionRecepcionOutput,
-  AppReceptionState,
-} from "@/types/domain"
+} from "@/services/domain/programacionToApp";
+import type { ProgramacionRecepcionOutput, AppReceptionState } from "@/types/domain";
 
 describe("programacionToApp - ProgramacionRecepcion → AppReceptionState mapper", () => {
   const mockProgramacionOutput = {
@@ -62,10 +59,10 @@ describe("programacionToApp - ProgramacionRecepcion → AppReceptionState mapper
         conversionMatch: true,
       },
     ],
-  }
+  };
 
   it("converts ProgramacionRecepcionOutput to AppReceptionState correctly", () => {
-    const result = programacionToAppReception(mockProgramacionOutput)
+    const result = programacionToAppReception(mockProgramacionOutput);
 
     expect(result).toEqual({
       folio: "OC-2024-001",
@@ -99,21 +96,21 @@ describe("programacionToApp - ProgramacionRecepcion → AppReceptionState mapper
       supplierId: null,
       tarimasTotal: 2,
       conversiones: mockProgramacionOutput.conversionesTabla,
-    })
-  })
+    });
+  });
 
   it("handles empty productos array", () => {
     const emptyOutput = {
       ...mockProgramacionOutput,
       productos: [],
       conversionesTabla: [],
-    }
-    const result = programacionToAppReception(emptyOutput)
+    };
+    const result = programacionToAppReception(emptyOutput);
 
-    expect(result.lineas).toHaveLength(0)
-    expect(result.tarimasTotal).toBe(0)
-    expect(result.conversiones).toHaveLength(0)
-  })
+    expect(result.lineas).toHaveLength(0);
+    expect(result.tarimasTotal).toBe(0);
+    expect(result.conversiones).toHaveLength(0);
+  });
 
   it("converts AppReceptionState back to ProgramacionRecepcionOutput", () => {
     const appState = {
@@ -169,9 +166,9 @@ describe("programacionToApp - ProgramacionRecepcion → AppReceptionState mapper
           conversionMatch: true,
         },
       ],
-    }
+    };
 
-    const result = appReceptionToProgramacion(appState)
+    const result = appReceptionToProgramacion(appState);
 
     expect(result).toEqual({
       hasOC: true,
@@ -201,6 +198,6 @@ describe("programacionToApp - ProgramacionRecepcion → AppReceptionState mapper
         },
       ],
       conversionesTabla: appState.conversiones,
-    })
-  })
-})
+    });
+  });
+});

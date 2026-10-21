@@ -8,50 +8,40 @@
  * Ahora: ~200 líneas + componentes modulares
  */
 
-import { useMemo } from "react"
-import { useAuth } from "@/context/AuthContext"
-import { useReceptionProgramming } from "@/domains/reception"
-import type { Producto } from "@/services/firestore/types"
+import { useMemo } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { useReceptionProgramming } from "@/domains/reception";
+import type { Producto } from "@/services/firestore/types";
 
 // Componentes por paso (lazy loaded para code splitting)
-const SelectHasOC = lazy(() => import("./ProgramacionRecepcion/SelectHasOC"))
-const UploadFile = lazy(() => import("./ProgramacionRecepcion/UploadFile"))
-const OcrResults = lazy(() => import("./ProgramacionRecepcion/OcrResults"))
-const MatchProducts = lazy(
-  () => import("./ProgramacionRecepcion/MatchProducts"),
-)
-const CalculateConversions = lazy(
-  () => import("./ProgramacionRecepcion/CalculateConversions"),
-)
-const ReviewStep = lazy(() => import("./ProgramacionRecepcion/ReviewStep"))
-const CompleteStep = lazy(() => import("./ProgramacionRecepcion/CompleteStep"))
+const SelectHasOC = lazy(() => import("./ProgramacionRecepcion/SelectHasOC"));
+const UploadFile = lazy(() => import("./ProgramacionRecepcion/UploadFile"));
+const OcrResults = lazy(() => import("./ProgramacionRecepcion/OcrResults"));
+const MatchProducts = lazy(() => import("./ProgramacionRecepcion/MatchProducts"));
+const CalculateConversions = lazy(() => import("./ProgramacionRecepcion/CalculateConversions"));
+const ReviewStep = lazy(() => import("./ProgramacionRecepcion/ReviewStep"));
+const CompleteStep = lazy(() => import("./ProgramacionRecepcion/CompleteStep"));
 
-import { Suspense } from "react"
-import { lazy } from "react"
-import {
-  ChevronLeft,
-  ChevronRight,
-  CheckCircle,
-  AlertCircle,
-  Loader2,
-} from "lucide-react"
+import { Suspense } from "react";
+import { lazy } from "react";
+import { ChevronLeft, ChevronRight, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 
-const { useState, useCallback, useEffect, Fragment } = require("react")
+const { useState, useCallback, useEffect, Fragment } = require("react");
 
 function StepIndicator({
   steps,
   currentStep,
   completedSteps,
 }: {
-  steps: any[]
-  currentStep: string
-  completedSteps: string[]
+  steps: any[];
+  currentStep: string;
+  completedSteps: string[];
 }) {
   return (
     <div className="flex items-center gap-2 overflow-x-auto pb-4 px-2">
       {steps.map((step, idx) => {
-        const isCompleted = completedSteps.includes(step.id)
-        const isCurrent = step.id === currentStep
+        const isCompleted = completedSteps.includes(step.id);
+        const isCurrent = step.id === currentStep;
         return (
           <Fragment key={step.id}>
             <div className="flex flex-col items-center min-w-[80px]">
@@ -86,19 +76,13 @@ function StepIndicator({
               />
             )}
           </Fragment>
-        )
+        );
       })}
     </div>
-  )
+  );
 }
 
-function ErrorBanner({
-  message,
-  onDismiss,
-}: {
-  message: string
-  onDismiss: () => void
-}) {
+function ErrorBanner({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   return (
     <div className="bg-[#fee2e2] border border-[#fca5a5] flex gap-3 items-start p-4 rounded-[12px]">
       <AlertCircle className="text-[#ef4444] text-[20px] shrink-0 mt-0.5" />
@@ -111,20 +95,17 @@ function ErrorBanner({
         ✕
       </button>
     </div>
-  )
+  );
 }
 
 function LegacyProgramacionRecepcionV2() {
-  const { profile } = useAuth()
+  const { profile } = useAuth();
   const catalogos: {
-    productos: Producto[]
-    almacenes: never[]
-    proveedores: never[]
-  } = { productos: [], almacenes: [], proveedores: [] }
-  const catalogProducts = useMemo(
-    () => catalogos?.productos ?? [],
-    [catalogos?.productos],
-  )
+    productos: Producto[];
+    almacenes: never[];
+    proveedores: never[];
+  } = { productos: [], almacenes: [], proveedores: [] };
+  const catalogProducts = useMemo(() => catalogos?.productos ?? [], [catalogos?.productos]);
 
   const {
     state,
@@ -148,70 +129,70 @@ function LegacyProgramacionRecepcionV2() {
     reset,
     ocrLoading,
     ocrError,
-  } = useReceptionProgramming(catalogProducts)
+  } = useReceptionProgramming(catalogProducts);
 
   const completedSteps = useMemo(() => {
-    const currentIndex = steps.findIndex((s) => s.id === currentStep)
-    return steps.slice(0, currentIndex).map((s) => s.id)
-  }, [steps, currentStep])
+    const currentIndex = steps.findIndex((s) => s.id === currentStep);
+    return steps.slice(0, currentIndex).map((s) => s.id);
+  }, [steps, currentStep]);
 
   const handleSelectHasOC = useCallback(
     (hasOC: boolean) => {
-      selectHasOC(hasOC)
+      selectHasOC(hasOC);
     },
     [selectHasOC],
-  )
+  );
 
   const handleRunOCR = useCallback(async () => {
-    await runOCR()
+    await runOCR();
     // Auto-match después de OCR
     if (catalogProducts.length > 0) {
-      matchProducts(catalogProducts)
+      matchProducts(catalogProducts);
     }
-  }, [runOCR, catalogProducts, matchProducts])
+  }, [runOCR, catalogProducts, matchProducts]);
 
   const handleNext = useCallback(() => {
     // Validaciones por paso antes de avanzar
     if (currentStep === "match-products" && matchedProducts.length === 0) {
-      return
+      return;
     }
     if (currentStep === "calculate-conversions" && conversions.length === 0) {
-      return
+      return;
     }
-    nextStep()
-  }, [currentStep, matchedProducts.length, conversions.length, nextStep])
+    nextStep();
+  }, [currentStep, matchedProducts.length, conversions.length, nextStep]);
 
   const handleSave = useCallback(async () => {
     try {
-      const receptionId = await saveReception()
+      const receptionId = await saveReception();
       if (receptionId) {
-        console.log("Recepción creada:", receptionId)
+        console.log("Recepción creada:", receptionId);
       }
     } catch (err) {
-      console.error("Error guardando:", err)
+      console.error("Error guardando:", err);
     }
-  }, [saveReception])
+  }, [saveReception]);
 
   const StepComponent = useMemo(() => {
     switch (currentStep) {
       case "select-has-oc":
-        return SelectHasOC
+        return SelectHasOC;
       case "upload-file":
-        return UploadFile
+        return UploadFile;
       case "ocr-results":
-        return OcrResults
+        return OcrResults;
       case "match-products":
-        return MatchProducts
+        return MatchProducts;
       case "calculate-conversions":
-        return CalculateConversions
+        return CalculateConversions;
       case "review":
-        return ReviewStep
+        return ReviewStep;
       case "complete":
-        return CompleteStep
+        return CompleteStep;
       default:
-        return SelectHasOC
+        return SelectHasOC;
     }
-  }, [currentStep])
+  }, [currentStep]);
 
   return (
     <div className="min-h-screen bg-[#f5f8fa]">
@@ -226,9 +207,7 @@ function LegacyProgramacionRecepcionV2() {
               >
                 <Loader2 className="w-5 h-5" />
               </button>
-              <h1 className="text-xl font-bold text-[#16343f]">
-                Programación de Recepción
-              </h1>
+              <h1 className="text-xl font-bold text-[#16343f]">Programación de Recepción</h1>
             </div>
             <div className="flex items-center gap-4 text-sm text-[#607078]">
               <span>Almacén: {profile?.warehouseId ?? "—"}</span>
@@ -237,26 +216,16 @@ function LegacyProgramacionRecepcionV2() {
               </span>
             </div>
           </div>
-          <StepIndicator
-            steps={steps}
-            currentStep={currentStep}
-            completedSteps={completedSteps}
-          />
+          <StepIndicator steps={steps} currentStep={currentStep} completedSteps={completedSteps} />
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-6">
-        {state.error && (
-          <ErrorBanner message={state.error} onDismiss={() => {}} />
-        )}
+        {state.error && <ErrorBanner message={state.error} onDismiss={() => {}} />}
 
         <div className="bg-white rounded-[16px] shadow-sm border border-[#dce4e7]">
           <Suspense
-            fallback={
-              <div className="p-8 text-center text-[#607078]">
-                Cargando paso...
-              </div>
-            }
+            fallback={<div className="p-8 text-center text-[#607078]">Cargando paso...</div>}
           >
             <StepComponent
               state={state}
@@ -285,7 +254,7 @@ function LegacyProgramacionRecepcionV2() {
         </div>
       </main>
     </div>
-  )
+  );
 }
 
 /**
@@ -295,8 +264,7 @@ function LegacyProgramacionRecepcionV2() {
 export default function ProgramacionRecepcionV2Disabled() {
   return (
     <div className="p-8 text-center text-[#607078]">
-      Esta versión de programación está desactivada. Usa Programación de
-      Recepción.
+      Esta versión de programación está desactivada. Usa Programación de Recepción.
     </div>
-  )
+  );
 }

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState } from "react";
 import {
   CheckCircle,
   FileText,
@@ -8,27 +8,22 @@ import {
   Share2,
   Download,
   Loader2,
-} from "lucide-react"
-import { TouchTarget } from "@/components/ui/TouchTarget"
+} from "lucide-react";
+import { TouchTarget } from "@/components/ui/TouchTarget";
 import {
   handleEnviarWhatsApp,
   type ProgramacionRecepcionData,
-} from "@/services/programacionRecepcionPdf"
+} from "@/services/programacionRecepcionPdf";
 
 interface Props {
-  state: any
-  receptionId: string | null
-  onPrev: () => void
-  onNew: () => void
+  state: any;
+  receptionId: string | null;
+  onPrev: () => void;
+  onNew: () => void;
 }
 
-export default function CompleteStep({
-  state,
-  receptionId,
-  onPrev,
-  onNew,
-}: Props) {
-  const [whatsappLoading, setWhatsappLoading] = useState(false)
+export default function CompleteStep({ state, receptionId, onPrev, onNew }: Props) {
+  const [whatsappLoading, setWhatsappLoading] = useState(false);
 
   const buildData = (): ProgramacionRecepcionData => ({
     folio: state.folio || "",
@@ -44,16 +39,16 @@ export default function CompleteStep({
         conversionMatch: p.conversionMatch || false,
         codigo: p.codigo,
       })) || [],
-  })
+  });
 
   const handleWhatsApp = async () => {
-    setWhatsappLoading(true)
+    setWhatsappLoading(true);
     try {
-      await handleEnviarWhatsApp(buildData())
+      await handleEnviarWhatsApp(buildData());
     } finally {
-      setWhatsappLoading(false)
+      setWhatsappLoading(false);
     }
-  }
+  };
 
   return (
     <div className="p-8 md:p-12 max-w-2xl mx-auto text-center">
@@ -61,9 +56,7 @@ export default function CompleteStep({
         <CheckCircle className="w-12 h-12 text-[#166534]" />
       </div>
 
-      <h2 className="text-3xl md:text-4xl font-bold text-[#16343f] mb-2">
-        ¡Recepción creada!
-      </h2>
+      <h2 className="text-3xl md:text-4xl font-bold text-[#16343f] mb-2">¡Recepción creada!</h2>
       <p className="text-[#607078] text-lg mb-8">
         La programación de recepción se ha guardado correctamente.
       </p>
@@ -74,9 +67,7 @@ export default function CompleteStep({
             <FileText className="w-8 h-8 text-[#16343f]" />
             <div>
               <p className="text-sm text-[#607078]">ID de Recepción</p>
-              <p className="font-mono text-lg text-[#16343f] break-all">
-                {receptionId}
-              </p>
+              <p className="font-mono text-lg text-[#16343f] break-all">{receptionId}</p>
             </div>
           </div>
           <p className="text-sm text-[#607078]">
@@ -86,11 +77,7 @@ export default function CompleteStep({
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-        <StatBox
-          icon={<FileText className="w-6 h-6" />}
-          label="Folio"
-          value={state.folio || "—"}
-        />
+        <StatBox icon={<FileText className="w-6 h-6" />} label="Folio" value={state.folio || "—"} />
         <StatBox
           icon={<Package className="w-6 h-6" />}
           label="Tarimas"
@@ -149,18 +136,10 @@ export default function CompleteStep({
         </TouchTarget>
       </div>
     </div>
-  )
+  );
 }
 
-function StatBox({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: string
-}) {
+function StatBox({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="bg-white border border-[#dce4e7] rounded-[12px] p-4">
       <div className="flex items-center justify-center gap-2 mb-2">
@@ -171,7 +150,7 @@ function StatBox({
       <p className="text-2xl font-bold text-[#16343f]">{value}</p>
       <p className="text-xs text-[#607078] mt-1">{label}</p>
     </div>
-  )
+  );
 }
 
 // Need to import useState and Loader2

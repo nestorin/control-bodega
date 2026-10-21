@@ -1,41 +1,38 @@
-import { useState, useRef, useEffect } from "react"
-import { isFeatureEnabled } from "@/config/featureFlags"
-import { createFirestoreServices } from "@/services/firestore"
-import { db, storage } from "@/lib/firebase"
-import { uploadInvoicePreview } from "@/services/invoiceEvidence"
-import { useAuthorization } from "@/hooks/useAuthorization"
+import { useState, useRef, useEffect } from "react";
+import { isFeatureEnabled } from "@/config/featureFlags";
+import { createFirestoreServices } from "@/services/firestore";
+import { db, storage } from "@/lib/firebase";
+import { uploadInvoicePreview } from "@/services/invoiceEvidence";
+import { useAuthorization } from "@/hooks/useAuthorization";
 
-const imgArrowRight = "/assets/55de6.svg"
-const ORG_ID = "org_exepa_001"
+const imgArrowRight = "/assets/55de6.svg";
+const ORG_ID = "org_exepa_001";
 
 interface PhotoSlot {
-  label: string
-  hint: string
-  file: string | null
+  label: string;
+  hint: string;
+  file: string | null;
 }
 
 interface EvidenceForm {
-  proveedor: string
-  item: string
-  tarimas: string
-  caducidad: string
-  lote: string
+  proveedor: string;
+  item: string;
+  tarimas: string;
+  caducidad: string;
+  lote: string;
 }
 
 interface Props {
-  onBack: () => void
-  receptionId?: string
+  onBack: () => void;
+  receptionId?: string;
   currentReception?: {
-    proveedor?: string
-    productos?: Array<{ nombre?: string }>
-    tarimas?: number
-    caducidad?: string
-    lote?: string
-  } | null
-  onContinue: (evidence: {
-    photos: [string | null, string | null]
-    form: EvidenceForm
-  }) => void
+    proveedor?: string;
+    productos?: Array<{ nombre?: string }>;
+    tarimas?: number;
+    caducidad?: string;
+    lote?: string;
+  } | null;
+  onContinue: (evidence: { photos: [string | null, string | null]; form: EvidenceForm }) => void;
 }
 
 function TrailerIcon({ size = 56 }: { size?: number }) {
@@ -83,32 +80,11 @@ function TrailerIcon({ size = 56 }: { size?: number }) {
       {/* hitch */}
       <rect x="44" y="34" width="6" height="3" rx="1" fill="#607078" />
       {/* wheels */}
-      <circle
-        cx="14"
-        cy="44"
-        r="5"
-        fill="#16343f"
-        stroke="#3276a8"
-        strokeWidth="1.5"
-      />
+      <circle cx="14" cy="44" r="5" fill="#16343f" stroke="#3276a8" strokeWidth="1.5" />
       <circle cx="14" cy="44" r="2" fill="#b9d9e4" />
-      <circle
-        cx="34"
-        cy="44"
-        r="5"
-        fill="#16343f"
-        stroke="#3276a8"
-        strokeWidth="1.5"
-      />
+      <circle cx="34" cy="44" r="5" fill="#16343f" stroke="#3276a8" strokeWidth="1.5" />
       <circle cx="34" cy="44" r="2" fill="#b9d9e4" />
-      <circle
-        cx="54"
-        cy="44"
-        r="4"
-        fill="#16343f"
-        stroke="#3276a8"
-        strokeWidth="1.5"
-      />
+      <circle cx="54" cy="44" r="4" fill="#16343f" stroke="#3276a8" strokeWidth="1.5" />
       <circle cx="54" cy="44" r="1.6" fill="#b9d9e4" />
       {/* doors line */}
       <line
@@ -121,21 +97,15 @@ function TrailerIcon({ size = 56 }: { size?: number }) {
         strokeDasharray="3 2"
       />
     </svg>
-  )
+  );
 }
 
-function PhotoUploadBox({
-  slot,
-  onFile,
-}: {
-  slot: PhotoSlot
-  onFile: (url: string) => void
-}) {
-  const ref = useRef<HTMLInputElement>(null)
+function PhotoUploadBox({ slot, onFile }: { slot: PhotoSlot; onFile: (url: string) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]
-    if (f) onFile(URL.createObjectURL(f))
+    const f = e.target.files?.[0];
+    if (f) onFile(URL.createObjectURL(f));
   }
 
   return (
@@ -151,11 +121,7 @@ function PhotoUploadBox({
     >
       {slot.file ? (
         <>
-          <img
-            src={slot.file}
-            alt={slot.label}
-            className="size-full object-cover rounded-[16px]"
-          />
+          <img src={slot.file} alt={slot.label} className="size-full object-cover rounded-[16px]" />
           <div className="absolute inset-0 bg-[rgba(22,52,63,0.4)] flex flex-col items-center justify-center gap-1 opacity-0 hover:opacity-100 transition-opacity rounded-[16px]">
             <svg
               width="22"
@@ -216,69 +182,65 @@ function PhotoUploadBox({
         onChange={handleChange}
       />
     </div>
-  )
+  );
 }
 
-export default function CapturaEvidencia({
-  onContinue,
-  currentReception,
-  receptionId,
-}: Props) {
-  const [photos, setPhotos] = useState<[string | null, string | null]>([
-    null,
-    null,
-  ])
+export default function CapturaEvidencia({ onContinue, currentReception, receptionId }: Props) {
+  const [photos, setPhotos] = useState<[string | null, string | null]>([null, null]);
   const [form, setForm] = useState<EvidenceForm>({
     proveedor: currentReception?.proveedor || "",
     item: currentReception?.productos?.[0]?.nombre || "",
     tarimas: currentReception?.tarimas ? String(currentReception.tarimas) : "",
     caducidad: currentReception?.caducidad || "",
     lote: currentReception?.lote || "",
-  })
-  const [notices, setNotices] = useState<string[]>([])
-  const [saved, setSaved] = useState(false)
-  const [saveNotice, setSaveNotice] = useState(false)
+  });
+  const [notices, setNotices] = useState<string[]>([]);
+  const [saved, setSaved] = useState(false);
+  const [saveNotice, setSaveNotice] = useState(false);
 
   // TEST-ONLY: Load test data from localStorage for legacy mode
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('test') === 'legacy-captura-evidencia') {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("test") === "legacy-captura-evidencia") {
       try {
-        const saved = localStorage.getItem('test-evidencia-form')
+        const saved = localStorage.getItem("test-evidencia-form");
         if (saved) {
-          const data = JSON.parse(saved)
+          const data = JSON.parse(saved);
           setForm({
             proveedor: data.proveedor || "",
             item: data.item || "",
             tarimas: data.tarimas || "",
             caducidad: data.caducidad || "",
             lote: data.lote || "",
-          })
+          });
         }
       } catch (e) {
-        console.warn('[TEST] No se pudo leer test-evidencia-form:', e)
+        console.warn("[TEST] No se pudo leer test-evidencia-form:", e);
       }
     }
-  }, [])
+  }, []);
 
   // Firestore integration
-  const { canQuery, user } = useAuthorization()
-  
+  const { canQuery, user } = useAuthorization();
+
   // TEST-ONLY: Disable Firestore in test mode to avoid emulator connection issues
-  const isTestMode = new URLSearchParams(window.location.search).get('test') === 'legacy-captura-evidencia'
-  const useFirestore = !isTestMode && isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery
-  
-  const [fsServices, setFsServices] =
-    useState<ReturnType<typeof createFirestoreServices> | null>(null)
-  const [firestoreReady, setFirestoreReady] = useState(false)
+  const isTestMode =
+    new URLSearchParams(window.location.search).get("test") === "legacy-captura-evidencia";
+  const useFirestore =
+    !isTestMode && isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery;
+
+  const [fsServices, setFsServices] = useState<ReturnType<typeof createFirestoreServices> | null>(
+    null,
+  );
+  const [firestoreReady, setFirestoreReady] = useState(false);
 
   useEffect(() => {
     if (useFirestore && db) {
-      const services = createFirestoreServices(db, ORG_ID)
-      setFsServices(services)
-      setFirestoreReady(true)
+      const services = createFirestoreServices(db, ORG_ID);
+      setFsServices(services);
+      setFirestoreReady(true);
     }
-  }, [useFirestore])
+  }, [useFirestore]);
 
   function buildWhatsAppMessage() {
     return [
@@ -298,11 +260,11 @@ export default function CapturaEvidencia({
       `  ${photos[1] ? "✅" : "⬜"} Producto y caducidad`,
       "━━━━━━━━━━━━━━━━━━━━",
       "_Enviado desde TarimaQR_",
-    ].join("\n")
+    ].join("\n");
   }
 
   async function saveEvidenceToFirestore(): Promise<boolean> {
-    if (!useFirestore || !firestoreReady || !fsServices) return true
+    if (!useFirestore || !firestoreReady || !fsServices) return true;
 
     try {
       if (receptionId && user) {
@@ -311,33 +273,31 @@ export default function CapturaEvidencia({
           receptionId,
           { trailer: photos[0] || undefined, product: photos[1] || undefined },
           `op-evidence-${Date.now()}`,
-        )
-        return true
+        );
+        return true;
       }
     } catch (e) {
-      console.error("Failed to save evidence to Firestore:", e)
-      return false
+      console.error("Failed to save evidence to Firestore:", e);
+      return false;
     }
-    return false
+    return false;
   }
 
   async function handleSave(): Promise<boolean> {
-    setSaveNotice(true)
-    setTimeout(() => setSaveNotice(false), 3000)
+    setSaveNotice(true);
+    setTimeout(() => setSaveNotice(false), 3000);
 
     // Dual-write: save to Firestore if enabled
     if (useFirestore) {
-      const persisted = await saveEvidenceToFirestore()
+      const persisted = await saveEvidenceToFirestore();
       if (!persisted) {
-        setNotices([
-          "No se pudo guardar la evidencia. Verificá tus permisos y conexión.",
-        ])
-        return false
+        setNotices(["No se pudo guardar la evidencia. Verificá tus permisos y conexión."]);
+        return false;
       }
     }
 
-    setSaved(true)
-    return true
+    setSaved(true);
+    return true;
   }
 
   const slots: Omit<PhotoSlot, "file">[] = [
@@ -349,35 +309,32 @@ export default function CapturaEvidencia({
       label: "Foto del producto y su caducidad",
       hint: "Asegúrate que la fecha de caducidad sea visible",
     },
-  ]
+  ];
 
   async function handleContinue() {
-    const missing: string[] = []
-    if (!photos[0]) missing.push("Foto del tráiler")
-    if (!photos[1]) missing.push("Foto del producto y caducidad")
-    if (!form.proveedor.trim()) missing.push("Nombre del proveedor")
-    if (!form.item.trim()) missing.push("Ítem a recibir")
-    if (!form.tarimas.trim()) missing.push("Cantidad de tarimas")
-    if (!form.caducidad.trim()) missing.push("Caducidad del producto")
+    const missing: string[] = [];
+    if (!photos[0]) missing.push("Foto del tráiler");
+    if (!photos[1]) missing.push("Foto del producto y caducidad");
+    if (!form.proveedor.trim()) missing.push("Nombre del proveedor");
+    if (!form.item.trim()) missing.push("Ítem a recibir");
+    if (!form.tarimas.trim()) missing.push("Cantidad de tarimas");
+    if (!form.caducidad.trim()) missing.push("Caducidad del producto");
 
     if (missing.length > 0) {
-      setNotices(missing)
-      setTimeout(() => setNotices([]), 5000)
-      return
+      setNotices(missing);
+      setTimeout(() => setNotices([]), 5000);
+      return;
     }
-    if (!(await handleSave())) return
+    if (!(await handleSave())) return;
     // Pass evidence data to parent
-    onContinue({ photos, form })
+    onContinue({ photos, form });
   }
 
   return (
     <div className="flex flex-col gap-[18px] items-start p-7 size-full overflow-y-auto">
       {/* Progress */}
       <div className="bg-[#dce4e7] flex flex-col h-2 items-start overflow-hidden rounded-full w-full shrink-0">
-        <div
-          className="bg-[#f2b84b] h-2 rounded-full"
-          style={{ width: "16%" }}
-        />
+        <div className="bg-[#f2b84b] h-2 rounded-full" style={{ width: "16%" }} />
       </div>
 
       {/* Header card */}
@@ -416,11 +373,12 @@ export default function CapturaEvidencia({
                 slot={{ ...slot, file: photos[i] }}
                 onFile={(url) =>
                   setPhotos((prev) => {
-                    const next: [string | null, string | null] = [
-                      ...prev,
-                    ] as [string | null, string | null]
-                    next[i] = url
-                    return next
+                    const next: [string | null, string | null] = [...prev] as [
+                      string | null,
+                      string | null,
+                    ];
+                    next[i] = url;
+                    return next;
                   })
                 }
               />
@@ -500,10 +458,8 @@ export default function CapturaEvidencia({
                 aria-label={label}
                 type={type ?? "text"}
                 placeholder={placeholder}
-                value={form[(key as keyof EvidenceForm)]}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, [key]: e.target.value }))
-                }
+                value={form[key as keyof EvidenceForm]}
+                onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                 className="bg-white border border-[#dce4e7] h-11 px-[14px] rounded-lg w-full text-[#172126] text-[14px] outline-none focus:border-[#3276a8] transition-colors"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}
               />
@@ -514,9 +470,7 @@ export default function CapturaEvidencia({
         {/* Notices */}
         {notices.length > 0 && (
           <div className="bg-[#fff8e6] border border-[#f2b84b] flex gap-3 items-start p-[14px] rounded-[12px] w-full">
-            <span className="text-[#f2b84b] text-[16px] shrink-0 mt-[1px]">
-              ⚠
-            </span>
+            <span className="text-[#f2b84b] text-[16px] shrink-0 mt-[1px]">⚠</span>
             <div className="flex flex-col gap-1">
               <p
                 className="font-bold text-[#7a5c00] text-[13px]"
@@ -638,9 +592,7 @@ export default function CapturaEvidencia({
                 cursor: saved ? "pointer" : "not-allowed",
                 opacity: saved ? 1 : 0.6,
               }}
-              title={
-                saved ? "Enviar por WhatsApp" : "Guarda la evidencia primero"
-              }
+              title={saved ? "Enviar por WhatsApp" : "Guarda la evidencia primero"}
             >
               <svg
                 width="18"
@@ -664,11 +616,7 @@ export default function CapturaEvidencia({
               onClick={handleContinue}
               className="bg-[#16343f] border border-[#16343f] flex gap-2 h-11 md:h-[52px] items-center justify-center px-4 md:px-5 rounded-[14px] cursor-pointer hover:bg-[#1e4456] transition-colors touch-target w-full sm:w-auto"
             >
-              <img
-                alt=""
-                className="size-5 md:size-[18px]"
-                src={imgArrowRight}
-              />
+              <img alt="" className="size-5 md:size-[18px]" src={imgArrowRight} />
               <p
                 className="font-bold text-white text-sm md:text-[15px] whitespace-nowrap"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
@@ -680,5 +628,5 @@ export default function CapturaEvidencia({
         </div>
       </div>
     </div>
-  )
+  );
 }

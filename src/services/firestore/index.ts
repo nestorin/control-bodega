@@ -1,10 +1,10 @@
-export * from "./types"
-export * from "./baseService"
-export * from "./domainServices"
-export * from "./inventoryService"
+export * from "./types";
+export * from "./baseService";
+export * from "./domainServices";
+export * from "./inventoryService";
 
 // Factory function to create all services for an organization
-import { Firestore } from "firebase/firestore"
+import { Firestore } from "firebase/firestore";
 import {
   WarehouseService,
   SupplierService,
@@ -17,27 +17,24 @@ import {
   InventoryMovementService,
   ShipmentService,
   LotCaducidadService,
-} from "./domainServices"
-import { InventoryService } from "./inventoryService"
+} from "./domainServices";
+import { InventoryService } from "./inventoryService";
 
 export interface FirestoreServices {
-  warehouses: WarehouseService
-  suppliers: SupplierService
-  products: ProductService
-  conversions: ConversionService
-  purchaseOrders: PurchaseOrderService
-  receptions: ReceptionService
-  pallets: PalletService
-  inventory: InventoryService
-  inventoryMovements: InventoryMovementService
-  shipments: ShipmentService
-  lotesCaducidades: LotCaducidadService
+  warehouses: WarehouseService;
+  suppliers: SupplierService;
+  products: ProductService;
+  conversions: ConversionService;
+  purchaseOrders: PurchaseOrderService;
+  receptions: ReceptionService;
+  pallets: PalletService;
+  inventory: InventoryService;
+  inventoryMovements: InventoryMovementService;
+  shipments: ShipmentService;
+  lotesCaducidades: LotCaducidadService;
 }
 
-export function createFirestoreServices(
-  db: Firestore,
-  orgId: string,
-): FirestoreServices {
+export function createFirestoreServices(db: Firestore, orgId: string): FirestoreServices {
   return {
     warehouses: new WarehouseService(db, orgId),
     suppliers: new SupplierService(db, orgId),
@@ -50,7 +47,7 @@ export function createFirestoreServices(
     inventoryMovements: new InventoryMovementService(db, orgId),
     shipments: new ShipmentService(db, orgId),
     lotesCaducidades: new LotCaducidadService(db, orgId),
-  }
+  };
 }
 
 export function createReceptionLineService(
@@ -58,7 +55,7 @@ export function createReceptionLineService(
   orgId: string,
   receptionId: string,
 ): ReceptionLineService {
-  return new ReceptionLineService(db, orgId, receptionId)
+  return new ReceptionLineService(db, orgId, receptionId);
 }
 
 export function createPalletServiceForReception(
@@ -66,5 +63,5 @@ export function createPalletServiceForReception(
   orgId: string,
   receptionId: string,
 ): PalletService {
-  return new PalletService(db, orgId, receptionId)
+  return new PalletService(db, orgId, receptionId);
 }

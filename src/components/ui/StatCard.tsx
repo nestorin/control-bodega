@@ -1,17 +1,13 @@
-import type { ReactNode } from "react"
+import type { ReactNode } from "react";
 
 interface StatCardProps {
-  value: ReactNode
-  label: string
-  valueClassName?: string
+  value: ReactNode;
+  label: string;
+  valueClassName?: string;
 }
 
 /** Compact metric used inside responsive summary panels. */
-export function StatCard({
-  value,
-  label,
-  valueClassName = "text-[#16343f]",
-}: StatCardProps) {
+export function StatCard({ value, label, valueClassName = "text-[#16343f]" }: StatCardProps) {
   return (
     <div className="flex flex-col gap-0.5 items-start">
       <p
@@ -27,5 +23,5 @@ export function StatCard({
         {label}
       </p>
     </div>
-  )
+  );
 }

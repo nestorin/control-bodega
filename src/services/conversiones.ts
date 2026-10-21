@@ -3,18 +3,18 @@ import {
   DocumentoItem,
   ConversionRegla,
   CalculoTarimasResultado,
-} from "@/types/documento"
+} from "@/types/documento";
 
 export interface EmbarqueConversion {
-  producto: string
-  piezasPorCaja: number
-  cajasPorTarima: number
+  producto: string;
+  piezasPorCaja: number;
+  cajasPorTarima: number;
 }
 
 export interface FirestoreConversionRecord {
-  productName?: string
-  piecesPerBox?: number
-  boxesPerPallet?: number
+  productName?: string;
+  piecesPerBox?: number;
+  boxesPerPallet?: number;
 }
 
 /** Firestore values override local fallback values by product name. */
@@ -36,21 +36,18 @@ export function mergeCanonicalConversions(
       producto: conversion.productName!.trim(),
       piezasPorCaja: Number(conversion.piecesPerBox),
       cajasPorTarima: Number(conversion.boxesPerPallet),
-    }))
+    }));
 
   const remoteNames = new Set(
-    remoteConversions.map((conversion) =>
-      conversion.producto.toLocaleLowerCase(),
-    ),
-  )
+    remoteConversions.map((conversion) => conversion.producto.toLocaleLowerCase()),
+  );
 
   return [
     ...remoteConversions,
     ...fallback.filter(
-      (conversion) =>
-        !remoteNames.has(conversion.producto.trim().toLocaleLowerCase()),
+      (conversion) => !remoteNames.has(conversion.producto.trim().toLocaleLowerCase()),
     ),
-  ]
+  ];
 }
 
 /**
@@ -91,7 +88,7 @@ export const CONVERSIONES_DEFAULT: ConversionRegla[] = [
     unidadDestino: "caja",
     factor: 10,
   },
-]
+];
 
 /**
  * Busca regla de conversión para un producto/unidad
@@ -108,7 +105,7 @@ export function encontrarConversion(
       c.productoId === productoId &&
       c.unidadOrigen === unidadOrigen &&
       c.unidadDestino === unidadDestino,
-  )
+  );
 
   // Fallback a wildcard '*'
   if (!regla) {
@@ -117,10 +114,10 @@ export function encontrarConversion(
         c.productoId === "*" &&
         c.unidadOrigen === unidadOrigen &&
         c.unidadDestino === unidadDestino,
-    )
+    );
   }
 
-  return regla ?? null
+  return regla ?? null;
 }
 
 /**
@@ -133,21 +130,16 @@ export function convertirCantidad(
   conversiones: ConversionRegla[],
   productoId: string,
 ): number {
-  if (unidadOrigen === unidadDestino) return cantidad
+  if (unidadOrigen === unidadDestino) return cantidad;
 
-  const regla = encontrarConversion(
-    productoId,
-    unidadOrigen,
-    unidadDestino,
-    conversiones,
-  )
+  const regla = encontrarConversion(productoId, unidadOrigen, unidadDestino, conversiones);
   if (!regla) {
     throw new Error(
       `No hay conversión de ${unidadOrigen} a ${unidadDestino} para producto ${productoId}`,
-    )
+    );
   }
 
-  return cantidad * regla.factor
+  return cantidad * regla.factor;
 }
 
 /**
@@ -165,7 +157,7 @@ export function calcularTarimas(
       "tarima",
       conversiones,
       item.productoId,
-    )
+    );
 
     return {
       productoId: item.productoId,
@@ -173,17 +165,17 @@ export function calcularTarimas(
       cantidadOriginal: item.cantidad,
       unidadOriginal: item.unidad,
       tarimasCalculadas: Math.ceil(tarimasCalculadas), // Redondear hacia arriba
-    }
-  })
+    };
+  });
 
-  const totalTarimas = desglose.reduce((sum, d) => sum + d.tarimasCalculadas, 0)
-  const totalStickers = totalTarimas * 4 // 4 stickers por tarima
+  const totalTarimas = desglose.reduce((sum, d) => sum + d.tarimasCalculadas, 0);
+  const totalStickers = totalTarimas * 4; // 4 stickers por tarima
 
   return {
     totalTarimas,
     totalStickers,
     desglose,
-  }
+  };
 }
 
 /**
@@ -194,10 +186,16 @@ export async function validarStockDisponible(
   items: DocumentoItem[],
   getStockFn: (almacenId: string, productoId: string) => Promise<number>,
 ): Promise<{
-  disponible: boolean
-  faltantes: { productoId: string; faltante: number }[]
+  disponible: boolean;
+  faltantes: {
+    productoId: string;
+    faltante: number;
+  }[];
 }> {
-  const faltantes: { productoId: string; faltante: number }[] = []
+  const faltantes: {
+    productoId: string;
+    faltante: number;
+  }[] = [];
 
   for (const item of items) {
     // Convertir a cajas para comparar con stock (asumiendo stock en cajas)
@@ -207,19 +205,19 @@ export async function validarStockDisponible(
       "caja",
       CONVERSIONES_DEFAULT,
       item.productoId,
-    )
-    const stock = await getStockFn(item.almacenDestinoId || "", item.productoId)
+    );
+    const stock = await getStockFn(item.almacenDestinoId || "", item.productoId);
 
     if (stock < cajasRequeridas) {
       faltantes.push({
         productoId: item.productoId,
         faltante: cajasRequeridas - stock,
-      })
+      });
     }
   }
 
   return {
     disponible: faltantes.length === 0,
     faltantes,
-  }
+  };
 }

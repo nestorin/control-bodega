@@ -1,7 +1,7 @@
-import { defineConfig } from "vite"
-import react from "@vitejs/plugin-react"
-import tailwindcss from "@tailwindcss/vite"
-import path from "path"
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import path from "path";
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -19,7 +19,7 @@ export default defineConfig({
         manualChunks(id) {
           // React core
           if (id.includes("react") || id.includes("react-dom")) {
-            return "vendor-react"
+            return "vendor-react";
           }
 
           // Firebase ecosystem
@@ -33,21 +33,17 @@ export default defineConfig({
             id.includes("firebase/analytics") ||
             id.includes("firebase/performance")
           ) {
-            return "vendor-firebase"
+            return "vendor-firebase";
           }
 
           // PDF/ocr processing
-          if (
-            id.includes("pdfjs-dist") ||
-            id.includes("jspdf") ||
-            id.includes("html2canvas")
-          ) {
-            return "vendor-pdf"
+          if (id.includes("pdfjs-dist") || id.includes("jspdf") || id.includes("html2canvas")) {
+            return "vendor-pdf";
           }
 
           // ZXing QR scanning
           if (id.includes("@zxing/browser") || id.includes("@zxing/library")) {
-            return "vendor-qr"
+            return "vendor-qr";
           }
 
           // UI components
@@ -57,7 +53,7 @@ export default defineConfig({
             id.includes("clsx") ||
             id.includes("tailwind-merge")
           ) {
-            return "vendor-ui"
+            return "vendor-ui";
           }
 
           // Default: let rolldown decide
@@ -65,4 +61,4 @@ export default defineConfig({
       },
     },
   },
-})
+});

@@ -1,32 +1,30 @@
-import { useState, useEffect } from "react"
-import { BrowserRouter, Route, Routes } from "react-router-dom"
-import { AuthProvider } from "@/context/AuthContext"
-import { useAuthorization } from "@/hooks/useAuthorization"
+import { useState, useEffect } from "react";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { AuthProvider } from "@/context/AuthContext";
+import { useAuthorization } from "@/hooks/useAuthorization";
 import {
   CANONICAL_WAREHOUSE_IDS,
   isGlobalMembershipRole,
   normalizeMembershipWarehouses,
-} from "@/schemas/membership"
-import Home from "./screens/Home"
-import Login from "./screens/Login"
-import Unauthorized from "./screens/Unauthorized"
-import CapturaEvidencia from "./screens/CapturaEvidencia"
-import ProgramacionRecepcion from "./screens/ProgramacionRecepcion"
-import NuevaRecepcionStep1 from "./screens/NuevaRecepcionStep1"
-import NuevaRecepcionStep2 from "./screens/NuevaRecepcionStep2"
-import CapturaTarima from "./screens/CapturaTarima"
-import RecepcionCompletada from "./screens/RecepcionCompletada"
-import Recepciones from "./screens/Recepciones"
-import TarimaDetalle from "./screens/TarimaDetalle"
-import ImpresionEtiquetas from "./screens/ImpresionEtiquetas"
-import EscanearQR from "./screens/EscanearQR"
-import EditarRecepcion from "./screens/EditarRecepcion"
-import Evidencias from "./screens/Evidencias"
-import EvidenciaDetalle, {
-  type EvidenciaData,
-} from "./screens/EvidenciaDetalle"
-import LotesCaducidades from "./screens/LotesCaducidades"
-import Embarques from "./screens/Embarques"
+} from "@/schemas/membership";
+import Home from "./screens/Home";
+import Login from "./screens/Login";
+import Unauthorized from "./screens/Unauthorized";
+import CapturaEvidencia from "./screens/CapturaEvidencia";
+import ProgramacionRecepcion from "./screens/ProgramacionRecepcion";
+import NuevaRecepcionStep1 from "./screens/NuevaRecepcionStep1";
+import NuevaRecepcionStep2 from "./screens/NuevaRecepcionStep2";
+import CapturaTarima from "./screens/CapturaTarima";
+import RecepcionCompletada from "./screens/RecepcionCompletada";
+import Recepciones from "./screens/Recepciones";
+import TarimaDetalle from "./screens/TarimaDetalle";
+import ImpresionEtiquetas from "./screens/ImpresionEtiquetas";
+import EscanearQR from "./screens/EscanearQR";
+import EditarRecepcion from "./screens/EditarRecepcion";
+import Evidencias from "./screens/Evidencias";
+import EvidenciaDetalle, { type EvidenciaData } from "./screens/EvidenciaDetalle";
+import LotesCaducidades from "./screens/LotesCaducidades";
+import Embarques from "./screens/Embarques";
 import Configuracion, {
   type Producto,
   PRODUCTOS_INIT,
@@ -36,33 +34,57 @@ import Configuracion, {
   CONVERSIONES_INIT,
   type Almacen,
   ALMACENES_INIT,
-} from "./screens/Configuracion"
-import { ProtectedRoute } from "@/components/ProtectedRoute"
-import { programacionToAppReception } from "@/services/domain/programacionToApp"
-import { isFeatureEnabled } from "@/config/featureFlags"
-import { createFirestoreServices } from "@/services/firestore"
-import { db } from "@/lib/firebase"
+} from "./screens/Configuracion";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { programacionToAppReception } from "@/services/domain/programacionToApp";
+import { isFeatureEnabled } from "@/config/featureFlags";
+import { createFirestoreServices } from "@/services/firestore";
+import { db } from "@/lib/firebase";
 import {
   mergeSupplierCatalog,
   normalizeSupplierType,
   CANONICAL_SUPPLIER_LOCAL,
-} from "@/config/supplierCatalog"
-import { useReceptionSession } from "@/domains/reception/useReceptionSession"
+} from "@/config/supplierCatalog";
+import { useReceptionSession } from "@/domains/reception/useReceptionSession";
 
-const assetPathPrefix = "/assets"
-const imgPackage = `${assetPathPrefix}/4cca0.svg`
-const imgWarehouseNav = `${assetPathPrefix}/66fcc.svg`
-const imgClipboardListNav = `${assetPathPrefix}/c2509.svg`
-const imgScanQrCodeNav = `${assetPathPrefix}/ba9e1.svg`
-const imgAvatar = `${assetPathPrefix}/35fee.svg`
-const imgIndicador = `${assetPathPrefix}/08d70.svg`
+const assetPathPrefix = "/assets";
+const imgPackage = `${assetPathPrefix}/4cca0.svg`;
+const imgWarehouseNav = `${assetPathPrefix}/66fcc.svg`;
+const imgClipboardListNav = `${assetPathPrefix}/c2509.svg`;
+const imgScanQrCodeNav = `${assetPathPrefix}/ba9e1.svg`;
+const imgAvatar = `${assetPathPrefix}/35fee.svg`;
+const imgIndicador = `${assetPathPrefix}/08d70.svg`;
 
-type Screen = "home" | "programacion-recepcion" | "captura-evidencia" | "nueva-step1" | "nueva-step2" | "captura-tarima" | "completada" | "recepciones" | "tarima-detalle" | "impresion" | "escanear-qr" | "editar-recepcion" | "evidencias" | "evidencia-detalle" | "lotes-caducidades" | "embarques" | "configuracion"
-type NavItem = "home" | "recepciones" | "embarques" | "qr" | "evidencias" | "lotes" | "configuracion"
+type Screen =
+  | "home"
+  | "programacion-recepcion"
+  | "captura-evidencia"
+  | "nueva-step1"
+  | "nueva-step2"
+  | "captura-tarima"
+  | "completada"
+  | "recepciones"
+  | "tarima-detalle"
+  | "impresion"
+  | "escanear-qr"
+  | "editar-recepcion"
+  | "evidencias"
+  | "evidencia-detalle"
+  | "lotes-caducidades"
+  | "embarques"
+  | "configuracion";
+type NavItem =
+  | "home"
+  | "recepciones"
+  | "embarques"
+  | "qr"
+  | "evidencias"
+  | "lotes"
+  | "configuracion";
 
 interface HeaderConfig {
-  subtitle: string
-  title: string
+  subtitle: string;
+  title: string;
 }
 
 export default function App() {
@@ -83,47 +105,44 @@ export default function App() {
         </Routes>
       </AuthProvider>
     </BrowserRouter>
-  )
+  );
 }
 
 // Separate layout component for cleaner code
 function AppLayout() {
-  const { user, profile, logout, canQuery } = useAuthorization()
-  const receptionSession = useReceptionSession()
-  const [screen, setScreen] = useState<Screen>("home")
-  const [activeNav, setActiveNav] = useState<NavItem>("home")
-  const [editId, setEditId] = useState<string>("OC-24891")
+  const { user, profile, logout, canQuery } = useAuthorization();
+  const receptionSession = useReceptionSession();
+  const [screen, setScreen] = useState<Screen>("home");
+  const [activeNav, setActiveNav] = useState<NavItem>("home");
+  const [editId, setEditId] = useState<string>("OC-24891");
   const [editReceptionData, setEditReceptionData] = useState<{
-    tarimas: number
-    proveedor: string
-    proveedorLogistico: string
-  } | null>(null)
-  const [selectedEvidencia, setSelectedEvidencia] =
-    useState<EvidenciaData | null>(null)
-  const [tarimaActual, setTarimaActual] = useState(3)
-  const [selectedReception, setSelectedReception] = useState<string | null>(
-    null,
-  )
-  const [scannedQrCode, setScannedQrCode] = useState<string | null>(null)
+    tarimas: number;
+    proveedor: string;
+    proveedorLogistico: string;
+  } | null>(null);
+  const [selectedEvidencia, setSelectedEvidencia] = useState<EvidenciaData | null>(null);
+  const [tarimaActual, setTarimaActual] = useState(3);
+  const [selectedReception, setSelectedReception] = useState<string | null>(null);
+  const [scannedQrCode, setScannedQrCode] = useState<string | null>(null);
 
-// TEST-ONLY: Legacy mode for TarimaDetalle (bypasses Firestore query)
+  // TEST-ONLY: Legacy mode for TarimaDetalle (bypasses Firestore query)
   // Enable with: ?test=legacy-tarima-detalle
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const testMode = params.get('test')
-    if (testMode === 'legacy-tarima-detalle') {
-      setScreen('tarima-detalle')
-      setActiveNav('qr')
+    const params = new URLSearchParams(window.location.search);
+    const testMode = params.get("test");
+    if (testMode === "legacy-tarima-detalle") {
+      setScreen("tarima-detalle");
+      setActiveNav("qr");
       // Don't set scannedQrCode - TarimaDetalle will use legacy mode
-      
+
       // Set up conversionesTabla for CapturaTarima (legacy mode)
       const conversiones = [
         {
-          producto: 'Agua mineral 600 ml',
-          productId: 'prod-test-1',
-          codigo: 'AGUA-600ML',
+          producto: "Agua mineral 600 ml",
+          productId: "prod-test-1",
+          codigo: "AGUA-600ML",
           unidades: 48,
-          unidad: 'cajas',
+          unidad: "cajas",
           piezasPorCaja: 24,
           cajasPorTarima: 2,
           cajas: 48,
@@ -132,11 +151,11 @@ function AppLayout() {
           conversionMatch: true,
         },
         {
-          producto: 'Refresco Cola 500 ml',
-          productId: 'prod-test-2',
-          codigo: 'COLA-500ML',
+          producto: "Refresco Cola 500 ml",
+          productId: "prod-test-2",
+          codigo: "COLA-500ML",
           unidades: 50,
-          unidad: 'cajas',
+          unidad: "cajas",
           piezasPorCaja: 25,
           cajasPorTarima: 2,
           cajas: 50,
@@ -145,11 +164,11 @@ function AppLayout() {
           conversionMatch: true,
         },
         {
-          producto: 'Jugo Naranja 1L',
-          productId: 'prod-test-3',
-          codigo: 'JUGO-1L',
+          producto: "Jugo Naranja 1L",
+          productId: "prod-test-3",
+          codigo: "JUGO-1L",
           unidades: 45,
-          unidad: 'cajas',
+          unidad: "cajas",
           piezasPorCaja: 15,
           cajasPorTarima: 3,
           cajas: 45,
@@ -157,102 +176,104 @@ function AppLayout() {
           stickers: 4,
           conversionMatch: true,
         },
-      ]
+      ];
       try {
-        localStorage.setItem('conversionesTabla', JSON.stringify(conversiones))
+        localStorage.setItem("conversionesTabla", JSON.stringify(conversiones));
       } catch (e) {
-        console.warn('[TEST] No se pudo setear localStorage conversionesTabla:', e)
+        console.warn("[TEST] No se pudo setear localStorage conversionesTabla:", e);
       }
-      
+
       // Dispatch event to set currentReception state for CapturaTarima
       const receptionData = {
-        ocFolio: 'OC-TEST-001',
+        ocFolio: "OC-TEST-001",
         tarimas: 5,
-        proveedor: 'Proveedor Test',
-        proveedorLogistico: 'Logística Test',
+        proveedor: "Proveedor Test",
+        proveedorLogistico: "Logística Test",
         conversionesTabla: conversiones,
-        receptionId: 'reception-test-e2e',
-      }
-      window.dispatchEvent(new CustomEvent('TEST_SET_RECEPTION', { detail: receptionData }))
-    } else if (testMode === 'escanear-qr') {
-      setScreen('escanear-qr')
-      setActiveNav('qr')
-    } else if (testMode === 'legacy-captura-evidencia') {
-      setScreen('captura-evidencia')
-      setActiveNav('home')
-      
+        receptionId: "reception-test-e2e",
+      };
+      window.dispatchEvent(new CustomEvent("TEST_SET_RECEPTION", { detail: receptionData }));
+    } else if (testMode === "escanear-qr") {
+      setScreen("escanear-qr");
+      setActiveNav("qr");
+    } else if (testMode === "legacy-captura-evidencia") {
+      setScreen("captura-evidencia");
+      setActiveNav("home");
+
       // Set up currentReception for CapturaEvidencia (needs receptionId for Firestore)
       const currentReceptionData = {
-        proveedor: 'Distribuidora del Norte',
-        item: 'Agua mineral 600 ml',
+        proveedor: "Distribuidora del Norte",
+        item: "Agua mineral 600 ml",
         tarimas: 20,
-        caducidad: '15 Mar 2027',
-        lote: 'LT-0926-A',
-        proveedorLogistico: 'Logística Veloz',
-        ocFolio: 'OC-TEST-001',
-        receptionId: 'reception-test-e2e',
-        productos: [{
-          productId: null,
-          codigo: null,
-          nombre: 'Agua mineral 600 ml',
-          unidad: null,
-          cantidad: 0,
-          precio: 0,
-          importe: 0,
-          estadoMatch: 'manual' as const,
-        }],
-      }
-      setCurrentReception(currentReceptionData)
-      
+        caducidad: "15 Mar 2027",
+        lote: "LT-0926-A",
+        proveedorLogistico: "Logística Veloz",
+        ocFolio: "OC-TEST-001",
+        receptionId: "reception-test-e2e",
+        productos: [
+          {
+            productId: null,
+            codigo: null,
+            nombre: "Agua mineral 600 ml",
+            unidad: null,
+            cantidad: 0,
+            precio: 0,
+            importe: 0,
+            estadoMatch: "manual" as const,
+          },
+        ],
+      };
+      setCurrentReception(currentReceptionData);
+
       // Also set localStorage for form prefill
       const receptionData = {
-        proveedor: 'Distribuidora del Norte',
-        item: 'Agua mineral 600 ml',
-        tarimas: '20',
-        caducidad: '15 Mar 2027',
-        lote: 'LT-0926-A',
-      }
+        proveedor: "Distribuidora del Norte",
+        item: "Agua mineral 600 ml",
+        tarimas: "20",
+        caducidad: "15 Mar 2027",
+        lote: "LT-0926-A",
+      };
       try {
-        localStorage.setItem('test-evidencia-form', JSON.stringify(receptionData))
+        localStorage.setItem("test-evidencia-form", JSON.stringify(receptionData));
       } catch (e) {
-        console.warn('[TEST] No se pudo setear localStorage test-evidencia-form:', e)
+        console.warn("[TEST] No se pudo setear localStorage test-evidencia-form:", e);
       }
-    } else if (testMode === 'legacy-evidencia-detalle') {
-      setScreen('evidencia-detalle')
-      setActiveNav('evidencias')
-      
+    } else if (testMode === "legacy-evidencia-detalle") {
+      setScreen("evidencia-detalle");
+      setActiveNav("evidencias");
+
       // Set up test data for legacy evidencia detalle
       const evidenciaData = {
-        id: 'EVD-QA-12345',
+        id: "EVD-QA-12345",
         fotoTrailer: null,
         fotoProducto: null,
-        proveedor: 'Distribuidora del Norte',
-        proveedorLogistico: 'Logística Veloz',
-        item: 'Agua mineral 600 ml',
+        proveedor: "Distribuidora del Norte",
+        proveedorLogistico: "Logística Veloz",
+        item: "Agua mineral 600 ml",
         tarimas: 20,
-        caducidad: '15 Mar 2027',
-        lote: 'LT-0926-A',
-        ocFolio: 'OC-24891',
-        fecha: '19 Sep 2026',
-        hora: '09:42',
-        estado: 'COMPLETADA',
-        color: '#16845b',
-        bg: '#e2f5ec',
-        img: '/assets/08d70.svg',
-      }
-      setSelectedEvidencia(evidenciaData)
-    } else if (testMode === 'legacy-captura-tarima') {
-      setScreen('captura-tarima')
-      setActiveNav('qr')
-      
+        caducidad: "15 Mar 2027",
+        lote: "LT-0926-A",
+        ocFolio: "OC-24891",
+        fecha: "19 Sep 2026",
+        hora: "09:42",
+        estado: "COMPLETADA",
+        color: "#16845b",
+        bg: "#e2f5ec",
+        img: "/assets/08d70.svg",
+      };
+      setSelectedEvidencia(evidenciaData);
+    } else if (testMode === "legacy-captura-tarima") {
+      setScreen("captura-tarima");
+      setActiveNav("qr");
+
       // Set up currentReception for CapturaTarima (legacy mode)
       const conversiones = [
         {
-          producto: 'Agua mineral 600 ml',
-          productId: 'prod-test-1',
-          codigo: 'AGUA-600ML',
+          producto: "Agua mineral 600 ml",
+          productId: "prod-test-1",
+          codigo: "AGUA-600ML",
           unidades: 48,
-          unidad: 'cajas',
+          unidad: "cajas",
           piezasPorCaja: 24,
           cajasPorTarima: 2,
           cajas: 48,
@@ -261,11 +282,11 @@ function AppLayout() {
           conversionMatch: true,
         },
         {
-          producto: 'Refresco Cola 500 ml',
-          productId: 'prod-test-2',
-          codigo: 'COLA-500ML',
+          producto: "Refresco Cola 500 ml",
+          productId: "prod-test-2",
+          codigo: "COLA-500ML",
           unidades: 50,
-          unidad: 'cajas',
+          unidad: "cajas",
           piezasPorCaja: 25,
           cajasPorTarima: 2,
           cajas: 50,
@@ -274,11 +295,11 @@ function AppLayout() {
           conversionMatch: true,
         },
         {
-          producto: 'Jugo Naranja 1L',
-          productId: 'prod-test-3',
-          codigo: 'JUGO-1L',
+          producto: "Jugo Naranja 1L",
+          productId: "prod-test-3",
+          codigo: "JUGO-1L",
           unidades: 45,
-          unidad: 'cajas',
+          unidad: "cajas",
           piezasPorCaja: 15,
           cajasPorTarima: 3,
           cajas: 45,
@@ -286,60 +307,58 @@ function AppLayout() {
           stickers: 4,
           conversionMatch: true,
         },
-      ]
+      ];
       try {
-        localStorage.setItem('conversionesTabla', JSON.stringify(conversiones))
+        localStorage.setItem("conversionesTabla", JSON.stringify(conversiones));
       } catch (e) {
-        console.warn('[TEST] No se pudo setear localStorage conversionesTabla:', e)
+        console.warn("[TEST] No se pudo setear localStorage conversionesTabla:", e);
       }
-      
+
       // Set up currentReception for CapturaTarima
       const currentReceptionData = {
-        proveedor: 'Distribuidora del Norte',
-        item: 'Agua mineral 600 ml',
+        proveedor: "Distribuidora del Norte",
+        item: "Agua mineral 600 ml",
         tarimas: 5,
-        caducidad: '15 Mar 2027',
-        lote: 'LT-0926-A',
-        proveedorLogistico: 'Logística Veloz',
-        ocFolio: 'OC-TEST-001',
-        receptionId: 'reception-test-e2e',
-        productos: [{
-          productId: null,
-          codigo: null,
-          nombre: 'Agua mineral 600 ml',
-          unidad: null,
-          cantidad: 0,
-          precio: 0,
-          importe: 0,
-          estadoMatch: 'manual' as const,
-        }],
+        caducidad: "15 Mar 2027",
+        lote: "LT-0926-A",
+        proveedorLogistico: "Logística Veloz",
+        ocFolio: "OC-TEST-001",
+        receptionId: "reception-test-e2e",
+        productos: [
+          {
+            productId: null,
+            codigo: null,
+            nombre: "Agua mineral 600 ml",
+            unidad: null,
+            cantidad: 0,
+            precio: 0,
+            importe: 0,
+            estadoMatch: "manual" as const,
+          },
+        ],
         conversionesTabla: conversiones,
-      }
-      setCurrentReception(currentReceptionData)
+      };
+      setCurrentReception(currentReceptionData);
     }
-  }, [])
-  const TARIMA_TOTAL = 20
-  const [catalogoProductos, setCatalogoProductos] =
-    useState<Producto[]>(PRODUCTOS_INIT)
-  const [catalogoProveedores, setCatalogoProveedores] =
-    useState<Proveedor[]>(PROVEEDORES_INIT)
-  const [catalogoConversiones, setCatalogoConversiones] =
-    useState<Conversion[]>(CONVERSIONES_INIT)
-  const [catalogoAlmacenes, setCatalogoAlmacenes] =
-    useState<Almacen[]>(ALMACENES_INIT)
-  const [catalogosLoading, setCatalogosLoading] = useState(false)
-  const [catalogosError, setCatalogosError] = useState<Error | null>(null)
+  }, []);
+  const TARIMA_TOTAL = 20;
+  const [catalogoProductos, setCatalogoProductos] = useState<Producto[]>(PRODUCTOS_INIT);
+  const [catalogoProveedores, setCatalogoProveedores] = useState<Proveedor[]>(PROVEEDORES_INIT);
+  const [catalogoConversiones, setCatalogoConversiones] = useState<Conversion[]>(CONVERSIONES_INIT);
+  const [catalogoAlmacenes, setCatalogoAlmacenes] = useState<Almacen[]>(ALMACENES_INIT);
+  const [catalogosLoading, setCatalogosLoading] = useState(false);
+  const [catalogosError, setCatalogosError] = useState<Error | null>(null);
 
   // Catalogs are needed by Nueva Recepción as well as Configuración. Load them
   // at the authenticated layout boundary so entering Nueva Recepción directly
   // does not depend on visiting Configuración first.
   useEffect(() => {
-    if (!canQuery || !isFeatureEnabled("USE_FIRESTORE_CATALOGOS") || !db) return
+    if (!canQuery || !isFeatureEnabled("USE_FIRESTORE_CATALOGOS") || !db) return;
 
-    const services = createFirestoreServices(db, "org_exepa_001")
-    let active = true
-    setCatalogosLoading(true)
-    setCatalogosError(null)
+    const services = createFirestoreServices(db, "org_exepa_001");
+    let active = true;
+    setCatalogosLoading(true);
+    setCatalogosError(null);
 
     Promise.allSettled([
       services.products.getAll({ orderBy: ["name", "asc"] }),
@@ -347,15 +366,15 @@ function AppLayout() {
       services.conversions.getAll({ orderBy: ["productName", "asc"] }),
       services.warehouses.getAll({ orderBy: ["code", "asc"] }),
     ]).then(([products, suppliers, conversions, warehouses]) => {
-      if (!active) return
+      if (!active) return;
       const failed = [products, suppliers, conversions, warehouses].filter(
         (result) => result.status === "rejected",
-      )
+      );
       setCatalogosError(
         failed.length > 0
           ? new Error(`${failed.length} catálogo(s) no pudieron actualizarse`)
           : null,
-      )
+      );
       if (products.status === "fulfilled") {
         setCatalogoProductos(
           products.value.data.map((p) => ({
@@ -367,7 +386,7 @@ function AppLayout() {
             activo: true,
             codigosProveedor: p.supplierCodes || [],
           })),
-        )
+        );
       }
       if (suppliers.status === "fulfilled") {
         setCatalogoProveedores(
@@ -380,13 +399,11 @@ function AppLayout() {
               email: p.email || "",
               tipo: normalizeSupplierType(
                 p.tipo,
-                CANONICAL_SUPPLIER_LOCAL.find(
-                  (supplier) => supplier.id === p.id,
-                )?.tipo,
+                CANONICAL_SUPPLIER_LOCAL.find((supplier) => supplier.id === p.id)?.tipo,
               ),
             })),
           ),
-        )
+        );
       }
       if (conversions.status === "fulfilled") {
         setCatalogoConversiones(
@@ -397,7 +414,7 @@ function AppLayout() {
             cajasPorTarima: c.boxesPerPallet,
             pesoKgCaja: c.weightKgPerBox || "",
           })),
-        )
+        );
       }
       if (warehouses.status === "fulfilled") {
         setCatalogoAlmacenes(
@@ -411,124 +428,124 @@ function AppLayout() {
               w.createdAt?.toDate?.()?.toISOString?.().slice(0, 10) ||
               new Date().toISOString().slice(0, 10),
           })),
-        )
+        );
       }
-      setCatalogosLoading(false)
-    })
+      setCatalogosLoading(false);
+    });
 
     return () => {
-      active = false
-    }
-  }, [canQuery])
+      active = false;
+    };
+  }, [canQuery]);
 
   // Estado para la recepción actual en proceso
   const [currentReception, setCurrentReception] = useState<{
-    hasOC?: boolean
-    ocFolio: string
-    tarimas: number
-    proveedor: string
-    proveedorLogistico: string
-    receptionId?: string
-    fechaRecepcion?: string
-    lote?: string
-    caducidad?: string
-    codigosQR?: string[]
+    hasOC?: boolean;
+    ocFolio: string;
+    tarimas: number;
+    proveedor: string;
+    proveedorLogistico: string;
+    receptionId?: string;
+    fechaRecepcion?: string;
+    lote?: string;
+    caducidad?: string;
+    codigosQR?: string[];
     productos: Array<{
-      productId: string | null
-      codigo: string | null
-      nombre: string
-      unidad: string | null
-      cantidad: number
-      precio: number
-      importe: number
-      estadoMatch: "confirmado" | "sugerido" | "manual"
-    }>
+      productId: string | null;
+      codigo: string | null;
+      nombre: string;
+      unidad: string | null;
+      cantidad: number;
+      precio: number;
+      importe: number;
+      estadoMatch: "confirmado" | "sugerido" | "manual";
+    }>;
     conversionesTabla?: Array<{
-      producto: string
-      productId?: string | null
-      codigo: string
-      unidades: number
-      unidad: string
-      piezasPorCaja: number
-      cajasPorTarima: number
-      cajas: number
-      tarimas: number
-      stickers: number
-    }>
-  } | null>(null)
+      producto: string;
+      productId?: string | null;
+      codigo: string;
+      unidades: number;
+      unidad: string;
+      piezasPorCaja: number;
+      cajasPorTarima: number;
+      cajas: number;
+      tarimas: number;
+      stickers: number;
+    }>;
+  } | null>(null);
 
   // Mobile state
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // ─── Inventario por almacén ──────────────────────────────────────────────
-  const [inventario, setInventario] =
-    useState<Record<string, Record<string, number>>>({})
+  const [inventario, setInventario] = useState<Record<string, Record<string, number>>>({});
 
   function inicializarInventarioAlmacen(almacenId: string) {
     setInventario((prev) => {
-      if (prev[almacenId]) return prev
-      const inicial: Record<string, number> = {}
+      if (prev[almacenId]) return prev;
+      const inicial: Record<string, number> = {};
       catalogoProductos.forEach((p) => {
-        inicial[p.id] = 0
-      })
-      return { ...prev, [almacenId]: inicial }
-    })
+        inicial[p.id] = 0;
+      });
+      return { ...prev, [almacenId]: inicial };
+    });
   }
 
   function aumentarInventario(
     almacenId: string,
-    productos: { productoId: string; cajas: number }[],
+    productos: {
+      productoId: string;
+      cajas: number;
+    }[],
   ) {
     setInventario((prev) => {
-      const almacen = prev[almacenId] ?? {}
-      const actualizado = { ...almacen }
+      const almacen = prev[almacenId] ?? {};
+      const actualizado = { ...almacen };
       productos.forEach(({ productoId, cajas }) => {
-        actualizado[productoId] = (actualizado[productoId] ?? 0) + cajas
-      })
-      return { ...prev, [almacenId]: actualizado }
-    })
+        actualizado[productoId] = (actualizado[productoId] ?? 0) + cajas;
+      });
+      return { ...prev, [almacenId]: actualizado };
+    });
   }
 
   function reducirInventario(
     almacenId: string,
-    productos: { productoId: string; cajas: number }[],
+    productos: {
+      productoId: string;
+      cajas: number;
+    }[],
   ) {
     setInventario((prev) => {
-      const almacen = prev[almacenId] ?? {}
-      const actualizado = { ...almacen }
+      const almacen = prev[almacenId] ?? {};
+      const actualizado = { ...almacen };
       productos.forEach(({ productoId, cajas }) => {
-        actualizado[productoId] = Math.max(
-          0,
-          (actualizado[productoId] ?? 0) - cajas,
-        )
-      })
-      return { ...prev, [almacenId]: actualizado }
-    })
+        actualizado[productoId] = Math.max(0, (actualizado[productoId] ?? 0) - cajas);
+      });
+      return { ...prev, [almacenId]: actualizado };
+    });
   }
 
-  const almacenActivo = catalogoAlmacenes.find((a) => a.activo)
+  const almacenActivo = catalogoAlmacenes.find((a) => a.activo);
 
   const handleActivarAlmacen = (almacenId: string) => {
-    setCatalogoAlmacenes((prev) =>
-      prev.map((a) => ({ ...a, activo: a.id === almacenId })),
-    )
-    inicializarInventarioAlmacen(almacenId)
-    if (isMobile) setSidebarOpen(false)
-  }
+    setCatalogoAlmacenes((prev) => prev.map((a) => ({ ...a, activo: a.id === almacenId })));
+    inicializarInventarioAlmacen(almacenId);
+    if (isMobile) setSidebarOpen(false);
+  };
 
   // Mobile detection
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 769)
-    checkMobile()
-    window.addEventListener("resize", checkMobile)
-    return () => window.removeEventListener("resize", checkMobile)
-  }, [])
+    const checkMobile = () => setIsMobile(window.innerWidth < 769);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   function navigate(s: Screen, nav?: NavItem) {
-    setScreen(s)
-    if (nav) setActiveNav(nav)
-    if (isMobile) setSidebarOpen(false)
+    setScreen(s);
+    if (nav) setActiveNav(nav);
+    if (isMobile) setSidebarOpen(false);
   }
 
   const headerConfig: Record<Screen, HeaderConfig> = {
@@ -585,13 +602,18 @@ function AppLayout() {
       subtitle: "NUEVA RECEPCIÓN",
       title: "Programación de recepción",
     },
-  }
+  };
 
-  const header = headerConfig[screen]
+  const header = headerConfig[screen];
 
   // Navigation items for sidebar/bottom nav
-  type NavIcon = NavItem
-  type NavEntry = { id: NavItem; label: string; screen: Screen; icon: NavIcon }
+  type NavIcon = NavItem;
+  type NavEntry = {
+    id: NavItem;
+    label: string;
+    screen: Screen;
+    icon: NavIcon;
+  };
   const navItems: NavEntry[] = [
     {
       id: "home" as NavItem,
@@ -635,15 +657,13 @@ function AppLayout() {
       screen: "configuracion" as Screen,
       icon: "configuracion",
     },
-  ] as const
+  ] as const;
 
   function renderNavIcon(item: NavEntry, active: boolean, size = 22) {
-    const iconColor = active ? "#f2b84b" : "#b9c9cf"
+    const iconColor = active ? "#f2b84b" : "#b9c9cf";
     switch (item.icon) {
       case "home":
-        return (
-          <img alt="" className={`size-[${size}px]`} src={imgWarehouseNav} />
-        )
+        return <img alt="" className={`size-[${size}px]`} src={imgWarehouseNav} />;
       case "recepciones":
         return (
           <svg
@@ -661,7 +681,7 @@ function AppLayout() {
             <line x1="9" y1="12" x2="15" y2="12" />
             <line x1="9" y1="16" x2="13" y2="16" />
           </svg>
-        )
+        );
       case "embarques":
         return (
           <svg
@@ -679,11 +699,9 @@ function AppLayout() {
             <circle cx="5.5" cy="18.5" r="2.5" />
             <circle cx="18.5" cy="18.5" r="2.5" />
           </svg>
-        )
+        );
       case "qr":
-        return (
-          <img alt="" className={`size-[${size}px]`} src={imgScanQrCodeNav} />
-        )
+        return <img alt="" className={`size-[${size}px]`} src={imgScanQrCodeNav} />;
       case "evidencias":
         return (
           <svg
@@ -699,7 +717,7 @@ function AppLayout() {
             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
             <circle cx="12" cy="13" r="4" />
           </svg>
-        )
+        );
       case "lotes":
         return (
           <svg
@@ -721,7 +739,7 @@ function AppLayout() {
             <line x1="8" y1="18" x2="8" y2="18" />
             <line x1="12" y1="18" x2="16" y2="18" />
           </svg>
-        )
+        );
       case "configuracion":
         return (
           <svg
@@ -737,9 +755,9 @@ function AppLayout() {
             <circle cx="12" cy="12" r="3" />
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
           </svg>
-        )
+        );
       default:
-        return null
+        return null;
     }
   }
 
@@ -764,16 +782,14 @@ function AppLayout() {
       >
         <div className="flex flex-col gap-[8px] items-start flex-1 w-full">
           {navItems.map((item) => {
-            const active = activeNav === item.id
+            const active = activeNav === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => navigate(item.screen, item.id)}
                 className="flex items-center gap-3 py-[10px] px-3 rounded-[14px] w-full touch-target transition-colors text-left"
                 style={{
-                  backgroundColor: active
-                    ? "rgba(255,255,255,0.09)"
-                    : "transparent",
+                  backgroundColor: active ? "rgba(255,255,255,0.09)" : "transparent",
                 }}
                 aria-current={active ? "page" : undefined}
                 aria-label={item.label}
@@ -790,7 +806,7 @@ function AppLayout() {
                   {item.label}
                 </p>
               </button>
-            )
+            );
           })}
         </div>
 
@@ -808,9 +824,7 @@ function AppLayout() {
                 className="text-[#b9c9cf] text-[10px] truncate"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
               >
-                {profile?.warehouseId === "wh_tehuacan_2"
-                  ? "Tehuacan-2"
-                  : "Tehuacan-1"}
+                {profile?.warehouseId === "wh_tehuacan_2" ? "Tehuacan-2" : "Tehuacan-1"}
               </p>
             </div>
           </div>
@@ -885,8 +899,8 @@ function AppLayout() {
               {screen === "nueva-step1" && (
                 <button
                   onClick={() => {
-                    setCurrentReception(null)
-                    navigate("captura-evidencia", "home")
+                    setCurrentReception(null);
+                    navigate("captura-evidencia", "home");
                   }}
                   className="flex items-center justify-center size-9 rounded-[10px] border border-[#dce4e7] bg-white hover:bg-[#f4f7f8] transition-colors shrink-0 touch-target"
                   title="Volver a captura de evidencia"
@@ -963,9 +977,7 @@ function AppLayout() {
                     </svg>
                   </button>
                   <button
-                    onClick={() =>
-                      setTarimaActual((t) => Math.min(TARIMA_TOTAL, t + 1))
-                    }
+                    onClick={() => setTarimaActual((t) => Math.min(TARIMA_TOTAL, t + 1))}
                     disabled={tarimaActual === TARIMA_TOTAL}
                     className="touch-target"
                     style={{
@@ -978,12 +990,8 @@ function AppLayout() {
                       borderRadius: 8,
                       flexShrink: 0,
                       border: "1px solid #16343f",
-                      background:
-                        tarimaActual === TARIMA_TOTAL ? "#dce4e7" : "#16343f",
-                      cursor:
-                        tarimaActual === TARIMA_TOTAL
-                          ? "not-allowed"
-                          : "pointer",
+                      background: tarimaActual === TARIMA_TOTAL ? "#dce4e7" : "#16343f",
+                      cursor: tarimaActual === TARIMA_TOTAL ? "not-allowed" : "pointer",
                       opacity: tarimaActual === TARIMA_TOTAL ? 0.5 : 1,
                       transition: "all 0.15s",
                     }}
@@ -993,22 +1001,18 @@ function AppLayout() {
                         fontFamily: "'Inter', sans-serif",
                         fontSize: 13,
                         fontWeight: 700,
-                        color:
-                          tarimaActual === TARIMA_TOTAL ? "#607078" : "white",
+                        color: tarimaActual === TARIMA_TOTAL ? "#607078" : "white",
                         whiteSpace: "nowrap",
                       }}
                     >
-                      Tarima {Math.min(TARIMA_TOTAL, tarimaActual + 1)} de{" "}
-                      {TARIMA_TOTAL}
+                      Tarima {Math.min(TARIMA_TOTAL, tarimaActual + 1)} de {TARIMA_TOTAL}
                     </span>
                     <svg
                       width="12"
                       height="12"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke={
-                        tarimaActual === TARIMA_TOTAL ? "#607078" : "white"
-                      }
+                      stroke={tarimaActual === TARIMA_TOTAL ? "#607078" : "white"}
                       strokeWidth="2.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1041,21 +1045,17 @@ function AppLayout() {
         )}
 
         {/* ─── Content ─── */}
-        <div
-          className={`flex-1 overflow-auto ${
-            isMobile ? "content-padded safe-bottom" : ""
-          }`}
-        >
+        <div className={`flex-1 overflow-auto ${isMobile ? "content-padded safe-bottom" : ""}`}>
           {screen === "home" && (
             <Home
               onNewReception={() => {
-                setCurrentReception(null)
+                setCurrentReception(null);
                 navigate(
                   isFeatureEnabled("USE_NEW_RECEPTION_FLOW")
                     ? "programacion-recepcion"
                     : "nueva-step1",
                   "home",
-                )
+                );
               }}
               onRecepciones={() => navigate("recepciones", "recepciones")}
               onEscanearQr={() => navigate("escanear-qr", "qr")}
@@ -1065,25 +1065,20 @@ function AppLayout() {
             <ProgramacionRecepcion
               onBack={() => navigate("home", "home")}
               onFinish={(data) => {
-                const conversionesTabla = (data.productos ?? []).map(
-                  (product) => ({
-                    producto: product.nombre,
-                    productId: product.productId,
-                    codigo: product.codigo || "",
-                    unidades: product.cantidad,
-                    unidad: product.unidad || "cajas",
-                    piezasPorCaja: 1,
-                    cajasPorTarima: product.cajasPorTarima || 1,
-                    cajas: product.cantidad,
-                    tarimas:
-                      product.tarimas ||
-                      Math.ceil(
-                        product.cantidad / (product.cajasPorTarima || 1),
-                      ),
-                    stickers: (product.tarimas || 0) * 4,
-                    conversionMatch: true,
-                  }),
-                )
+                const conversionesTabla = (data.productos ?? []).map((product) => ({
+                  producto: product.nombre,
+                  productId: product.productId,
+                  codigo: product.codigo || "",
+                  unidades: product.cantidad,
+                  unidad: product.unidad || "cajas",
+                  piezasPorCaja: 1,
+                  cajasPorTarima: product.cajasPorTarima || 1,
+                  cajas: product.cantidad,
+                  tarimas:
+                    product.tarimas || Math.ceil(product.cantidad / (product.cajasPorTarima || 1)),
+                  stickers: (product.tarimas || 0) * 4,
+                  conversionMatch: true,
+                }));
                 const appReception = programacionToAppReception({
                   hasOC: true,
                   ocFolio: data.folio,
@@ -1096,12 +1091,10 @@ function AppLayout() {
                     estadoMatch: product.productId ? "confirmado" : "sugerido",
                   })),
                   conversionesTabla,
-                })
+                });
                 if (!data.recepcionId) {
-                  console.error(
-                    "Reception session requires a stable receptionId",
-                  )
-                  return
+                  console.error("Reception session requires a stable receptionId");
+                  return;
                 }
                 receptionSession.startSession(
                   {
@@ -1116,7 +1109,7 @@ function AppLayout() {
                     totalPallets: data.tarimas,
                   },
                   "EVIDENCE",
-                )
+                );
                 setCurrentReception({
                   ocFolio: data.folio,
                   tarimas: data.tarimas,
@@ -1127,8 +1120,8 @@ function AppLayout() {
                   fechaRecepcion: data.fechaRecepcion,
                   codigosQR: data.codigosQR,
                   conversionesTabla,
-                })
-                navigate("captura-evidencia")
+                });
+                navigate("captura-evidencia");
               }}
               catalogos={{
                 proveedores: catalogoProveedores,
@@ -1152,8 +1145,7 @@ function AppLayout() {
                           documentation: undefined,
                         },
                         proveedor: evidence.form.proveedor,
-                        proveedorLogistico:
-                          evidence.form.item || prev?.proveedorLogistico,
+                        proveedorLogistico: evidence.form.item || prev?.proveedorLogistico,
                         lote: evidence.form.lote,
                         caducidad: evidence.form.caducidad,
                       }
@@ -1171,17 +1163,17 @@ function AppLayout() {
                           documentation: undefined,
                         },
                       },
-                )
-                receptionSession.transition("PALLETS")
-                navigate("captura-tarima")
+                );
+                receptionSession.transition("PALLETS");
+                navigate("captura-tarima");
               }}
             />
           )}
           {screen === "nueva-step1" && (
             <NuevaRecepcionStep1
               onBack={() => {
-                setCurrentReception(null)
-                navigate("home", "home")
+                setCurrentReception(null);
+                navigate("home", "home");
               }}
               initialData={
                 currentReception?.receptionId
@@ -1217,8 +1209,8 @@ function AppLayout() {
                   conversionesTabla: data.conversionesTabla,
                   lote: prev?.lote,
                   caducidad: prev?.caducidad,
-                }))
-                navigate("nueva-step2")
+                }));
+                navigate("nueva-step2");
               }}
               catalogos={{
                 proveedores: catalogoProveedores,
@@ -1265,14 +1257,11 @@ function AppLayout() {
             <CapturaTarima
               onBack={() => navigate("nueva-step2")}
               onFinish={() => {
-                if (
-                  receptionSession.session.data &&
-                  receptionSession.session.phase === "PALLETS"
-                ) {
-                  receptionSession.transition("CONFIRMED")
-                  receptionSession.transition("COMPLETED")
+                if (receptionSession.session.data && receptionSession.session.phase === "PALLETS") {
+                  receptionSession.transition("CONFIRMED");
+                  receptionSession.transition("COMPLETED");
                 }
-                navigate("completada")
+                navigate("completada");
               }}
               almacenActivo={almacenActivo ?? null}
               onAumentarInventario={aumentarInventario}
@@ -1284,9 +1273,9 @@ function AppLayout() {
           {screen === "completada" && (
             <RecepcionCompletada
               onHome={() => {
-                receptionSession.endSession()
-                setCurrentReception(null)
-                navigate("home", "home")
+                receptionSession.endSession();
+                setCurrentReception(null);
+                navigate("home", "home");
               }}
               onPrint={() => navigate("impresion")}
               currentReception={currentReception}
@@ -1302,22 +1291,22 @@ function AppLayout() {
           {screen === "recepciones" && (
             <Recepciones
               onSelectTarima={(id) => {
-                setSelectedReception(id)
-                navigate("tarima-detalle", "recepciones")
+                setSelectedReception(id);
+                navigate("tarima-detalle", "recepciones");
               }}
               onEdit={(id) => {
-                setEditId(id)
-                setEditReceptionData(null)
-                navigate("editar-recepcion", "recepciones")
+                setEditId(id);
+                setEditReceptionData(null);
+                navigate("editar-recepcion", "recepciones");
               }}
             />
           )}
           {screen === "escanear-qr" && (
             <EscanearQR
               onFound={(qrCode) => {
-                setScannedQrCode(qrCode)
-                setSelectedReception(null)
-                navigate("tarima-detalle", "qr")
+                setScannedQrCode(qrCode);
+                setSelectedReception(null);
+                navigate("tarima-detalle", "qr");
               }}
               onClose={() => navigate("home", "home")}
             />
@@ -1328,39 +1317,41 @@ function AppLayout() {
               readOnly={!!editReceptionData}
               initialData={editReceptionData ?? undefined}
               onBack={() => {
-                setEditReceptionData(null)
-                navigate("recepciones", "recepciones")
+                setEditReceptionData(null);
+                navigate("recepciones", "recepciones");
               }}
               onSave={() => {
-                setEditReceptionData(null)
-                navigate("recepciones", "recepciones")
+                setEditReceptionData(null);
+                navigate("recepciones", "recepciones");
               }}
             />
           )}
           {screen === "tarima-detalle" && (
             <TarimaDetalle
-              authorizedWarehouseIds={profile && isGlobalMembershipRole(profile.role)
-                ? [...CANONICAL_WAREHOUSE_IDS]
-                : profile ? normalizeMembershipWarehouses(profile) ?? [] : []}
+              authorizedWarehouseIds={
+                profile && isGlobalMembershipRole(profile.role)
+                  ? [...CANONICAL_WAREHOUSE_IDS]
+                  : profile
+                    ? (normalizeMembershipWarehouses(profile) ?? [])
+                    : []
+              }
               onBack={() => {
-                setScannedQrCode(null)
-                setSelectedReception(null)
-                navigate("recepciones", "recepciones")
+                setScannedQrCode(null);
+                setSelectedReception(null);
+                navigate("recepciones", "recepciones");
               }}
               onViewReference={(reference) => {
-                setEditId(reference.recId)
+                setEditId(reference.recId);
                 setEditReceptionData({
                   tarimas: reference.tarimas,
                   proveedor: reference.proveedor,
                   proveedorLogistico: reference.proveedorLogistico,
-                })
-                navigate("editar-recepcion", "recepciones")
+                });
+                navigate("editar-recepcion", "recepciones");
               }}
               currentReception={
                 currentReception ||
-                (selectedReception
-                  ? { ocFolio: selectedReception, tarimas: 20 }
-                  : null)
+                (selectedReception ? { ocFolio: selectedReception, tarimas: 20 } : null)
               }
               qrCode={scannedQrCode ?? undefined}
             />
@@ -1368,8 +1359,8 @@ function AppLayout() {
           {screen === "evidencias" && (
             <Evidencias
               onSelect={(ev) => {
-                setSelectedEvidencia(ev)
-                navigate("evidencia-detalle", "evidencias")
+                setSelectedEvidencia(ev);
+                navigate("evidencia-detalle", "evidencias");
               }}
             />
           )}
@@ -1413,7 +1404,7 @@ function AppLayout() {
           style={{ gap: 4 }}
         >
           {navItems.map((item) => {
-            const active = activeNav === item.id
+            const active = activeNav === item.id;
             return (
               <button
                 key={item.id}
@@ -1434,10 +1425,10 @@ function AppLayout() {
                   {item.label}
                 </p>
               </button>
-            )
+            );
           })}
         </nav>
       )}
     </div>
-  )
+  );
 }

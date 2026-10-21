@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest"
-import { buildWhatsAppMessage } from "@/services/programacionRecepcionPdf"
+import { describe, expect, it } from "vitest";
+import { buildWhatsAppMessage } from "@/services/programacionRecepcionPdf";
 
 describe("programacionRecepcionPdf", () => {
   it("includes the selected logistics supplier in the generated summary", () => {
@@ -17,8 +17,8 @@ describe("programacionRecepcionPdf", () => {
           conversionMatch: true,
         },
       ],
-    })
+    });
 
-    expect(message).toContain("🚚 Proveedor Logístico: LOGÍSTICA VELOZ")
-  })
-})
+    expect(message).toContain("🚚 Proveedor Logístico: LOGÍSTICA VELOZ");
+  });
+});

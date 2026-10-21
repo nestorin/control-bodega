@@ -2,17 +2,17 @@
  * Paso 1: Seleccionar si tiene Orden de Compra
  */
 
-import { ChevronRight } from "lucide-react"
-import { TouchTarget } from "@/components/ui/TouchTarget"
+import { ChevronRight } from "lucide-react";
+import { TouchTarget } from "@/components/ui/TouchTarget";
 
 interface Props {
-  state: any
-  onSelectHasOC: (hasOC: boolean) => void
-  onNext: () => void
+  state: any;
+  onSelectHasOC: (hasOC: boolean) => void;
+  onNext: () => void;
 }
 
 export default function SelectHasOC({ state, onSelectHasOC, onNext }: Props) {
-  const hasOC = state.hasOC
+  const hasOC = state.hasOC;
 
   return (
     <div className="p-6 md:p-8 max-w-3xl mx-auto">
@@ -41,9 +41,7 @@ export default function SelectHasOC({ state, onSelectHasOC, onNext }: Props) {
             }`}
           >
             <svg
-              className={`w-8 h-8 ${
-                hasOC === true ? "text-white" : "text-[#16343f]"
-              }`}
+              className={`w-8 h-8 ${hasOC === true ? "text-white" : "text-[#16343f]"}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -63,11 +61,7 @@ export default function SelectHasOC({ state, onSelectHasOC, onNext }: Props) {
           >
             {hasOC === true ? "✓ Sí, tengo OC" : "Sí, tengo OC"}
           </p>
-          <p
-            className={`text-sm mt-1 ${
-              hasOC === true ? "text-white/80" : "text-[#607078]"
-            }`}
-          >
+          <p className={`text-sm mt-1 ${hasOC === true ? "text-white/80" : "text-[#607078]"}`}>
             Subir PDF/imagen de la OC
           </p>
         </TouchTarget>
@@ -87,9 +81,7 @@ export default function SelectHasOC({ state, onSelectHasOC, onNext }: Props) {
             }`}
           >
             <svg
-              className={`w-8 h-8 ${
-                hasOC === false ? "text-white" : "text-[#16343f]"
-              }`}
+              className={`w-8 h-8 ${hasOC === false ? "text-white" : "text-[#16343f]"}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -109,11 +101,7 @@ export default function SelectHasOC({ state, onSelectHasOC, onNext }: Props) {
           >
             {hasOC === false ? "✓ No tengo OC" : "No tengo OC"}
           </p>
-          <p
-            className={`text-sm mt-1 ${
-              hasOC === false ? "text-white/80" : "text-[#607078]"
-            }`}
-          >
+          <p className={`text-sm mt-1 ${hasOC === false ? "text-white/80" : "text-[#607078]"}`}>
             Solo foto de la factura
           </p>
         </TouchTarget>
@@ -134,5 +122,5 @@ export default function SelectHasOC({ state, onSelectHasOC, onNext }: Props) {
         </TouchTarget>
       </div>
     </div>
-  )
+  );
 }

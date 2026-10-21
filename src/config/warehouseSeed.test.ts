@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vitest";
 import {
   CANONICAL_WAREHOUSE_SEED,
   ORGANIZATION_ID,
   validateExistingWarehouse,
-} from "./warehouseSeed"
+} from "./warehouseSeed";
 
 describe("warehouse seed validation", () => {
   it("accepts an existing canonical warehouse without changes", () => {
@@ -15,8 +15,8 @@ describe("warehouse seed validation", () => {
         },
         CANONICAL_WAREHOUSE_SEED[0],
       ),
-    ).toEqual([])
-  })
+    ).toEqual([]);
+  });
 
   it("reports conflicts instead of allowing an overwrite", () => {
     const errors = validateExistingWarehouse(
@@ -26,7 +26,7 @@ describe("warehouse seed validation", () => {
         name: "Otro nombre",
       },
       CANONICAL_WAREHOUSE_SEED[0],
-    )
-    expect(errors).toContain("name expected Tehuacan-1, found Otro nombre")
-  })
-})
+    );
+    expect(errors).toContain("name expected Tehuacan-1, found Otro nombre");
+  });
+});

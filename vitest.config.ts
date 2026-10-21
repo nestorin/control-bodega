@@ -1,6 +1,6 @@
-import { defineConfig } from "vitest/config"
-import react from "@vitejs/plugin-react"
-import path from "path"
+import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
+import path from "path";
 
 export default defineConfig({
   plugins: [react()],
@@ -55,12 +55,12 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      "react": path.resolve(__dirname, "./node_modules/react"),
+      react: path.resolve(__dirname, "./node_modules/react"),
       "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
     },
   },
   // Ensure react plugin uses development build
   define: {
-    "process.env.NODE_ENV": "\"development\"",
+    "process.env.NODE_ENV": '"development"',
   },
-})
+});

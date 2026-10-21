@@ -2,6 +2,6 @@
 // Polyfill WritableStream for MSW (required in JSDOM)
 if (typeof globalThis.WritableStream === "undefined") {
   // @ts-ignore
-  const { WritableStream } = require("stream/web")
-  globalThis.WritableStream = WritableStream
+  const { WritableStream } = require("stream/web");
+  globalThis.WritableStream = WritableStream;
 }

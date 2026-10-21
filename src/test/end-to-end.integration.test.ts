@@ -9,8 +9,8 @@
  * 5. Envío por WhatsApp
  */
 
-import { describe, it, expect } from "vitest"
-import { WAREHOUSE_IDS } from "@/config/warehouses"
+import { describe, it, expect } from "vitest";
+import { WAREHOUSE_IDS } from "@/config/warehouses";
 import {
   ocrProductsToMatchedProducts,
   calculateConversions,
@@ -18,7 +18,7 @@ import {
   buildReceptionDraft,
   validateReceptionDraft,
   CATALOGO_CONVERSIONES_DEFAULT,
-} from "@/domains/reception/receptionDomain"
+} from "@/domains/reception/receptionDomain";
 
 // Mock data de prueba - ahora con datos que coinciden con el catálogo
 const mockOcrResults = [
@@ -42,7 +42,7 @@ const mockOcrResults = [
     importe: 125.0,
     confianza: 0.92,
   },
-]
+];
 
 const mockCatalogo = [
   {
@@ -59,46 +59,34 @@ const mockCatalogo = [
     unidad: "paquetes",
     cajasPorTarima: 50,
   },
-]
+];
 
 describe("Integración End-to-End: OC → OCR → Tabla → PDF → WhatsApp", () => {
   it("debe procesar OCR y mapear productos correctamente", () => {
-    const matchedProducts = ocrProductsToMatchedProducts(
-      mockOcrResults,
-      mockCatalogo,
-    )
+    const matchedProducts = ocrProductsToMatchedProducts(mockOcrResults, mockCatalogo);
 
-    expect(matchedProducts).toHaveLength(2)
-    expect(matchedProducts[0]).toHaveProperty("productId", "prod1")
-    expect(matchedProducts[0]).toHaveProperty("estadoMatch", "confirmado")
-    expect(matchedProducts[1]).toHaveProperty("productId", "prod2")
-    expect(matchedProducts[1]).toHaveProperty("estadoMatch", "confirmado")
-  })
+    expect(matchedProducts).toHaveLength(2);
+    expect(matchedProducts[0]).toHaveProperty("productId", "prod1");
+    expect(matchedProducts[0]).toHaveProperty("estadoMatch", "confirmado");
+    expect(matchedProducts[1]).toHaveProperty("productId", "prod2");
+    expect(matchedProducts[1]).toHaveProperty("estadoMatch", "confirmado");
+  });
 
   it("debe calcular conversiones y tarimas correctamente", () => {
-    const matchedProducts = ocrProductsToMatchedProducts(
-      mockOcrResults,
-      mockCatalogo,
-    )
+    const matchedProducts = ocrProductsToMatchedProducts(mockOcrResults, mockCatalogo);
 
-    const conversions = calculateConversions(
-      matchedProducts,
-      CATALOGO_CONVERSIONES_DEFAULT,
-    )
+    const conversions = calculateConversions(matchedProducts, CATALOGO_CONVERSIONES_DEFAULT);
 
-    const totalTarimas = calculateTotalTarimas(conversions)
+    const totalTarimas = calculateTotalTarimas(conversions);
 
     // Solo productos confirmados se procesan
-    expect(conversions).toHaveLength(2) // Ambos son confirmados
-    expect(totalTarimas).toBe(2) // AJONJOLI: 10/10 = 1 tarima, AZUCAR: 5/50 = 1 tarima (redondeo hacia arriba)
-  })
+    expect(conversions).toHaveLength(2); // Ambos son confirmados
+    expect(totalTarimas).toBe(2); // AJONJOLI: 10/10 = 1 tarima, AZUCAR: 5/50 = 1 tarima (redondeo hacia arriba)
+  });
 
   it("debe construir borrador de recepción", () => {
     // First convert OCR results to ReceptionLineState using the mapper
-    const matchedProducts = ocrProductsToMatchedProducts(
-      mockOcrResults,
-      mockCatalogo,
-    )
+    const matchedProducts = ocrProductsToMatchedProducts(mockOcrResults, mockCatalogo);
 
     const draft = buildReceptionDraft(
       {
@@ -113,19 +101,16 @@ describe("Integración End-to-End: OC → OCR → Tabla → PDF → WhatsApp", (
         conversiones: [],
       },
       CATALOGO_CONVERSIONES_DEFAULT,
-    )
+    );
 
-    expect(draft).toBeDefined()
-    expect(draft.folio).toBe("OC-2026-001")
-    expect(draft.lineas).toHaveLength(2)
-    expect(draft.tarimasTotal).toBeGreaterThan(0)
-  })
+    expect(draft).toBeDefined();
+    expect(draft.folio).toBe("OC-2026-001");
+    expect(draft.lineas).toHaveLength(2);
+    expect(draft.tarimasTotal).toBeGreaterThan(0);
+  });
 
   it("debe validar datos de recepción", () => {
-    const matchedProducts = ocrProductsToMatchedProducts(
-      mockOcrResults,
-      mockCatalogo,
-    )
+    const matchedProducts = ocrProductsToMatchedProducts(mockOcrResults, mockCatalogo);
 
     const draft = buildReceptionDraft(
       {
@@ -140,12 +125,12 @@ describe("Integración End-to-End: OC → OCR → Tabla → PDF → WhatsApp", (
         conversiones: [],
       },
       CATALOGO_CONVERSIONES_DEFAULT,
-    )
+    );
 
-    const validationResult = validateReceptionDraft(draft)
-    expect(validationResult.valid).toBe(true)
-    expect(validationResult.errors).toHaveLength(0)
-  })
+    const validationResult = validateReceptionDraft(draft);
+    expect(validationResult.valid).toBe(true);
+    expect(validationResult.errors).toHaveLength(0);
+  });
 
   it("debe construir mensaje WhatsApp válido", () => {
     // Simulamos la función del servicio de PDF
@@ -159,24 +144,24 @@ describe("Integración End-to-End: OC → OCR → Tabla → PDF → WhatsApp", (
         `🚚 Proveedor Logístico: ${data.proveedorLogistico || "—"}`,
         "",
         "📦 *PRODUCTOS PROGRAMADOS:*",
-      ]
+      ];
 
       data.productos.forEach((p: any, i: number) => {
-        lines.push(`${i + 1}. ${p.nombre}`)
+        lines.push(`${i + 1}. ${p.nombre}`);
         lines.push(
           `   Cajas: ${p.cantidad} | Tarimas: ${p.tarimas || Math.ceil(p.cantidad / (p.cajasPorTarima || 10))}${
             !p.conversionMatch ? " ⚠" : ""
           }`,
-        )
-      })
+        );
+      });
 
-      lines.push("")
-      lines.push(`📊 Total Tarimas: ${data.totalTarimas}`)
-      lines.push("━━━━━━━━━━━━━━━━━━━━")
-      lines.push("_Generado desde TarimaQR_")
+      lines.push("");
+      lines.push(`📊 Total Tarimas: ${data.totalTarimas}`);
+      lines.push("━━━━━━━━━━━━━━━━━━━━");
+      lines.push("_Generado desde TarimaQR_");
 
-      return lines.join("\n")
-    }
+      return lines.join("\n");
+    };
 
     const mockData = {
       folio: "OC-2026-001",
@@ -200,12 +185,12 @@ describe("Integración End-to-End: OC → OCR → Tabla → PDF → WhatsApp", (
           codigo: "XYZ789",
         },
       ],
-    }
+    };
 
-    const message = buildWhatsAppMessage(mockData)
-    expect(message).toContain("PROGRAMACIÓN RECEPCIÓN")
-    expect(message).toContain("Folio: OC-2026-001")
-    expect(message).toContain("Proveedor: Proveedor S.A. de C.V.")
-    expect(message).toContain("Total Tarimas: 2")
-  })
-})
+    const message = buildWhatsAppMessage(mockData);
+    expect(message).toContain("PROGRAMACIÓN RECEPCIÓN");
+    expect(message).toContain("Folio: OC-2026-001");
+    expect(message).toContain("Proveedor: Proveedor S.A. de C.V.");
+    expect(message).toContain("Total Tarimas: 2");
+  });
+});

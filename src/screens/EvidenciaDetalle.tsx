@@ -1,43 +1,37 @@
-import { useState, useRef } from "react"
+import { useState, useRef } from "react";
 
 export interface EvidenciaData {
-  id: string
-  fotoTrailer: string | null
-  fotoProducto: string | null
-  proveedor: string
-  proveedorLogistico: string
-  item: string
-  tarimas: number
-  caducidad: string
-  lote: string
-  ocFolio: string
-  fecha: string
-  hora: string
-  estado: string
-  color: string
-  bg: string
-  img: string
+  id: string;
+  fotoTrailer: string | null;
+  fotoProducto: string | null;
+  proveedor: string;
+  proveedorLogistico: string;
+  item: string;
+  tarimas: number;
+  caducidad: string;
+  lote: string;
+  ocFolio: string;
+  fecha: string;
+  hora: string;
+  estado: string;
+  color: string;
+  bg: string;
+  img: string;
 }
 
 interface Props {
-  evidencia: EvidenciaData
-  onBack: () => void
-  onDelete?: () => void
+  evidencia: EvidenciaData;
+  onBack: () => void;
+  onDelete?: () => void;
 }
 
 function WhatsAppIcon() {
   return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="white"
-      xmlns="http://www.w3.org/2000/svg"
-    >
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
       <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
       <path d="M12.004 2C6.484 2 2 6.484 2 12.004c0 1.868.516 3.614 1.41 5.112L2 22l4.984-1.387A9.945 9.945 0 0 0 12.004 22C17.523 22 22 17.516 22 12.004 22 6.484 17.523 2 12.004 2zm0 18.122a8.094 8.094 0 0 1-4.122-1.126l-.296-.176-3.073.855.855-3.073-.196-.306A8.094 8.094 0 0 1 3.878 12c0-4.478 3.644-8.122 8.122-8.122S20.122 7.522 20.122 12c0 4.479-3.644 8.122-8.118 8.122z" />
     </svg>
-  )
+  );
 }
 
 function EditablePhotoCard({
@@ -46,12 +40,12 @@ function EditablePhotoCard({
   editing,
   onFile,
 }: {
-  label: string
-  src: string | null
-  editing: boolean
-  onFile: (url: string) => void
+  label: string;
+  src: string | null;
+  editing: boolean;
+  onFile: (url: string) => void;
 }) {
-  const ref = useRef<HTMLInputElement>(null)
+  const ref = useRef<HTMLInputElement>(null);
   return (
     <div className="flex flex-col gap-2 flex-1">
       <p
@@ -66,11 +60,7 @@ function EditablePhotoCard({
         style={{
           height: 180,
           background: src ? "transparent" : "#e7f0f2",
-          border: src
-            ? editing
-              ? "2px solid #3276a8"
-              : "none"
-            : "2px dashed #b9d9e4",
+          border: src ? (editing ? "2px solid #3276a8" : "none") : "2px dashed #b9d9e4",
           cursor: editing ? "pointer" : "default",
         }}
       >
@@ -135,13 +125,13 @@ function EditablePhotoCard({
           capture="environment"
           className="hidden"
           onChange={(e) => {
-            const f = e.target.files?.[0]
-            if (f) onFile(URL.createObjectURL(f))
+            const f = e.target.files?.[0];
+            if (f) onFile(URL.createObjectURL(f));
           }}
         />
       </div>
     </div>
-  )
+  );
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -160,7 +150,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
         {value}
       </p>
     </div>
-  )
+  );
 }
 
 function EditRow({
@@ -169,10 +159,10 @@ function EditRow({
   onChange,
   type = "text",
 }: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  type?: string
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
 }) {
   return (
     <div className="flex flex-col gap-[5px] py-[8px] border-b border-[#edf1f3] last:border-0">
@@ -190,28 +180,23 @@ function EditRow({
         style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}
       />
     </div>
-  )
+  );
 }
 
-export default function EvidenciaDetalle({
-  evidencia: ev,
-  onBack,
-  onDelete,
-}: Props) {
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(ev)
+export default function EvidenciaDetalle({ evidencia: ev, onBack, onDelete }: Props) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(ev);
 
   function field(key: keyof EvidenciaData) {
-    return String(draft[key] ?? "")
+    return String(draft[key] ?? "");
   }
   function set(key: keyof EvidenciaData) {
-    return (v: string) =>
-      setDraft((d) => ({ ...d, [key]: key === "tarimas" ? Number(v) : v }))
+    return (v: string) => setDraft((d) => ({ ...d, [key]: key === "tarimas" ? Number(v) : v }));
   }
 
   function sendWhatsApp() {
-    const d = draft
+    const d = draft;
     const msg = [
       "🏭 *EVIDENCIA DE RECEPCIÓN — BODEGA Exapa*",
       "━━━━━━━━━━━━━━━━━━━━",
@@ -232,8 +217,8 @@ export default function EvidenciaDetalle({
       `  ${d.fotoProducto ? "✅" : "⬜"} Producto y caducidad`,
       "━━━━━━━━━━━━━━━━━━━━",
       "_Enviado desde TarimaQR_",
-    ].join("\n")
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank")
+    ].join("\n");
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   }
 
   return (
@@ -302,8 +287,8 @@ export default function EvidenciaDetalle({
                   lineHeight: 1.5,
                 }}
               >
-                Estas fotos son exclusivas de la evidencia y fueron capturadas
-                al inicio del proceso de recepción.
+                Estas fotos son exclusivas de la evidencia y fueron capturadas al inicio del proceso
+                de recepción.
               </p>
             </div>
           )}
@@ -521,9 +506,8 @@ export default function EvidenciaDetalle({
                     lineHeight: 1.5,
                   }}
                 >
-                  Se eliminará{" "}
-                  <strong style={{ color: "#172126" }}>{draft.id}</strong> y sus
-                  fotos. Esta acción no se puede deshacer.
+                  Se eliminará <strong style={{ color: "#172126" }}>{draft.id}</strong> y sus fotos.
+                  Esta acción no se puede deshacer.
                 </p>
               </div>
               <div className="flex flex-col lg:flex-row gap-3 w-full">
@@ -542,9 +526,9 @@ export default function EvidenciaDetalle({
                 </button>
                 <button
                   onClick={() => {
-                    setShowDeleteConfirm(false)
-                    onDelete?.()
-                    onBack()
+                    setShowDeleteConfirm(false);
+                    onDelete?.();
+                    onBack();
                   }}
                   className="flex-1 h-11 lg:h-12 rounded-[12px] border-none hover:opacity-90 transition-opacity touch-target"
                   style={{
@@ -574,11 +558,7 @@ export default function EvidenciaDetalle({
           <div className="w-full">
             {editing ? (
               <>
-                <EditRow
-                  label="Ítem recibido"
-                  value={field("item")}
-                  onChange={set("item")}
-                />
+                <EditRow label="Ítem recibido" value={field("item")} onChange={set("item")} />
                 <EditRow
                   label="Proveedor de mercancía"
                   value={field("proveedor")}
@@ -594,11 +574,7 @@ export default function EvidenciaDetalle({
                   value={field("ocFolio")}
                   onChange={set("ocFolio")}
                 />
-                <EditRow
-                  label="Lote"
-                  value={field("lote")}
-                  onChange={set("lote")}
-                />
+                <EditRow label="Lote" value={field("lote")} onChange={set("lote")} />
                 <EditRow
                   label="Tarimas recibidas"
                   value={field("tarimas")}
@@ -620,28 +596,13 @@ export default function EvidenciaDetalle({
             ) : (
               <>
                 <InfoRow label="Ítem recibido" value={draft.item} />
-                <InfoRow
-                  label="Proveedor de mercancía"
-                  value={draft.proveedor}
-                />
-                <InfoRow
-                  label="Proveedor logístico"
-                  value={draft.proveedorLogistico}
-                />
+                <InfoRow label="Proveedor de mercancía" value={draft.proveedor} />
+                <InfoRow label="Proveedor logístico" value={draft.proveedorLogistico} />
                 <InfoRow label="Orden de compra" value={draft.ocFolio} />
                 <InfoRow label="Lote" value={draft.lote} />
-                <InfoRow
-                  label="Tarimas recibidas"
-                  value={`${draft.tarimas} tarimas`}
-                />
-                <InfoRow
-                  label="Caducidad del producto"
-                  value={draft.caducidad}
-                />
-                <InfoRow
-                  label="Fecha de recepción"
-                  value={`${draft.fecha} · ${draft.hora}`}
-                />
+                <InfoRow label="Tarimas recibidas" value={`${draft.tarimas} tarimas`} />
+                <InfoRow label="Caducidad del producto" value={draft.caducidad} />
+                <InfoRow label="Fecha de recepción" value={`${draft.fecha} · ${draft.hora}`} />
               </>
             )}
           </div>
@@ -665,5 +626,5 @@ export default function EvidenciaDetalle({
         </div>
       </div>
     </div>
-  )
+  );
 }

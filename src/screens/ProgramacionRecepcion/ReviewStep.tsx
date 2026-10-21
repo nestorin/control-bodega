@@ -12,21 +12,21 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
-} from "lucide-react"
-import { TouchTarget } from "@/components/ui/TouchTarget"
+} from "lucide-react";
+import { TouchTarget } from "@/components/ui/TouchTarget";
 
 interface Props {
-  state: any
-  matchedProducts: any[]
-  conversions: any[]
-  tarimasTotal: number
-  warehouses: any[]
-  suppliers: any[]
-  onSetWarehouse: (id: string) => void
-  onSetSupplier: (id: string) => void
-  onPrev: () => void
-  onSave: () => Promise<void>
-  saving: boolean
+  state: any;
+  matchedProducts: any[];
+  conversions: any[];
+  tarimasTotal: number;
+  warehouses: any[];
+  suppliers: any[];
+  onSetWarehouse: (id: string) => void;
+  onSetSupplier: (id: string) => void;
+  onPrev: () => void;
+  onSave: () => Promise<void>;
+  saving: boolean;
 }
 
 export default function ReviewStep({
@@ -42,12 +42,10 @@ export default function ReviewStep({
   onSave,
   saving,
 }: Props) {
-  const warehouse = warehouses.find((w) => w.id === state.warehouseId)
-  const supplier = suppliers.find((s) => s.id === state.supplierId)
+  const warehouse = warehouses.find((w) => w.id === state.warehouseId);
+  const supplier = suppliers.find((s) => s.id === state.supplierId);
 
-  const hasProductsWithoutQuantity = matchedProducts.some(
-    (p) => p.cantidad <= 0,
-  )
+  const hasProductsWithoutQuantity = matchedProducts.some((p) => p.cantidad <= 0);
 
   const isValid =
     state.folio &&
@@ -56,7 +54,7 @@ export default function ReviewStep({
     state.warehouseId &&
     state.supplierId &&
     matchedProducts.length > 0 &&
-    !hasProductsWithoutQuantity
+    !hasProductsWithoutQuantity;
 
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto">
@@ -65,38 +63,22 @@ export default function ReviewStep({
           <FileText className="w-8 h-8" />
           Revisar y Confirmar
         </h2>
-        <p className="text-[#607078]">
-          Verifica todos los datos antes de crear la recepción
-        </p>
+        <p className="text-[#607078]">Verifica todos los datos antes de crear la recepción</p>
       </div>
 
       <div className="space-y-6">
         {/* Info general */}
-        <SectionCard
-          title="Información de la OC"
-          icon={<FileText className="w-5 h-5" />}
-        >
+        <SectionCard title="Información de la OC" icon={<FileText className="w-5 h-5" />}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <InfoField label="Folio" value={state.folio || "—"} required />
             <InfoField label="Fecha" value={state.fecha || "—"} required />
-            <InfoField
-              label="Proveedor"
-              value={state.proveedor || "—"}
-              required
-            />
-            <InfoField
-              label="Total"
-              value={`$${state.total || "0.00"}`}
-              required
-            />
+            <InfoField label="Proveedor" value={state.proveedor || "—"} required />
+            <InfoField label="Total" value={`$${state.total || "0.00"}`} required />
           </div>
         </SectionCard>
 
         {/* Almacén y Proveedor Logístico */}
-        <SectionCard
-          title="Destino y Logística"
-          icon={<MapPin className="w-5 h-5" />}
-        >
+        <SectionCard title="Destino y Logística" icon={<MapPin className="w-5 h-5" />}>
           <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
             <SelectField
               label="Almacén destino"
@@ -124,36 +106,19 @@ export default function ReviewStep({
             <table className="w-full text-sm">
               <thead className="bg-[#f5f8fa] border-b border-[#dce4e7]">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium text-[#607078]">
-                    #
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-[#607078]">
-                    Producto
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-[#607078]">
-                    Cajas
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-[#607078]">
-                    Precio
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-[#607078]">
-                    Importe
-                  </th>
-                  <th className="px-4 py-3 text-center font-medium text-[#607078]">
-                    Match
-                  </th>
+                  <th className="px-4 py-3 text-left font-medium text-[#607078]">#</th>
+                  <th className="px-4 py-3 text-left font-medium text-[#607078]">Producto</th>
+                  <th className="px-4 py-3 text-right font-medium text-[#607078]">Cajas</th>
+                  <th className="px-4 py-3 text-right font-medium text-[#607078]">Precio</th>
+                  <th className="px-4 py-3 text-right font-medium text-[#607078]">Importe</th>
+                  <th className="px-4 py-3 text-center font-medium text-[#607078]">Match</th>
                 </tr>
               </thead>
               <tbody>
                 {matchedProducts.map((p, idx) => (
-                  <tr
-                    key={idx}
-                    className="border-b border-[#dce4e7] hover:bg-[#f8fafb]"
-                  >
+                  <tr key={idx} className="border-b border-[#dce4e7] hover:bg-[#f8fafb]">
                     <td className="px-4 py-3 text-[#607078]">{idx + 1}</td>
-                    <td className="px-4 py-3 text-[#16343f] max-w-xs truncate">
-                      {p.nombre}
-                    </td>
+                    <td className="px-4 py-3 text-[#16343f] max-w-xs truncate">{p.nombre}</td>
                     <td className="px-4 py-3 text-right text-[#16343f] font-mono">
                       {p.cantidad?.toLocaleString() || 0}
                     </td>
@@ -173,9 +138,7 @@ export default function ReviewStep({
                               : "bg-[#fee2e2] text-[#991b1b]"
                         }`}
                       >
-                        {p.estadoMatch === "confirmado" && (
-                          <CheckCircle className="w-3 h-3" />
-                        )}
+                        {p.estadoMatch === "confirmado" && <CheckCircle className="w-3 h-3" />}
                         {p.estadoMatch}
                       </span>
                     </td>
@@ -193,21 +156,14 @@ export default function ReviewStep({
         >
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <InfoField label="Total Tarimas" value={tarimasTotal.toString()} />
-            <InfoField
-              label="Total Stickers"
-              value={(tarimasTotal * 4).toString()}
-            />
+            <InfoField label="Total Stickers" value={(tarimasTotal * 4).toString()} />
             <InfoField
               label="Con Conversión"
-              value={conversions
-                .filter((c) => c.conversionMatch)
-                .length.toString()}
+              value={conversions.filter((c) => c.conversionMatch).length.toString()}
             />
             <InfoField
               label="Sin Conversión"
-              value={conversions
-                .filter((c) => !c.conversionMatch)
-                .length.toString()}
+              value={conversions.filter((c) => !c.conversionMatch).length.toString()}
             />
           </div>
         </SectionCard>
@@ -217,21 +173,15 @@ export default function ReviewStep({
           <div className="bg-[#fee2e2] border border-[#fca5a5] rounded-[12px] p-4 flex items-start gap-3">
             <AlertCircle className="text-[#ef4444] text-xl mt-0.5 shrink-0" />
             <div>
-              <p className="font-medium text-[#991b1b] mb-1">
-                Faltan datos requeridos:
-              </p>
+              <p className="font-medium text-[#991b1b] mb-1">Faltan datos requeridos:</p>
               <ul className="text-sm text-[#991b1b] space-y-1">
                 {!state.folio && <li>• Folio</li>}
                 {!state.fecha && <li>• Fecha</li>}
                 {!state.proveedor && <li>• Proveedor</li>}
                 {!state.warehouseId && <li>• Almacén destino</li>}
                 {!state.supplierId && <li>• Proveedor logístico</li>}
-                {matchedProducts.length === 0 && (
-                  <li>• Al menos un producto</li>
-                )}
-                {hasProductsWithoutQuantity && (
-                  <li>- Cantidad {">"} 0 en todos los productos</li>
-                )}
+                {matchedProducts.length === 0 && <li>• Al menos un producto</li>}
+                {hasProductsWithoutQuantity && <li>- Cantidad {">"} 0 en todos los productos</li>}
               </ul>
             </div>
           </div>
@@ -240,9 +190,7 @@ export default function ReviewStep({
         {isValid && (
           <div className="bg-[#dcfce7] border border-[#86efac] rounded-[12px] p-4 flex items-center gap-3">
             <CheckCircle className="text-[#166534] text-xl shrink-0" />
-            <p className="font-medium text-[#166534]">
-              Todo listo para crear la recepción
-            </p>
+            <p className="font-medium text-[#166534]">Todo listo para crear la recepción</p>
           </div>
         )}
       </div>
@@ -278,7 +226,7 @@ export default function ReviewStep({
         </TouchTarget>
       </div>
     </div>
-  )
+  );
 }
 
 function SectionCard({
@@ -286,9 +234,9 @@ function SectionCard({
   icon,
   children,
 }: {
-  title: string
-  icon: React.ReactNode
-  children: React.ReactNode
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
 }) {
   return (
     <div className="bg-white border border-[#dce4e7] rounded-[12px] p-4 md:p-6">
@@ -300,7 +248,7 @@ function SectionCard({
       </div>
       {children}
     </div>
-  )
+  );
 }
 
 function InfoField({
@@ -308,9 +256,9 @@ function InfoField({
   value,
   required,
 }: {
-  label: string
-  value: string
-  required?: boolean
+  label: string;
+  value: string;
+  required?: boolean;
 }) {
   return (
     <div>
@@ -319,7 +267,7 @@ function InfoField({
       </span>
       <p className="font-medium text-[#16343f]">{value}</p>
     </div>
-  )
+  );
 }
 
 function SelectField({
@@ -329,11 +277,11 @@ function SelectField({
   onChange,
   required,
 }: {
-  label: string
-  value: string | null
-  options: any[]
-  onChange: (id: string) => void
-  required?: boolean
+  label: string;
+  value: string | null;
+  options: any[];
+  onChange: (id: string) => void;
+  required?: boolean;
 }) {
   return (
     <div>
@@ -358,5 +306,5 @@ function SelectField({
         ))}
       </select>
     </div>
-  )
+  );
 }

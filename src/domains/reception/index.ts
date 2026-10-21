@@ -10,6 +10,6 @@
  * - validation.ts: Validación en frontera
  */
 
-export * from "./receptionMachine"
-export * from "./receptionDomain"
-export * from "./useReceptionProgramming"
+export * from "./receptionMachine";
+export * from "./receptionDomain";
+export * from "./useReceptionProgramming";

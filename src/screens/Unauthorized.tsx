@@ -1,17 +1,17 @@
-import { Link } from "react-router-dom"
-import { useAuth } from "@/context/AuthContext"
+import { Link } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 
-const assetPathPrefix = "/assets"
-const imgLogo = `${assetPathPrefix}/4cca0.svg`
+const assetPathPrefix = "/assets";
+const imgLogo = `${assetPathPrefix}/4cca0.svg`;
 
 export default function Unauthorized() {
-  const { accessStatus } = useAuth()
+  const { accessStatus } = useAuth();
   const message =
     accessStatus === "PENDING"
       ? "Tu cuenta está pendiente de aprobación. Contacta a tu supervisor o administrador."
       : accessStatus === "INACTIVE"
         ? "Tu cuenta está inactiva. Contacta a tu supervisor o administrador."
-        : "No tienes permisos para acceder a esta sección. Contacta a tu supervisor o administrador."
+        : "No tienes permisos para acceder a esta sección. Contacta a tu supervisor o administrador.";
 
   return (
     <div className="flex items-center justify-center h-screen bg-[#edf1f3] p-4">
@@ -47,5 +47,5 @@ export default function Unauthorized() {
         </div>
       </div>
     </div>
-  )
+  );
 }

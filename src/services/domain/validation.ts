@@ -13,70 +13,65 @@ import type {
   ReceptionConversion,
   PersistedReceptionProduct,
   ValidationResult,
-} from "@/types/domain"
+} from "@/types/domain";
 
 /**
  * Valida una línea de recepción antes de persistir
  */
-export function validateReceptionLine(
-  line: ReceptionLineState,
-): ValidationResult {
-  const errors: string[] = []
-  const normalizedName =
-    typeof line.nombre === "string" ? line.nombre.trim() : ""
+export function validateReceptionLine(line: ReceptionLineState): ValidationResult {
+  const errors: string[] = [];
+  const normalizedName = typeof line.nombre === "string" ? line.nombre.trim() : "";
 
   if (normalizedName.length === 0) {
-    errors.push("Nombre del producto es requerido")
+    errors.push("Nombre del producto es requerido");
   }
 
   if (line.cantidad <= 0) {
-    errors.push("Cantidad debe ser mayor a 0")
+    errors.push("Cantidad debe ser mayor a 0");
   }
 
   if (line.precio < 0) {
-    errors.push("Precio no puede ser negativo")
+    errors.push("Precio no puede ser negativo");
   }
 
   if (line.importe < 0) {
-    errors.push("Importe no puede ser negativo")
+    errors.push("Importe no puede ser negativo");
   }
 
   if (!["confirmado", "sugerido", "manual"].includes(line.estadoMatch)) {
-    errors.push("Estado de match inválido")
+    errors.push("Estado de match inválido");
   }
 
-  return { valid: errors.length === 0, errors }
+  return { valid: errors.length === 0, errors };
 }
 
 /**
  * Valida una conversión
  */
-export function validateConversion(
-  conv: ReceptionConversion,
-): ValidationResult {
-  const errors: string[] = []
+export function validateConversion(conv: ReceptionConversion): ValidationResult {
+  const errors: string[] = [];
 
   if (!conv.producto || conv.producto.trim().length === 0) {
-    errors.push("Producto es requerido")
+    errors.push("Producto es requerido");
   }
 
   if (conv.cajas < 0) {
-    errors.push("Cajas no puede ser negativo")
+    errors.push("Cajas no puede ser negativo");
   }
 
   if (conv.cajasPorTarima <= 0) {
-    errors.push("Cajas por tarima debe ser mayor a 0")
+    errors.push("Cajas por tarima debe ser mayor a 0");
   }
 
   if (conv.tarimas < 0) {
-    errors.push("Tarimas no puede ser negativo")
+    errors.push("Tarimas no puede ser negativo");
   }
 
   if (conv.stickers < 0) {
-    errors.push("Stickers no puede ser negativo")
+    errors.push("Stickers no puede ser negativo");
   }
 
-  return { valid: errors.length === 0, errors }
+  return { valid: errors.length === 0, errors };
 }
 
 /**
@@ -85,68 +80,68 @@ export function validateConversion(
  * Esta es la validación crítica: NO se persiste nada sin pasar aquí.
  */
 export function validateReceptionDraft(draft: {
-  folio: string | null
-  fecha: string | null
-  proveedor: string | null
-  proveedorLogistico: string | null
-  lineas: ReceptionLineState[]
-  warehouseId: string | null
-  supplierId: string | null
-  tarimasTotal: number
-  conversiones: ReceptionConversion[]
+  folio: string | null;
+  fecha: string | null;
+  proveedor: string | null;
+  proveedorLogistico: string | null;
+  lineas: ReceptionLineState[];
+  warehouseId: string | null;
+  supplierId: string | null;
+  tarimasTotal: number;
+  conversiones: ReceptionConversion[];
 }): ValidationResult {
-  const errors: string[] = []
+  const errors: string[] = [];
 
   // Campos obligatorios
   if (!draft.folio || draft.folio.trim() === "") {
-    errors.push("Folio es requerido")
+    errors.push("Folio es requerido");
   }
 
   if (!draft.fecha || draft.fecha.trim() === "") {
-    errors.push("Fecha es requerida")
+    errors.push("Fecha es requerida");
   }
 
   if (!draft.proveedor || draft.proveedor.trim() === "") {
-    errors.push("Proveedor es requerido")
+    errors.push("Proveedor es requerido");
   }
 
   if (!draft.proveedorLogistico || draft.proveedorLogistico.trim() === "") {
-    errors.push("Proveedor logístico es requerido")
+    errors.push("Proveedor logístico es requerido");
   }
 
   if (!draft.warehouseId) {
-    errors.push("Almacén destino es requerido")
+    errors.push("Almacén destino es requerido");
   }
 
   if (!draft.supplierId) {
-    errors.push("Proveedor logístico (ID) es requerido")
+    errors.push("Proveedor logístico (ID) es requerido");
   }
 
   // Líneas
   if (!draft.lineas.length) {
-    errors.push("Al menos un producto es requerido")
+    errors.push("Al menos un producto es requerido");
   } else {
     draft.lineas.forEach((line, i) => {
-      const lineValidation = validateReceptionLine(line)
+      const lineValidation = validateReceptionLine(line);
       if (!lineValidation.valid) {
-        errors.push(`Producto ${i + 1}: ${lineValidation.errors.join(", ")}`)
+        errors.push(`Producto ${i + 1}: ${lineValidation.errors.join(", ")}`);
       }
-    })
+    });
   }
 
   // Conversiones
   if (draft.tarimasTotal <= 0) {
-    errors.push("Total de tarimas debe ser mayor a 0")
+    errors.push("Total de tarimas debe ser mayor a 0");
   }
 
   draft.conversiones.forEach((conv, i) => {
-    const convValidation = validateConversion(conv)
+    const convValidation = validateConversion(conv);
     if (!convValidation.valid) {
-      errors.push(`Conversión ${i + 1}: ${convValidation.errors.join(", ")}`)
+      errors.push(`Conversión ${i + 1}: ${convValidation.errors.join(", ")}`);
     }
-  })
+  });
 
-  return { valid: errors.length === 0, errors }
+  return { valid: errors.length === 0, errors };
 }
 
 /**
@@ -154,23 +149,19 @@ export function validateReceptionDraft(draft: {
  *
  * Lanza si la línea no es válida - fail fast en frontera de persistencia.
  */
-export function toPersistedProduct(
-  line: ReceptionLineState,
-): {
-  productId: string | null
-  codigo: string | null
-  nombre: string
-  unidad: string | null
-  cantidad: number
-  precio: number
-  importe: number
-  estadoMatch: "confirmed" | "unmatched"
+export function toPersistedProduct(line: ReceptionLineState): {
+  productId: string | null;
+  codigo: string | null;
+  nombre: string;
+  unidad: string | null;
+  cantidad: number;
+  precio: number;
+  importe: number;
+  estadoMatch: "confirmed" | "unmatched";
 } {
-  const validation = validateReceptionLine(line)
+  const validation = validateReceptionLine(line);
   if (!validation.valid) {
-    throw new Error(
-      `Línea inválida para persistir: ${validation.errors.join(", ")}`,
-    )
+    throw new Error(`Línea inválida para persistir: ${validation.errors.join(", ")}`);
   }
 
   return {
@@ -182,29 +173,25 @@ export function toPersistedProduct(
     precio: line.precio,
     importe: line.importe,
     estadoMatch: line.estadoMatch === "confirmado" ? "confirmed" : "unmatched",
-  }
+  };
 }
 
 /**
  * Valida y convierte conversión a formato persistido
  */
-export function toPersistedConversion(
-  conv: ReceptionConversion,
-): {
-  producto: string
-  codigo: string | null
-  unidades: number
-  cajas: number
-  cajasPorTarima: number
-  tarimas: number
-  stickers: number
-  conversionMatch: boolean
+export function toPersistedConversion(conv: ReceptionConversion): {
+  producto: string;
+  codigo: string | null;
+  unidades: number;
+  cajas: number;
+  cajasPorTarima: number;
+  tarimas: number;
+  stickers: number;
+  conversionMatch: boolean;
 } {
-  const validation = validateConversion(conv)
+  const validation = validateConversion(conv);
   if (!validation.valid) {
-    throw new Error(
-      `Conversión inválida para persistir: ${validation.errors.join(", ")}`,
-    )
+    throw new Error(`Conversión inválida para persistir: ${validation.errors.join(", ")}`);
   }
 
   return {
@@ -216,5 +203,5 @@ export function toPersistedConversion(
     tarimas: conv.tarimas,
     stickers: conv.stickers,
     conversionMatch: conv.conversionMatch,
-  }
+  };
 }

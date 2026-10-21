@@ -2,16 +2,13 @@
  * Tests for ocrToReception domain mapper
  */
 
-import { describe, it, expect } from "vitest"
+import { describe, it, expect } from "vitest";
 import {
   ocrProductToReceptionLine,
   ocrResponseToReceptionLines,
   isOcrValidForReception,
-} from "@/services/domain/ocrToReception"
-import {
-  createMockOcrProduct,
-  createMockOcrResponse,
-} from "@/test/utils/testUtils"
+} from "@/services/domain/ocrToReception";
+import { createMockOcrProduct, createMockOcrResponse } from "@/test/utils/testUtils";
 
 describe("ocrToReception - OCR → ReceptionLineState mapper", () => {
   it("converts OcrProduct to ReceptionLineState correctly", () => {
@@ -24,9 +21,9 @@ describe("ocrToReception - OCR → ReceptionLineState mapper", () => {
       precio: 120,
       importe: 6000,
       confianza: 0.95,
-    })
+    });
 
-    const result = ocrProductToReceptionLine(ocrProduct)
+    const result = ocrProductToReceptionLine(ocrProduct);
 
     expect(result).toEqual({
       productId: null,
@@ -37,8 +34,8 @@ describe("ocrToReception - OCR → ReceptionLineState mapper", () => {
       precio: 120,
       importe: 6000,
       estadoMatch: "sugerido",
-    })
-  })
+    });
+  });
 
   it("converts OcrResponse to ReceptionLineState array", () => {
     const ocrResponse = createMockOcrResponse({
@@ -53,22 +50,22 @@ describe("ocrToReception - OCR → ReceptionLineState mapper", () => {
           createMockOcrProduct({ linea: 2, nombre: "CAFE", cantidad: 12 }),
         ],
       },
-    })
+    });
 
-    const result = ocrResponseToReceptionLines(ocrResponse)
+    const result = ocrResponseToReceptionLines(ocrResponse);
 
-    expect(result).toHaveLength(2)
+    expect(result).toHaveLength(2);
     expect(result[0]).toMatchObject({
       nombre: "AZUCAR",
       cantidad: 50,
       estadoMatch: "sugerido",
-    })
+    });
     expect(result[1]).toMatchObject({
       nombre: "CAFE",
       cantidad: 12,
       estadoMatch: "sugerido",
-    })
-  })
+    });
+  });
 
   it("filters out products with cantidad <= 0", () => {
     const ocrResponse = createMockOcrResponse({
@@ -79,12 +76,12 @@ describe("ocrToReception - OCR → ReceptionLineState mapper", () => {
           createMockOcrProduct({ linea: 3, cantidad: -5 }),
         ],
       },
-    })
+    });
 
-    const result = ocrResponseToReceptionLines(ocrResponse)
-    expect(result).toHaveLength(1)
-    expect(result[0].cantidad).toBe(10)
-  })
+    const result = ocrResponseToReceptionLines(ocrResponse);
+    expect(result).toHaveLength(1);
+    expect(result[0].cantidad).toBe(10);
+  });
 
   it("filters out products with empty nombre", () => {
     const ocrResponse = createMockOcrResponse({
@@ -95,12 +92,12 @@ describe("ocrToReception - OCR → ReceptionLineState mapper", () => {
           createMockOcrProduct({ linea: 3, nombre: "   ", cantidad: 10 }),
         ],
       },
-    })
+    });
 
-    const result = ocrResponseToReceptionLines(ocrResponse)
-    expect(result).toHaveLength(1)
-    expect(result[0].nombre).toBe("VALIDO")
-  })
+    const result = ocrResponseToReceptionLines(ocrResponse);
+    expect(result).toHaveLength(1);
+    expect(result[0].nombre).toBe("VALIDO");
+  });
 
   it("validates OCR for reception correctly", () => {
     const validOcr = createMockOcrResponse({
@@ -108,23 +105,19 @@ describe("ocrToReception - OCR → ReceptionLineState mapper", () => {
       parsed: {
         productos: [createMockOcrProduct({ cantidad: 10, nombre: "VALIDO" })],
       },
-    })
+    });
 
-    expect(isOcrValidForReception(validOcr)).toBe(true)
-  })
+    expect(isOcrValidForReception(validOcr)).toBe(true);
+  });
 
   it("rejects invalid OCR responses", () => {
     // No success
-    expect(
-      isOcrValidForReception(createMockOcrResponse({ success: false })),
-    ).toBe(false)
+    expect(isOcrValidForReception(createMockOcrResponse({ success: false }))).toBe(false);
 
     // No productos
     expect(
-      isOcrValidForReception(
-        createMockOcrResponse({ success: true, parsed: { productos: [] } }),
-      ),
-    ).toBe(false)
+      isOcrValidForReception(createMockOcrResponse({ success: true, parsed: { productos: [] } })),
+    ).toBe(false);
 
     // Productos sin cantidad válida
     expect(
@@ -136,6 +129,6 @@ describe("ocrToReception - OCR → ReceptionLineState mapper", () => {
           },
         }),
       ),
-    ).toBe(false)
-  })
-})
+    ).toBe(false);
+  });
+});

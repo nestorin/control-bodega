@@ -1,40 +1,40 @@
-import { useState, useRef, useEffect, useMemo } from "react"
+import { useState, useRef, useEffect, useMemo } from "react";
 
-import { PalletDoc } from "@/services/firestore/types"
-import { TarimaDetailView, TarimaDetailState } from "@/types/tarimaDetail"
-import { parseTarimaQR } from "@/types/qrcode"
-import { createFirestoreServices } from "@/services/firestore"
-import { db } from "@/lib/firebase"
+import { PalletDoc } from "@/services/firestore/types";
+import { TarimaDetailView, TarimaDetailState } from "@/types/tarimaDetail";
+import { parseTarimaQR } from "@/types/qrcode";
+import { createFirestoreServices } from "@/services/firestore";
+import { db } from "@/lib/firebase";
 
-const assetPathPrefix = "/assets"
-const imgWarehouse = `${assetPathPrefix}/fc229.svg`
-const imgIndicador = `${assetPathPrefix}/08d70.svg`
-const imgIndicadorBlue = `${assetPathPrefix}/cf2d3.svg`
-const imgQrCode = `${assetPathPrefix}/60da5.svg`
+const assetPathPrefix = "/assets";
+const imgWarehouse = `${assetPathPrefix}/fc229.svg`;
+const imgIndicador = `${assetPathPrefix}/08d70.svg`;
+const imgIndicadorBlue = `${assetPathPrefix}/cf2d3.svg`;
+const imgQrCode = `${assetPathPrefix}/60da5.svg`;
 
-const FORMATS = ["SVG", "PNG", "JPEG", "PDF"] as const
-type Format = typeof FORMATS[number]
+const FORMATS = ["SVG", "PNG", "JPEG", "PDF"] as const;
+type Format = (typeof FORMATS)[number];
 
-const ORG_ID = "org_exepa_001"
+const ORG_ID = "org_exepa_001";
 
 interface ReceptionReference {
-  recId: string
-  tarimas: number
-  proveedor: string
-  proveedorLogistico: string
+  recId: string;
+  tarimas: number;
+  proveedor: string;
+  proveedorLogistico: string;
 }
 
 interface Props {
-  onBack: () => void
-  onViewReference?: (reference: ReceptionReference) => void
+  onBack: () => void;
+  onViewReference?: (reference: ReceptionReference) => void;
   currentReception?: {
-    ocFolio: string
-    tarimas: number
-    proveedor?: string
-    proveedorLogistico?: string
-  } | null
-  qrCode?: string
-  authorizedWarehouseIds?: string[]
+    ocFolio: string;
+    tarimas: number;
+    proveedor?: string;
+    proveedorLogistico?: string;
+  } | null;
+  qrCode?: string;
+  authorizedWarehouseIds?: string[];
 }
 
 export default function TarimaDetalle({
@@ -44,57 +44,51 @@ export default function TarimaDetalle({
   qrCode,
   authorizedWarehouseIds,
 }: Props) {
-  const [showFormats, setShowFormats] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-  const [customImage, setCustomImage] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [showFormats, setShowFormats] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [customImage, setCustomImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fsServices = useMemo(() => createFirestoreServices(db!, ORG_ID), [])
-  const { pallets, products, suppliers, receptions } = fsServices
+  const fsServices = useMemo(() => createFirestoreServices(db!, ORG_ID), []);
+  const { pallets, products, suppliers, receptions } = fsServices;
 
   const [detailState, setDetailState] = useState<TarimaDetailState>({
     status: "loading",
-  })
-  const [legacyMode, setLegacyMode] = useState(false)
+  });
+  const [legacyMode, setLegacyMode] = useState(false);
 
   useEffect(() => {
     if (qrCode) {
-      setLegacyMode(false)
-      fetchTarimaDetail(qrCode)
+      setLegacyMode(false);
+      fetchTarimaDetail(qrCode);
     } else {
-      setLegacyMode(true)
-      setDetailState({ status: "success", data: buildLegacyData() })
+      setLegacyMode(true);
+      setDetailState({ status: "success", data: buildLegacyData() });
     }
-  }, [qrCode])
+  }, [qrCode]);
 
   async function fetchTarimaDetail(qrIdentifier: string) {
-    setDetailState({ status: "loading" })
+    setDetailState({ status: "loading" });
     try {
-      const pallet = await pallets.getByQR(qrIdentifier, authorizedWarehouseIds ?? [])
+      const pallet = await pallets.getByQR(qrIdentifier, authorizedWarehouseIds ?? []);
       if (!pallet) {
-        setDetailState({ status: "not-found", qrCode: qrIdentifier })
-        return
+        setDetailState({ status: "not-found", qrCode: qrIdentifier });
+        return;
       }
 
       // Fetch related product
-      const product = pallet.productId
-        ? await products.getById(pallet.productId)
-        : null
+      const product = pallet.productId ? await products.getById(pallet.productId) : null;
 
       // Fetch reception to get supplierId and folio
-      const reception = pallet.receptionId
-        ? await receptions.getById(pallet.receptionId)
-        : null
+      const reception = pallet.receptionId ? await receptions.getById(pallet.receptionId) : null;
 
       // Fetch supplier from reception.supplierId
-      const supplier = reception?.supplierId
-        ? await suppliers.getById(reception.supplierId)
-        : null
+      const supplier = reception?.supplierId ? await suppliers.getById(reception.supplierId) : null;
 
       const detail: TarimaDetailView = {
         qrIdentifier: pallet.qrIdentifier,
         lot: pallet.lot || "",
-        expiryDate: pallet.expiryDate ?? { toDate: () => new Date() } as any,
+        expiryDate: pallet.expiryDate ?? ({ toDate: () => new Date() } as any),
         quantity: pallet.quantity,
         unit: pallet.unit,
         status: pallet.status,
@@ -106,27 +100,25 @@ export default function TarimaDetalle({
         supplierCode: supplier?.code || "",
         receptionFolio: reception?.purchaseOrderId || reception?.id || "",
         receptionDate:
-          reception?.receivedAt ??
-          reception?.createdAt ??
-          { toDate: () => new Date() } as any,
-      }
+          reception?.receivedAt ?? reception?.createdAt ?? ({ toDate: () => new Date() } as any),
+      };
 
-      setDetailState({ status: "success", data: detail })
+      setDetailState({ status: "success", data: detail });
     } catch (error) {
       setDetailState({
         status: "error",
         message: error instanceof Error ? error.message : "Error desconocido",
         retry: () => fetchTarimaDetail(qrIdentifier),
-      })
+      });
     }
   }
 
   function buildLegacyData(): TarimaDetailView {
-    const ocFolio = currentReception?.ocFolio ?? "OC-24891"
-    const tarimasTotal = currentReception?.tarimas ?? 20
-    const tarimaNum = 3
-    const ocNumber = ocFolio.replace("OC-", "")
-    const tarimaId = `TQR-${ocNumber}-${String(tarimaNum).padStart(3, "0")}`
+    const ocFolio = currentReception?.ocFolio ?? "OC-24891";
+    const tarimasTotal = currentReception?.tarimas ?? 20;
+    const tarimaNum = 3;
+    const ocNumber = ocFolio.replace("OC-", "");
+    const tarimaId = `TQR-${ocNumber}-${String(tarimaNum).padStart(3, "0")}`;
 
     return {
       qrIdentifier: tarimaId,
@@ -142,33 +134,33 @@ export default function TarimaDetalle({
       supplierCode: "PROV-001",
       receptionFolio: "19 Sep 2026 · 09:42",
       receptionDate: { toDate: () => new Date("2026-09-19") } as any,
-    }
+    };
   }
 
   function downloadAs(format: Format) {
-    const a = document.createElement("a")
-    a.href = imgQrCode
-    a.download = `${getTarimaId()}.${format.toLowerCase()}`
-    a.click()
+    const a = document.createElement("a");
+    a.href = imgQrCode;
+    a.download = `${getTarimaId()}.${format.toLowerCase()}`;
+    a.click();
   }
 
   function getTarimaId(): string {
     if (detailState.status === "success") {
-      return detailState.data.qrIdentifier
+      return detailState.data.qrIdentifier;
     }
-    const ocFolio = currentReception?.ocFolio ?? "OC-24891"
-    const ocNumber = ocFolio.replace("OC-", "")
-    return `TQR-${ocNumber}-003`
+    const ocFolio = currentReception?.ocFolio ?? "OC-24891";
+    const ocNumber = ocFolio.replace("OC-", "");
+    return `TQR-${ocNumber}-003`;
   }
 
   function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
     reader.onload = (event) => {
-      setCustomImage(event.target?.result as string)
-    }
-    reader.readAsDataURL(file)
+      setCustomImage(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
   }
 
   function renderLoading() {
@@ -176,12 +168,10 @@ export default function TarimaDetalle({
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 p-4 lg:p-7 size-full overflow-y-auto">
         <div className="flex-1 flex flex-col items-center justify-center py-12">
           <div className="w-24 h-24 border-3 border-[#3276a8] border-t-transparent rounded-full animate-spin" />
-          <p className="mt-4 text-lg font-medium text-gray-900">
-            Cargando tarima…
-          </p>
+          <p className="mt-4 text-lg font-medium text-gray-900">Cargando tarima…</p>
         </div>
       </div>
-    )
+    );
   }
 
   function renderNotFound(qrCode: string) {
@@ -201,9 +191,7 @@ export default function TarimaDetalle({
               d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          <p className="mt-4 text-lg font-medium text-gray-900">
-            Tarima no encontrada
-          </p>
+          <p className="mt-4 text-lg font-medium text-gray-900">Tarima no encontrada</p>
           <p className="mt-1 text-sm text-gray-500">
             El código QR "{qrCode}" no corresponde a ninguna tarima registrada.
           </p>
@@ -215,7 +203,7 @@ export default function TarimaDetalle({
           </button>
         </div>
       </div>
-    )
+    );
   }
 
   function renderError(message: string, retry: () => void) {
@@ -235,9 +223,7 @@ export default function TarimaDetalle({
               d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
             />
           </svg>
-          <p className="mt-4 text-lg font-medium text-gray-900">
-            Error al cargar la tarima
-          </p>
+          <p className="mt-4 text-lg font-medium text-gray-900">Error al cargar la tarima</p>
           <p className="mt-1 text-sm text-gray-500">{message}</p>
           <div className="mt-6 flex gap-4">
             <button
@@ -255,11 +241,11 @@ export default function TarimaDetalle({
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   function renderSuccess(data: TarimaDetailView) {
-    const tarimaId = data.qrIdentifier
+    const tarimaId = data.qrIdentifier;
 
     return (
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 p-4 lg:p-7 size-full overflow-y-auto">
@@ -292,15 +278,9 @@ export default function TarimaDetalle({
                         fontWeight: 800,
                       }}
                     >
-                      TARIMA{" "}
-                      {data.qrIdentifier.split("-").pop()?.padStart(2, "0") ||
-                        "03"}{" "}
-                      /{" "}
+                      TARIMA {data.qrIdentifier.split("-").pop()?.padStart(2, "0") || "03"} /{" "}
                       {data.receptionFolio
-                        ? data.receptionFolio
-                            .split("·")[1]
-                            ?.trim()
-                            .split(" ")[0]
+                        ? data.receptionFolio.split("·")[1]?.trim().split(" ")[0]
                         : "20"}
                     </p>
                   </>
@@ -407,8 +387,8 @@ export default function TarimaDetalle({
                       <button
                         key={fmt}
                         onClick={() => {
-                          downloadAs(fmt)
-                          setShowFormats(false)
+                          downloadAs(fmt);
+                          setShowFormats(false);
                         }}
                         className="flex items-center gap-2 w-full px-3 py-[9px] hover:bg-[#f4f7f8] transition-colors text-left"
                       >
@@ -751,13 +731,8 @@ export default function TarimaDetalle({
                   className="font-extrabold text-[#172126] text-[15px] lg:text-lg whitespace-nowrap"
                   style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
                 >
-                  {data.receptionFolio?.split("·")[0]?.trim() ||
-                    data.productCode ||
-                    "OC-24891"}{" "}
-                  ·{" "}
-                  {data.receptionFolio?.split("·")[1]?.trim().split(" ")[0] ||
-                    "20"}{" "}
-                  tarimas
+                  {data.receptionFolio?.split("·")[0]?.trim() || data.productCode || "OC-24891"} ·{" "}
+                  {data.receptionFolio?.split("·")[1]?.trim().split(" ")[0] || "20"} tarimas
                 </p>
               </div>
               <button
@@ -768,10 +743,8 @@ export default function TarimaDetalle({
                       data.receptionFolio?.split("·")[0]?.trim() ||
                       "OC-24891",
                     tarimas: currentReception?.tarimas ?? 20,
-                    proveedor:
-                      currentReception?.proveedor || data.supplierName || "—",
-                    proveedorLogistico:
-                      currentReception?.proveedorLogistico || "Logística Veloz",
+                    proveedor: currentReception?.proveedor || data.supplierName || "—",
+                    proveedorLogistico: currentReception?.proveedorLogistico || "Logística Veloz",
                   })
                 }
                 className="font-extrabold text-[#16343f] text-[14px] lg:text-[15px] whitespace-nowrap hover:underline touch-target"
@@ -783,13 +756,11 @@ export default function TarimaDetalle({
           </div>
         </div>
       </div>
-    )
+    );
   }
 
-  if (detailState.status === "loading") return renderLoading()
-  if (detailState.status === "not-found")
-    return renderNotFound(detailState.qrCode)
-  if (detailState.status === "error")
-    return renderError(detailState.message, detailState.retry)
-  return renderSuccess(detailState.data)
+  if (detailState.status === "loading") return renderLoading();
+  if (detailState.status === "not-found") return renderNotFound(detailState.qrCode);
+  if (detailState.status === "error") return renderError(detailState.message, detailState.retry);
+  return renderSuccess(detailState.data);
 }

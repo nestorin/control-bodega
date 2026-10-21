@@ -1,15 +1,15 @@
-import { useState, useRef, useEffect } from "react"
-import { isFeatureEnabled } from "@/config/featureFlags"
-import { useCollection } from "@/hooks/useFirestore"
-import { db } from "@/lib/firebase"
-import { createFirestoreServices } from "@/services/firestore"
-import { WAREHOUSE_IDS } from "@/config/warehouses"
-import { useAuthorization } from "@/hooks/useAuthorization"
+import { useState, useRef, useEffect } from "react";
+import { isFeatureEnabled } from "@/config/featureFlags";
+import { useCollection } from "@/hooks/useFirestore";
+import { db } from "@/lib/firebase";
+import { createFirestoreServices } from "@/services/firestore";
+import { WAREHOUSE_IDS } from "@/config/warehouses";
+import { useAuthorization } from "@/hooks/useAuthorization";
 
-const imgIndicador = "/assets/08d70.svg"
-const imgIndicadorRed = "/assets/9d6fd.svg"
+const imgIndicador = "/assets/08d70.svg";
+const imgIndicadorRed = "/assets/9d6fd.svg";
 
-const ORG_ID = "org_exepa_001"
+const ORG_ID = "org_exepa_001";
 
 // Fallback local data
 export const evidenciasDataLocal = [
@@ -68,31 +68,31 @@ export const evidenciasDataLocal = [
     img: imgIndicadorRed,
   },
   // ... rest of local data
-]
+];
 
 // Export for use in EvidenciaDetalle
-export type EvidenciaData = typeof evidenciasDataLocal[0]
+export type EvidenciaData = (typeof evidenciasDataLocal)[0];
 
 function RowMenu({
   evId,
   onEdit,
   onDelete,
 }: {
-  evId: string
-  onEdit: () => void
-  onDelete: () => void
+  evId: string;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [open])
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
 
   return (
     <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
@@ -112,8 +112,8 @@ function RowMenu({
         <div className="absolute right-0 top-10 z-50 bg-white border border-[#dce4e7] rounded-[14px] shadow-[0px_12px_28px_rgba(22,52,63,0.14)] overflow-hidden min-w-[160px]">
           <button
             onClick={() => {
-              setOpen(false)
-              onEdit()
+              setOpen(false);
+              onEdit();
             }}
             className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-[#f4f7f8] transition-colors border-b border-[#edf1f3]"
           >
@@ -143,8 +143,8 @@ function RowMenu({
           </button>
           <button
             onClick={() => {
-              setOpen(false)
-              alert(`Ver fotos de ${evId}`)
+              setOpen(false);
+              alert(`Ver fotos de ${evId}`);
             }}
             className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-[#f4f7f8] transition-colors border-b border-[#edf1f3]"
           >
@@ -174,8 +174,8 @@ function RowMenu({
           </button>
           <button
             onClick={() => {
-              setOpen(false)
-              onDelete()
+              setOpen(false);
+              onDelete();
             }}
             className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-[#f4f7f8] transition-colors"
           >
@@ -208,53 +208,50 @@ function RowMenu({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 interface Props {
-  onSelect?: (ev: EvidenciaData) => void
+  onSelect?: (ev: EvidenciaData) => void;
 }
 
 export default function Evidencias({ onSelect }: Props) {
-  const { canQuery } = useAuthorization()
-  const useFirestore =
-    isFeatureEnabled("USE_FIRESTORE_EVIDENCIAS") && !!db && canQuery
+  const { canQuery } = useAuthorization();
+  const useFirestore = isFeatureEnabled("USE_FIRESTORE_EVIDENCIAS") && !!db && canQuery;
 
-  const [listaLocal, setListaLocal] = useState(evidenciasDataLocal)
-  const [fsServices, setFsServices] =
-    useState<ReturnType<typeof createFirestoreServices> | null>(null)
-  const [firestoreReady, setFirestoreReady] = useState(false)
-  const [loadingFs, setLoadingFs] = useState(false)
-  const [errorFs, setErrorFs] = useState<string | null>(null)
+  const [listaLocal, setListaLocal] = useState(evidenciasDataLocal);
+  const [fsServices, setFsServices] = useState<ReturnType<typeof createFirestoreServices> | null>(
+    null,
+  );
+  const [firestoreReady, setFirestoreReady] = useState(false);
+  const [loadingFs, setLoadingFs] = useState(false);
+  const [errorFs, setErrorFs] = useState<string | null>(null);
 
   // Estados de filtro
-  const [searchText, setSearchText] = useState("")
-  const [filterEstado, setFilterEstado] =
-    useState<"todos" | "Completa" | "Incompleta">("todos")
+  const [searchText, setSearchText] = useState("");
+  const [filterEstado, setFilterEstado] = useState<"todos" | "Completa" | "Incompleta">("todos");
 
   // Initialize Firestore services
   useEffect(() => {
     if (useFirestore && db) {
-      const services = createFirestoreServices(db, ORG_ID)
-      setFsServices(services)
-      setFirestoreReady(true)
+      const services = createFirestoreServices(db, ORG_ID);
+      setFsServices(services);
+      setFirestoreReady(true);
     }
-  }, [useFirestore])
+  }, [useFirestore]);
 
   // Load Firestore data when feature flag is enabled
   useEffect(() => {
-    if (!useFirestore || !fsServices) return
+    if (!useFirestore || !fsServices) return;
 
-    setLoadingFs(true)
-    setErrorFs(null)
+    setLoadingFs(true);
+    setErrorFs(null);
 
     fsServices.receptions
       .getByWarehouse(WAREHOUSE_IDS.NORTH)
       .then((receptions: any[]) => {
         const converted = receptions
-          .filter(
-            (r: any) => r.evidencePhotos?.trailer || r.evidencePhotos?.product,
-          )
+          .filter((r: any) => r.evidencePhotos?.trailer || r.evidencePhotos?.product)
           .map((r: any) => ({
             id: r.operationId || r.id,
             fotoTrailer: r.evidencePhotos?.trailer,
@@ -272,81 +269,61 @@ export default function Evidencias({ onSelect }: Props) {
               "",
             hora: r.receivedAt?.toDate?.()?.toLocaleTimeString?.("es-ES") || "",
             estado:
-              r.evidencePhotos?.trailer && r.evidencePhotos?.product
-                ? "Completa"
-                : "Incompleta",
-            color:
-              r.evidencePhotos?.trailer && r.evidencePhotos?.product
-                ? "#16845b"
-                : "#c54b45",
-            bg:
-              r.evidencePhotos?.trailer && r.evidencePhotos?.product
-                ? "#e2f5ec"
-                : "#fce9e7",
+              r.evidencePhotos?.trailer && r.evidencePhotos?.product ? "Completa" : "Incompleta",
+            color: r.evidencePhotos?.trailer && r.evidencePhotos?.product ? "#16845b" : "#c54b45",
+            bg: r.evidencePhotos?.trailer && r.evidencePhotos?.product ? "#e2f5ec" : "#fce9e7",
             img:
               r.evidencePhotos?.trailer && r.evidencePhotos?.product
                 ? imgIndicador
                 : imgIndicadorRed,
-          }))
-        setListaLocal(converted)
-        setLoadingFs(false)
+          }));
+        setListaLocal(converted);
+        setLoadingFs(false);
       })
       .catch((err: Error) => {
-        console.error("Error loading evidencias:", err)
-        setErrorFs(err.message)
-        setLoadingFs(false)
-      })
-  }, [useFirestore, fsServices])
+        console.error("Error loading evidencias:", err);
+        setErrorFs(err.message);
+        setLoadingFs(false);
+      });
+  }, [useFirestore, fsServices]);
 
   // Firestore hook - read from a collection (could be receptions with evidence or separate evidences collection)
-  const { data: evidenciasFirestore, loading } =
-    useCollection<EvidenciaData | null>(
-      db,
-      `organizations/${ORG_ID}/receptions`, // Using receptions with evidence data embedded
-      {
-        enabled: useFirestore,
-        mapFn: (doc) => {
-          const d = doc.data()
-          if (!d.evidencePhotos) return null
-          return {
-            id: d.operationId || doc.id,
-            fotoTrailer: d.evidencePhotos.trailer,
-            fotoProducto: d.evidencePhotos.product,
-            proveedor: d.supplierName || "Sin proveedor",
-            proveedorLogistico: "",
-            item: d.productName || "Sin producto",
-            tarimas: d.palletCount || 0,
-            caducidad: "",
-            lote: "",
-            ocFolio: d.operationId || doc.id,
-            fecha:
-              d.receivedAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
-              d.createdAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
-              "",
-            hora: d.receivedAt?.toDate?.()?.toLocaleTimeString?.("es-ES") || "",
-            estado:
-              d.evidencePhotos?.trailer && d.evidencePhotos?.product
-                ? "Completa"
-                : "Incompleta",
-            color:
-              d.evidencePhotos?.trailer && d.evidencePhotos?.product
-                ? "#16845b"
-                : "#c54b45",
-            bg:
-              d.evidencePhotos?.trailer && d.evidencePhotos?.product
-                ? "#e2f5ec"
-                : "#fce9e7",
-            img:
-              d.evidencePhotos?.trailer && d.evidencePhotos?.product
-                ? imgIndicador
-                : imgIndicadorRed,
-          }
-        },
+  const { data: evidenciasFirestore, loading } = useCollection<EvidenciaData | null>(
+    db,
+    `organizations/${ORG_ID}/receptions`, // Using receptions with evidence data embedded
+    {
+      enabled: useFirestore,
+      mapFn: (doc) => {
+        const d = doc.data();
+        if (!d.evidencePhotos) return null;
+        return {
+          id: d.operationId || doc.id,
+          fotoTrailer: d.evidencePhotos.trailer,
+          fotoProducto: d.evidencePhotos.product,
+          proveedor: d.supplierName || "Sin proveedor",
+          proveedorLogistico: "",
+          item: d.productName || "Sin producto",
+          tarimas: d.palletCount || 0,
+          caducidad: "",
+          lote: "",
+          ocFolio: d.operationId || doc.id,
+          fecha:
+            d.receivedAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
+            d.createdAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
+            "",
+          hora: d.receivedAt?.toDate?.()?.toLocaleTimeString?.("es-ES") || "",
+          estado:
+            d.evidencePhotos?.trailer && d.evidencePhotos?.product ? "Completa" : "Incompleta",
+          color: d.evidencePhotos?.trailer && d.evidencePhotos?.product ? "#16845b" : "#c54b45",
+          bg: d.evidencePhotos?.trailer && d.evidencePhotos?.product ? "#e2f5ec" : "#fce9e7",
+          img:
+            d.evidencePhotos?.trailer && d.evidencePhotos?.product ? imgIndicador : imgIndicadorRed,
+        };
       },
-    )
+    },
+  );
 
-  const lista: EvidenciaData[] =
-    useFirestore && !loadingFs ? listaLocal : listaLocal
+  const lista: EvidenciaData[] = useFirestore && !loadingFs ? listaLocal : listaLocal;
 
   // Lista filtrada
   const listaFiltrada = lista.filter((ev) => {
@@ -355,10 +332,10 @@ export default function Evidencias({ onSelect }: Props) {
       ev.id.toLowerCase().includes(searchText.toLowerCase()) ||
       ev.proveedor.toLowerCase().includes(searchText.toLowerCase()) ||
       ev.item.toLowerCase().includes(searchText.toLowerCase()) ||
-      ev.ocFolio.toLowerCase().includes(searchText.toLowerCase())
-    const matchesEstado = filterEstado === "todos" || ev.estado === filterEstado
-    return matchesSearch && matchesEstado
-  })
+      ev.ocFolio.toLowerCase().includes(searchText.toLowerCase());
+    const matchesEstado = filterEstado === "todos" || ev.estado === filterEstado;
+    return matchesSearch && matchesEstado;
+  });
 
   return (
     <div className="flex flex-col gap-5 items-start p-7 size-full overflow-y-auto">
@@ -379,9 +356,7 @@ export default function Evidencias({ onSelect }: Props) {
             <select
               value={filterEstado}
               onChange={(e) =>
-                setFilterEstado(
-                  e.target.value as "todos" | "Completa" | "Incompleta",
-                )
+                setFilterEstado(e.target.value as "todos" | "Completa" | "Incompleta")
               }
               className="bg-transparent outline-none text-[13px] text-[#172126] appearance-none pr-8 cursor-pointer"
               style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
@@ -396,16 +371,10 @@ export default function Evidencias({ onSelect }: Props) {
           </div>
         </div>
         <div className="bg-[#16343f] text-white rounded-[10px] px-4 py-[6px] flex items-center gap-2">
-          <span
-            className="text-[13px] font-bold"
-            style={{ fontFamily: "'Inter', sans-serif" }}
-          >
+          <span className="text-[13px] font-bold" style={{ fontFamily: "'Inter', sans-serif" }}>
             {listaFiltrada.length}
           </span>
-          <span
-            className="text-[13px] font-medium"
-            style={{ fontFamily: "'Inter', sans-serif" }}
-          >
+          <span className="text-[13px] font-medium" style={{ fontFamily: "'Inter', sans-serif" }}>
             evidencias
           </span>
           {useFirestore && (
@@ -457,16 +426,14 @@ export default function Evidencias({ onSelect }: Props) {
           Error: {errorFs}
           <button
             onClick={() => {
-              setLoadingFs(true)
-              setErrorFs(null)
+              setLoadingFs(true);
+              setErrorFs(null);
               fsServices?.receptions
                 .getByWarehouse(WAREHOUSE_IDS.NORTH)
                 .then((r: any[]) => {
                   const converted = r
                     .filter(
-                      (rec: any) =>
-                        rec.evidencePhotos?.trailer ||
-                        rec.evidencePhotos?.product,
+                      (rec: any) => rec.evidencePhotos?.trailer || rec.evidencePhotos?.product,
                     )
                     .map((rec: any) => ({
                       id: rec.operationId || rec.id,
@@ -480,45 +447,34 @@ export default function Evidencias({ onSelect }: Props) {
                       lote: "",
                       ocFolio: rec.operationId || rec.id,
                       fecha:
-                        rec.receivedAt
-                          ?.toDate?.()
-                          ?.toLocaleDateString?.("es-ES") ||
-                        rec.createdAt
-                          ?.toDate?.()
-                          ?.toLocaleDateString?.("es-ES") ||
+                        rec.receivedAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
+                        rec.createdAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
                         "",
-                      hora:
-                        rec.receivedAt
-                          ?.toDate?.()
-                          ?.toLocaleTimeString?.("es-ES") || "",
+                      hora: rec.receivedAt?.toDate?.()?.toLocaleTimeString?.("es-ES") || "",
                       estado:
-                        rec.evidencePhotos?.trailer &&
-                        rec.evidencePhotos?.product
+                        rec.evidencePhotos?.trailer && rec.evidencePhotos?.product
                           ? "Completa"
                           : "Incompleta",
                       color:
-                        rec.evidencePhotos?.trailer &&
-                        rec.evidencePhotos?.product
+                        rec.evidencePhotos?.trailer && rec.evidencePhotos?.product
                           ? "#16845b"
                           : "#c54b45",
                       bg:
-                        rec.evidencePhotos?.trailer &&
-                        rec.evidencePhotos?.product
+                        rec.evidencePhotos?.trailer && rec.evidencePhotos?.product
                           ? "#e2f5ec"
                           : "#fce9e7",
                       img:
-                        rec.evidencePhotos?.trailer &&
-                        rec.evidencePhotos?.product
+                        rec.evidencePhotos?.trailer && rec.evidencePhotos?.product
                           ? imgIndicador
                           : imgIndicadorRed,
-                    }))
-                  setListaLocal(converted)
-                  setLoadingFs(false)
+                    }));
+                  setListaLocal(converted);
+                  setLoadingFs(false);
                 })
                 .catch((e: Error) => {
-                  setErrorFs(e.message)
-                  setLoadingFs(false)
-                })
+                  setErrorFs(e.message);
+                  setLoadingFs(false);
+                });
             }}
             className="ml-2 underline text-[11px]"
           >
@@ -614,14 +570,12 @@ export default function Evidencias({ onSelect }: Props) {
               <RowMenu
                 evId={ev.id}
                 onEdit={() => alert(`Editando evidencia ${ev.id}`)}
-                onDelete={() =>
-                  setListaLocal((prev) => prev.filter((e) => e.id !== ev.id))
-                }
+                onDelete={() => setListaLocal((prev) => prev.filter((e) => e.id !== ev.id))}
               />
             </div>
           </div>
         ))}
       </div>
     </div>
-  )
+  );
 }

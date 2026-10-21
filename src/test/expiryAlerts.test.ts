@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest"
-import { buildUpcomingExpiryAlert } from "@/services/expiryAlerts"
+import { describe, expect, it } from "vitest";
+import { buildUpcomingExpiryAlert } from "@/services/expiryAlerts";
 
 describe("buildUpcomingExpiryAlert", () => {
-  const now = new Date("2026-10-04T00:00:00Z")
+  const now = new Date("2026-10-04T00:00:00Z");
 
   it("uses persisted lots and orders the nearest expiry first", () => {
     const alert = buildUpcomingExpiryAlert(
@@ -21,14 +21,12 @@ describe("buildUpcomingExpiryAlert", () => {
         },
       ],
       now,
-    )
+    );
 
-    expect(alert).toContain("Coca Cola lote L-2")
-    expect(alert).toContain("Leche")
-    expect(alert?.indexOf("Coca Cola")).toBeLessThan(
-      alert?.indexOf("Leche") ?? 0,
-    )
-  })
+    expect(alert).toContain("Coca Cola lote L-2");
+    expect(alert).toContain("Leche");
+    expect(alert?.indexOf("Coca Cola")).toBeLessThan(alert?.indexOf("Leche") ?? 0);
+  });
 
   it("does not create alerts for expired or distant lots", () => {
     expect(
@@ -49,8 +47,8 @@ describe("buildUpcomingExpiryAlert", () => {
         ],
         now,
       ),
-    ).toBeNull()
-  })
+    ).toBeNull();
+  });
 
   it("supports Firestore Timestamp-like values", () => {
     const alert = buildUpcomingExpiryAlert(
@@ -63,7 +61,7 @@ describe("buildUpcomingExpiryAlert", () => {
         },
       ],
       now,
-    )
-    expect(alert).toContain("Producto")
-  })
-})
+    );
+    expect(alert).toContain("Producto");
+  });
+});

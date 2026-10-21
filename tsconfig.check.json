@@ -4,11 +4,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "exclude": [
-    "node_modules",
-    "dist",
-    ".github",
-    "functions",
-    "scripts"
-  ]
+  "exclude": ["node_modules", "dist", ".github", "functions", "scripts"]
 }
