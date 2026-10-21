@@ -9,6 +9,7 @@ here.
 
 from hashlib import sha256
 import json
+import os
 
 from firebase_functions import https_fn
 from firebase_functions.options import CorsOptions
@@ -21,7 +22,16 @@ from rbac import (
 
 # CORS configuration for production domain
 ALLOWED_ORIGIN = "https://exepa-almacen-safe.web.app"
-CORS_OPTS = CorsOptions(cors_origins=[ALLOWED_ORIGIN])
+_EMULATOR_ORIGINS = {"http://127.0.0.1:4173", "http://localhost:4173"}
+_FUNCTIONS_EMULATOR = os.environ.get("FUNCTIONS_EMULATOR", "").lower() in {
+    "1",
+    "true",
+}
+CORS_OPTS = CorsOptions(
+    cors_origins=[ALLOWED_ORIGIN, *_EMULATOR_ORIGINS]
+    if _FUNCTIONS_EMULATOR
+    else [ALLOWED_ORIGIN],
+)
 
 
 MAX_LINES = 500
@@ -79,6 +89,14 @@ def _operation_result(snapshot, kind, digest):
     return previous.get("result", {})
 
 
+def _transaction_snapshot(transaction, reference):
+    """Read one document across supported Firestore transaction APIs."""
+    result = transaction.get(reference)
+    if hasattr(result, "exists"):
+        return result
+    return next(iter(result), None)
+
+
 @https_fn.on_call(cors=CORS_OPTS)
 def create_reception(req: https_fn.CallableRequest):
     data = _data(req)
@@ -112,11 +130,11 @@ def create_reception(req: https_fn.CallableRequest):
 
     @firestore.transactional
     def txn(transaction):
-        previous = transaction.get(operation_ref)
-        if previous.exists:
+        previous = _transaction_snapshot(transaction, operation_ref)
+        if previous is not None and previous.exists:
             return _operation_result(previous, "create_reception", digest)
-        existing = transaction.get(reception_ref)
-        if existing.exists:
+        existing = _transaction_snapshot(transaction, reception_ref)
+        if existing is not None and existing.exists:
             current = existing.to_dict() or {}
             if current.get("operationId") != operation_id:
                 raise _error("reception id collision")
@@ -179,11 +197,11 @@ def register_reception_pallet(req: https_fn.CallableRequest):
 
     @firestore.transactional
     def txn(transaction):
-        previous = transaction.get(operation_ref)
-        if previous.exists:
+        previous = _transaction_snapshot(transaction, operation_ref)
+        if previous is not None and previous.exists:
             return _operation_result(previous, "register_reception_pallet", digest)
-        reception_snapshot = transaction.get(reception_ref)
-        if not reception_snapshot.exists:
+        reception_snapshot = _transaction_snapshot(transaction, reception_ref)
+        if reception_snapshot is None or not reception_snapshot.exists:
             raise https_fn.HttpsError("not-found", "Reception not found")
         reception = reception_snapshot.to_dict() or {}
         if reception.get("organizationId") != ORG_ID or reception.get("warehouseId") != warehouse_id:
@@ -194,7 +212,8 @@ def register_reception_pallet(req: https_fn.CallableRequest):
         current_version = reception.get("version", 0)
         if expected is not None and current_version != expected:
             raise _error("Reception version precondition failed")
-        if transaction.get(pallet_ref).exists:
+        pallet_snapshot = _transaction_snapshot(transaction, pallet_ref)
+        if pallet_snapshot is not None and pallet_snapshot.exists:
             raise _error("pallet id collision")
         now = firestore.SERVER_TIMESTAMP
         transaction.set(pallet_ref, {"id": pallet_id, "organizationId": ORG_ID,
@@ -243,14 +262,14 @@ def _update_reception(req, action):
 
     @firestore.transactional
     def txn(transaction):
-        snapshot = transaction.get(reception_ref)
-        if not snapshot.exists:
+        snapshot = _transaction_snapshot(transaction, reception_ref)
+        if snapshot is None or not snapshot.exists:
             raise https_fn.HttpsError("not-found", "Reception not found")
         reception = snapshot.to_dict() or {}
         warehouse_id = reception.get("warehouseId")
         actor = _check_actor(req, db, warehouse_id)
-        previous = transaction.get(operation_ref)
-        if previous.exists:
+        previous = _transaction_snapshot(transaction, operation_ref)
+        if previous is not None and previous.exists:
             return _operation_result(previous, action, digest)
         expected = _version(data.get("expectedVersion"))
         current_version = reception.get("version", 0)

@@ -9,11 +9,18 @@ import {
 import {
   doc,
   getDoc,
+  getDocs,
   setDoc,
   deleteDoc,
   updateDoc,
   runTransaction,
   Timestamp,
+  collectionGroup,
+  query,
+  where,
+  limit,
+  documentId,
+  collection,
 } from "firebase/firestore"
 import { afterAll, afterEach, beforeAll, describe, it } from "vitest"
 
@@ -65,6 +72,24 @@ async function seedFixtures() {
         doc(db, `organizations/${orgId}/users/admin-1`),
         membership("admin-1", "ADMIN", null),
       ),
+      ...[
+        "SUPER_ADMIN", "GERENTE_ALMACEN", "AUXILIAR_ALMACENISTA",
+        "AUDITOR", "OPERATOR", "SUPERVISOR",
+      ].map((role, i) => setDoc(
+        doc(db, `organizations/${orgId}/users/role-${i}`),
+        membership(`role-${i}`, role),
+      )),
+      ...[
+        { id: "pallet-wh1", org: orgId, warehouse: wh1 },
+        { id: "pallet-wh2", org: orgId, warehouse: wh2 },
+        { id: "pallet-other-org", org: "other-org", warehouse: wh1 },
+      ].map(({ id, org, warehouse }) => setDoc(
+        doc(db, `organizations/${org}/receptions/rec-${id}/pallets/${id}`),
+        { id, organizationId: org, warehouseId: warehouse, receptionId: `rec-${id}`, qrIdentifier: id },
+      )),
+      setDoc(doc(db, `organizations/${orgId}/users/inactive-1`), {
+        ...membership("inactive-1", "OPERATOR"), status: "INACTIVE",
+      }),
       setDoc(doc(db, `organizations/${orgId}/inventory_locks/seed-lock`), {
         warehouseId: wh1,
         productId: "CB0301",
@@ -117,10 +142,39 @@ afterEach(async () => {
 })
 
 describe("Firestore security rules (emulator)", () => {
+  rulesTest("requires authenticated active organization and authorized warehouse plus a bounded query", async () => {
+    const path = collectionGroup(testEnv!.authenticatedContext("operator-1").firestore(), "pallets")
+    const scoped = query(path, where("organizationId", "==", orgId), where("warehouseId", "==", wh1), limit(43))
+    await assertSucceeds(getDocs(scoped))
+    await assertSucceeds(getDoc(doc(testEnv!.authenticatedContext("operator-1").firestore(), `organizations/${orgId}/receptions/rec-pallet-wh1/pallets/pallet-wh1`)))
+    await assertFails(getDocs(query(path, where("organizationId", "==", orgId), where("warehouseId", "==", wh2), limit(43))))
+    await assertFails(getDocs(query(path, where("organizationId", "==", orgId), limit(43))))
+    await assertFails(getDocs(query(path, where("organizationId", "==", "other-org"), where("warehouseId", "==", wh1), limit(43))))
+    await assertFails(getDocs(query(path, where("organizationId", "==", orgId), where("warehouseId", "==", wh1))))
+    await assertFails(getDocs(query(path, where("organizationId", "==", orgId), where("warehouseId", "==", wh1), limit(44))))
+    await assertFails(getDocs(query(collectionGroup(testEnv!.unauthenticatedContext().firestore(), "pallets"), where("organizationId", "==", orgId), where("warehouseId", "==", wh1), limit(43))))
+    const inactive = testEnv!.authenticatedContext("inactive-1").firestore()
+    await assertFails(getDocs(query(collectionGroup(inactive, "pallets"), where("organizationId", "==", orgId), where("warehouseId", "==", wh1), limit(43))))
+    await assertFails(getDoc(doc(testEnv!.unauthenticatedContext().firestore(), `organizations/${orgId}/receptions/rec-pallet-wh1/pallets/pallet-wh1`)))
+    await assertFails(getDoc(doc(testEnv!.authenticatedContext("operator-1").firestore(), `organizations/${orgId}/receptions/rec-pallet-wh2/pallets/pallet-wh2`)))
+    for (let i = 0; i < 6; i++) {
+      const db = testEnv!.authenticatedContext(`role-${i}`).firestore()
+      await assertSucceeds(getDocs(query(collectionGroup(db, "pallets"), where("organizationId", "==", orgId), where("warehouseId", "==", wh1), limit(43))))
+    }
+    const adminDb = testEnv!.authenticatedContext("admin-1").firestore()
+    await assertSucceeds(getDocs(query(collectionGroup(adminDb, "pallets"), where("organizationId", "==", orgId), where("warehouseId", "==", wh2), limit(43))))
+  })
+
   rulesTest("allows a member to read canonical warehouse data", async () => {
     const db = testEnv.authenticatedContext("operator-1").firestore()
     await assertSucceeds(
       getDoc(doc(db, `organizations/${orgId}/warehouses/${wh1}`)),
+    )
+    await assertSucceeds(
+      getDocs(query(
+        collection(db, `organizations/${orgId}/warehouses`),
+        where(documentId(), "in", [wh1, wh2]),
+      )),
     )
   })
 
@@ -131,11 +185,19 @@ describe("Firestore security rules (emulator)", () => {
         doc(unauthenticatedDb, `organizations/${orgId}/warehouses/${wh1}`),
       ),
     )
+    await assertFails(getDocs(query(
+      collection(unauthenticatedDb, `organizations/${orgId}/warehouses`),
+      where(documentId(), "in", [wh1, wh2]),
+    )))
 
     const nonMemberDb = testEnv.authenticatedContext("unknown-user").firestore()
     await assertFails(
       getDoc(doc(nonMemberDb, `organizations/${orgId}/warehouses/${wh1}`)),
     )
+    await assertFails(getDocs(query(
+      collection(nonMemberDb, `organizations/${orgId}/warehouses`),
+      where(documentId(), "in", [wh1, wh2]),
+    )))
   })
 
   rulesTest(
@@ -232,6 +294,21 @@ describe("Firestore security rules (emulator)", () => {
             updatedAt: now,
           },
         )
+      }),
+    )
+  })
+
+  rulesTest("denies reception creation without createdAt", async () => {
+    const db = testEnv.authenticatedContext("operator-1").firestore()
+    await assertFails(
+      setDoc(doc(db, `organizations/${orgId}/receptions/reception-no-created-at`), {
+        id: "reception-no-created-at",
+        organizationId: orgId,
+        warehouseId: wh1,
+        status: "DRAFT",
+        operationId: "op-no-created-at",
+        actorUserId: "operator-1",
+        updatedAt: Timestamp.now(),
       }),
     )
   })

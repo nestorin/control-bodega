@@ -1,4 +1,4 @@
-"""Firebase Functions Gen2 - Endpoint OCR con PaddleOCR (Callable + HTTP legacy)."""
+"""Firebase Functions Gen2 - Callable OCR con PaddleOCR."""
 import json
 import base64
 import time
@@ -39,89 +39,6 @@ def _check_rate_limit(uid: str) -> Tuple[bool, int]:
     
     _rate_limit_store[uid].append(now)
     return True, RATE_LIMIT_MAX_REQUESTS - current_count - 1
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# HTTP LEGACY (mantener compatibilidad temporal)
-# ─────────────────────────────────────────────────────────────────────────────
-@https_fn.on_request(cors=CORS_OPTS)
-def extract_ocr(req: https_fn.Request) -> https_fn.Response:
-    """
-    POST multipart/form-data con campo 'file' (PDF, JPG o PNG)
-    Query param opcional: ?tipo=cfdi|oc  (default: cfdi)
-    DEPRECADO: usar Callable Function 'extract_ocr_secure'
-    """
-    if req.method != "POST":
-        return https_fn.Response(
-            json.dumps({"error": "Solo POST permitido"}),
-            status=405,
-            mimetype="application/json"
-        )
-    
-    # Obtener archivo
-    file = req.files.get("file")
-    if not file:
-        return https_fn.Response(
-            json.dumps({"error": "Campo 'file' requerido (multipart/form-data)"}),
-            status=400,
-            mimetype="application/json"
-        )
-    
-    # Validar tipo
-    content_type = (file.content_type or "").lower()
-    if not (content_type.startswith("image/") or content_type == "application/pdf"):
-        return https_fn.Response(
-            json.dumps({"error": "Formato no soportado. Usa PDF, JPG o PNG."}),
-            status=400,
-            mimetype="application/json"
-        )
-    
-    # Tipo de documento
-    doc_type = req.args.get("tipo", "cfdi")  # cfdi | oc
-    
-    try:
-        # Ejecutar OCR
-        document_bytes = file.read()
-        ocr_result = extract_document(document_bytes, content_type)
-        
-        # Parsing según tipo
-        if doc_type == "cfdi":
-            parsed = parse_cfdi(ocr_result["blocks"])
-        elif doc_type == "oc":
-            parsed = parse_orden_compra(ocr_result["blocks"])
-        else:
-            parsed = {"tipo_desconocido": doc_type}
-        
-        response = {
-            "success": True,
-            "ocr": {
-                "blocks": ocr_result["blocks"],
-                "full_text": ocr_result["full_text"]
-            },
-            "parsed": parsed,
-            "tipo": doc_type
-        }
-        # Preview is transient and intentionally not persisted in Firestore.
-        if ocr_result.get("preview"):
-            response["preview"] = {
-                "mimeType": "image/jpeg",
-                "dataUrl": "data:image/jpeg;base64," + base64.b64encode(ocr_result["preview"]).decode("ascii"),
-            }
-        
-        return https_fn.Response(
-            json.dumps(response, ensure_ascii=False),
-            status=200,
-            mimetype="application/json"
-        )
-    
-    except Exception as e:
-        # Log para debugging
-        print(f"OCR Error: {e}")
-        return https_fn.Response(
-            json.dumps({"error": f"Error procesando OCR: {str(e)}"}),
-            status=500,
-            mimetype="application/json"
-        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

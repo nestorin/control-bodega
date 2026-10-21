@@ -1,11 +1,14 @@
 import base64
 import io
+import inspect
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import fitz
 from PIL import Image
+from firebase_functions import https_fn
 
 from ocr import main_secure
 from ocr import paddle_ocr
@@ -32,6 +35,34 @@ class SecurityAndOcrTests(unittest.TestCase):
         secure_source = Path(__file__).parent.joinpath("ocr", "main_secure.py").read_text()
         self.assertIn('allowed_mime_types = {"image/jpeg", "image/png", "image/webp", "application/pdf"}', secure_source)
         self.assertIn("validate=True", secure_source)
+
+    def test_legacy_http_ocr_endpoint_is_not_exported_or_consumed(self):
+        entrypoint = Path(__file__).with_name("main.py").read_text()
+        legacy_module = Path(__file__).parent.joinpath("ocr", "main.py").read_text()
+        frontend_transport = Path(__file__).parents[1].joinpath("src", "services", "paddleOcr.ts").read_text()
+        active_client = Path(__file__).parents[1].joinpath("src", "hooks", "useOcr.ts").read_text()
+
+        self.assertNotIn("from ocr.main import extract_ocr", entrypoint)
+        self.assertNotIn("def extract_ocr(", legacy_module)
+        self.assertNotIn("extractWithPaddleOcr", frontend_transport)
+        self.assertNotIn("/extract_ocr?tipo=", frontend_transport)
+        self.assertIn('"extract_ocr_secure"', active_client)
+
+    def test_secure_callable_does_not_return_internal_ocr_exception(self):
+        request = SimpleNamespace(
+            auth=SimpleNamespace(uid="internal-error-test-user"),
+            data={
+                "fileBase64": base64.b64encode(b"document").decode("ascii"),
+                "mimeType": "application/pdf",
+                "tipo": "cfdi",
+            },
+        )
+
+        with patch.object(main_secure, "extract_document", side_effect=RuntimeError("private parser detail")):
+            with self.assertRaises(https_fn.HttpsError) as raised:
+                inspect.unwrap(main_secure.extract_ocr_secure)(request)
+
+        self.assertNotIn("private parser detail", raised.exception.message)
 
     def test_image_only_pdf_processes_every_page(self):
         document = fitz.open()

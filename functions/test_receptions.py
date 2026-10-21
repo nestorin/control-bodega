@@ -2,7 +2,13 @@ import unittest
 
 from firebase_functions import https_fn
 
-from receptions import _canonical_warehouse_id, _digest, _operation_result, _validate_operation_id
+from receptions import (
+    _canonical_warehouse_id,
+    _digest,
+    _operation_result,
+    _transaction_snapshot,
+    _validate_operation_id,
+)
 
 
 class ReceptionCommandContractTests(unittest.TestCase):
@@ -28,6 +34,22 @@ class ReceptionCommandContractTests(unittest.TestCase):
         self.assertEqual(_operation_result(Snapshot(), "create_reception", "digest"), {"receptionId": "r"})
         with self.assertRaises(https_fn.HttpsError):
             _operation_result(Snapshot(), "confirm", "digest")
+
+    def test_transaction_snapshot_supports_single_snapshot_and_iterable_apis(self):
+        class Snapshot:
+            exists = True
+
+        class Transaction:
+            def __init__(self, result):
+                self.result = result
+
+            def get(self, _reference):
+                return self.result
+
+        snapshot = Snapshot()
+        self.assertIs(_transaction_snapshot(Transaction(snapshot), "ref"), snapshot)
+        self.assertIs(_transaction_snapshot(Transaction(iter([snapshot])), "ref"), snapshot)
+        self.assertIsNone(_transaction_snapshot(Transaction(iter([])), "ref"))
 
 
 if __name__ == "__main__":

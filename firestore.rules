@@ -3,14 +3,10 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ===== ROOT-LEVEL COLLECTION GROUP RULES =====
-    // Pallets collection group (for QR lookup across all organizations)
-    // This rule is evaluated for collection group queries on "pallets"
+    // Collection-group reads use document data because no organization path
+    // variable is available at this match level.
     match /{path=**}/pallets/{palletId} {
-      allow list: if request.query.limit != null;
-      allow get: if resource.data.organizationId != null &&
-        resource.data.warehouseId != null &&
-        isMemberOf(resource.data.organizationId) &&
-        canAccessWarehouse(resource.data.organizationId, resource.data.warehouseId);
+      allow list: if isAuthorizedPallet(resource.data) && isBoundedPalletQuery();
     }
 
     // ===== HELPER FUNCTIONS =====
@@ -57,6 +53,18 @@ service cloud.firestore {
         (membership.data.warehouseIds is list &&
           membership.data.warehouseIds.hasAny([warehouseId]))
       );
+    }
+
+    function isAuthorizedPallet(data) {
+      return request.auth != null && data.organizationId is string &&
+        data.warehouseId is string && isMemberOf(data.organizationId) &&
+        canAccessWarehouse(data.organizationId, data.warehouseId);
+    }
+
+    // Pagination bound only; authorization is independently enforced above.
+    function isBoundedPalletQuery() {
+      return request.query.limit is int && request.query.limit > 0 &&
+        request.query.limit <= 43;
     }
 
     // Operational records must remain assigned to their original warehouse.
@@ -288,7 +296,11 @@ service cloud.firestore {
 
         // ---- SUB-COLLECTION: PALLETS (QR) ----
         match /pallets/{palletId} {
-          allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId);
+          allow get: if resource.data.organizationId == orgId &&
+            isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId);
+          allow list: if resource.data.organizationId == orgId &&
+            isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId) &&
+            isBoundedPalletQuery();
           allow create: if isMemberOf(orgId) &&
             canAccessWarehouse(orgId,
               getAfter(/databases/$(database)/documents/organizations/$(orgId)/receptions/$(receptionId)).data.warehouseId) &&
@@ -314,7 +326,11 @@ service cloud.firestore {
       // ===== COLLECTION GROUP: PALLETS (for QR lookup) =====
       // Allows reading pallets by qrIdentifier across all receptions
       match /{path=**}/pallets/{palletId} {
-        allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId);
+        allow get: if resource.data.organizationId == orgId &&
+          isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId);
+        allow list: if resource.data.organizationId == orgId &&
+          isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId) &&
+          isBoundedPalletQuery();
       }
 
       // ===== INVENTORY MOVEMENTS (IMMUTABLE AFTER CREATE) =====

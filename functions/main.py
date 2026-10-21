@@ -1,7 +1,7 @@
 # functions/main.py - Entry point para Firebase Functions Gen2 (Python)
 # Re-exporta las funciones desde el módulo ocr
 
-from ocr.main import extract_ocr, health
+from ocr.main import health
 from ocr.main_secure import extract_ocr_secure
 from shipments import confirm_shipment
 from rbac import adjust_inventory, import_inventory, update_membership

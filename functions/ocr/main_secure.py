@@ -62,7 +62,7 @@ def require_auth(func):
     return wrapper
 
 # ===== CALLABLE FUNCTION PRINCIPAL =====
-@https_fn.on_call(cors=CORS_OPTS)
+@https_fn.on_call(cors=CORS_OPTS, enforce_app_check=True)
 @require_auth
 def extract_ocr_secure(req: https_fn.CallableRequest) -> dict:
     """
@@ -144,7 +144,7 @@ def extract_ocr_secure(req: https_fn.CallableRequest) -> dict:
         raise  # Re-lanzar errores conocidos
     except Exception as e:
         print(f"OCR Error for user {req.auth.uid if req.auth else 'unknown'}: {e}")
-        raise https_fn.HttpsError("internal", f"Error procesando OCR: {str(e)}")
+        raise https_fn.HttpsError("internal", "Error procesando OCR")
 
 
 # ===== HEALTH CHECK (público, sin auth) =====

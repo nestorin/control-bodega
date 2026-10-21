@@ -1,0 +1,37 @@
+# Python
+**/__pycache__/**
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/venv/**
+**/.venv/**
+**/env/**
+**/.env/**
+**/pip-wheel-metadata/**
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+*.cover
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log
+
+# Local config
+.local/
