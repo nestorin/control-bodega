@@ -1058,6 +1058,7 @@ function AppLayout() {
                 )
               }}
               onRecepciones={() => navigate("recepciones", "recepciones")}
+              onEscanearQr={() => navigate("escanear-qr", "qr")}
             />
           )}
           {screen === "programacion-recepcion" && (

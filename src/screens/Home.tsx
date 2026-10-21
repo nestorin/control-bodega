@@ -11,9 +11,14 @@ const imgWarehouse = `${assetPathPrefix}/0d81c.svg`
 interface HomeProps {
   onNewReception: () => void
   onRecepciones: () => void
+  onEscanearQr: () => void
 }
 
-export default function Home({ onNewReception, onRecepciones }: HomeProps) {
+export default function Home({
+  onNewReception,
+  onRecepciones,
+  onEscanearQr,
+}: HomeProps) {
   return (
     <div className="flex flex-col gap-4 md:gap-5 p-4 md:p-7 size-full overflow-auto">
       {/* Header section */}
@@ -64,6 +69,7 @@ export default function Home({ onNewReception, onRecepciones }: HomeProps) {
           description="Consultar y editar"
         />
         <QuickActionCard
+          onClick={onEscanearQr}
           iconSrc={imgScanQrCode}
           iconBackgroundClassName="bg-[#e7f0f2]"
           title="Escanear QR"

@@ -6,9 +6,14 @@ describe("Home dashboard presentation", () => {
   it("keeps dashboard actions wired to the screen callbacks", () => {
     const onNewReception = vi.fn()
     const onRecepciones = vi.fn()
+    const onEscanearQr = vi.fn()
 
     render(
-      <Home onNewReception={onNewReception} onRecepciones={onRecepciones} />,
+      <Home
+        onNewReception={onNewReception}
+        onRecepciones={onRecepciones}
+        onEscanearQr={onEscanearQr}
+      />,
     )
 
     fireEvent.click(screen.getByRole("button", { name: "Nueva recepción" }))
@@ -19,11 +24,18 @@ describe("Home dashboard presentation", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Recepciones/ }))
     expect(onRecepciones).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole("button", { name: /Escanear QR/ }))
+    expect(onEscanearQr).toHaveBeenCalledTimes(1)
   })
 
   it("preserves responsive classes and dashboard content", () => {
     const { container } = render(
-      <Home onNewReception={vi.fn()} onRecepciones={vi.fn()} />,
+      <Home
+        onNewReception={vi.fn()}
+        onRecepciones={vi.fn()}
+        onEscanearQr={vi.fn()}
+      />,
     )
 
     expect(screen.getByText("Recepción sin vueltas")).toBeInTheDocument()
