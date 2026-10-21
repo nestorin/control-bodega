@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
 import type { User } from "firebase/auth";
@@ -11,6 +11,8 @@ import { useAuth, type UserProfile } from "@/context/AuthContext";
 vi.mock("@/context/AuthContext", () => ({
   useAuth: vi.fn(),
 }));
+
+vi.mock("react-router-dom", async () => await vi.importActual("react-router-dom"));
 
 const activeProfile: UserProfile = {
   userId: "user-1",
@@ -37,12 +39,26 @@ function authState(overrides: Record<string, unknown> = {}) {
   } as ReturnType<typeof useAuth>;
 }
 
+function RedirectReasonProbe() {
+  const location = useLocation();
+  const reason = ((location.state ?? {}) as { reason?: string }).reason;
+  return <span data-testid="redirect-reason">{JSON.stringify(reason ?? null)}</span>;
+}
+
 function renderRoute(props: Partial<ComponentProps<typeof ProtectedRoute>> = {}) {
   render(
     <MemoryRouter initialEntries={["/recepciones"]}>
       <Routes>
         <Route path="/login" element={<div>Login page</div>} />
-        <Route path="/unauthorized" element={<div>Unauthorized page</div>} />
+        <Route
+          path="/unauthorized"
+          element={
+            <div>
+              <div>Unauthorized page</div>
+              <RedirectReasonProbe />
+            </div>
+          }
+        />
         <Route
           path="/recepciones"
           element={
@@ -115,5 +131,27 @@ describe("ProtectedRoute", () => {
     renderRoute({ requiredWarehouseId: "warehouse-2" });
 
     expect(screen.getByText("Unauthorized page")).toBeInTheDocument();
+  });
+
+  it("carries the access-status reason when the membership is not active", () => {
+    vi.mocked(useAuth).mockReturnValue(
+      authState({ profile: { ...activeProfile, status: "PENDING" }, accessStatus: "PENDING" }),
+    );
+
+    renderRoute();
+
+    expect(screen.getByTestId("redirect-reason")).toHaveTextContent('"PENDING"');
+  });
+
+  it("carries the role reason when the role check fails", () => {
+    renderRoute({ allowedRoles: ["ADMIN"] });
+
+    expect(screen.getByTestId("redirect-reason")).toHaveTextContent('"role"');
+  });
+
+  it("carries the warehouse reason when the warehouse check fails", () => {
+    renderRoute({ requiredWarehouseId: "warehouse-2" });
+
+    expect(screen.getByTestId("redirect-reason")).toHaveTextContent('"warehouse"');
   });
 });

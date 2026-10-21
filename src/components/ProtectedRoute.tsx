@@ -37,15 +37,15 @@ export function ProtectedRoute({
   }
 
   if (accessStatus !== "ACTIVE" || !profile) {
-    return <Navigate to="/unauthorized" replace />;
+    return <Navigate to="/unauthorized" replace state={{ reason: accessStatus }} />;
   }
 
   if (allowedRoles?.length && !hasRole(allowedRoles)) {
-    return <Navigate to="/unauthorized" replace />;
+    return <Navigate to="/unauthorized" replace state={{ reason: "role" }} />;
   }
 
   if (requiredWarehouseId && !canAccessWarehouse(requiredWarehouseId)) {
-    return <Navigate to="/unauthorized" replace />;
+    return <Navigate to="/unauthorized" replace state={{ reason: "warehouse" }} />;
   }
 
   return <>{children}</>;
