@@ -229,6 +229,19 @@ jobs:
           npm install -g firebase-tools
           firebase deploy --only firestore:rules,firestore:indexes --project exepa-almacen-safe
 
+      # The firebase CLI requires the Python functions source to ship a venv
+      # containing the Functions SDK (same requirement the E2E job satisfies
+      # for the functions emulator).
+      - name: Set up Python for Functions deploy
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build Functions virtualenv
+        run: |
+          python -m venv functions/venv
+          functions/venv/bin/python -m pip install --disable-pip-version-check -r functions/requirements.txt
+
       - name: Deploy Functions
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa/sa.json
