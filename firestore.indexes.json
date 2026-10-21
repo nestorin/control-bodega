@@ -4,150 +4,150 @@
       "collectionGroup": "receptions",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "warehouseId", "order": "ASCENDING"},
-        {"fieldPath": "createdAt", "order": "DESCENDING"}
+        { "fieldPath": "warehouseId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
       "collectionGroup": "receptions",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "warehouseId", "order": "ASCENDING"},
-        {"fieldPath": "status", "order": "ASCENDING"},
-        {"fieldPath": "createdAt", "order": "DESCENDING"}
+        { "fieldPath": "warehouseId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
       "collectionGroup": "receptions",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "purchaseOrderId", "order": "ASCENDING"},
-        {"fieldPath": "createdAt", "order": "DESCENDING"}
+        { "fieldPath": "purchaseOrderId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
       "collectionGroup": "pallets",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "receptionId", "order": "ASCENDING"},
-        {"fieldPath": "createdAt", "order": "ASCENDING"}
+        { "fieldPath": "receptionId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
       ]
     },
     {
       "collectionGroup": "pallets",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "warehouseId", "order": "ASCENDING"},
-        {"fieldPath": "status", "order": "ASCENDING"},
-        {"fieldPath": "createdAt", "order": "DESCENDING"}
+        { "fieldPath": "warehouseId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
       "collectionGroup": "pallets",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        {"fieldPath": "qrIdentifier", "order": "ASCENDING"},
-        {"fieldPath": "organizationId", "order": "ASCENDING"}
+        { "fieldPath": "qrIdentifier", "order": "ASCENDING" },
+        { "fieldPath": "organizationId", "order": "ASCENDING" }
       ]
     },
     {
       "collectionGroup": "inventory_movements",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "warehouseId", "order": "ASCENDING"},
-        {"fieldPath": "productId", "order": "ASCENDING"},
-        {"fieldPath": "occurredAt", "order": "DESCENDING"}
+        { "fieldPath": "warehouseId", "order": "ASCENDING" },
+        { "fieldPath": "productId", "order": "ASCENDING" },
+        { "fieldPath": "occurredAt", "order": "DESCENDING" }
       ]
     },
     {
       "collectionGroup": "inventory_movements",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "operationId", "order": "ASCENDING"},
-        {"fieldPath": "occurredAt", "order": "ASCENDING"}
+        { "fieldPath": "operationId", "order": "ASCENDING" },
+        { "fieldPath": "occurredAt", "order": "ASCENDING" }
       ]
     },
     {
       "collectionGroup": "shipments",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "warehouseId", "order": "ASCENDING"},
-        {"fieldPath": "createdAt", "order": "DESCENDING"}
+        { "fieldPath": "warehouseId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
       "collectionGroup": "shipments",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "warehouseId", "order": "ASCENDING"},
-        {"fieldPath": "status", "order": "ASCENDING"},
-        {"fieldPath": "createdAt", "order": "DESCENDING"}
+        { "fieldPath": "warehouseId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
       "collectionGroup": "embarques",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "warehouseId", "order": "ASCENDING"},
-        {"fieldPath": "status", "order": "ASCENDING"},
-        {"fieldPath": "createdAt", "order": "DESCENDING"}
+        { "fieldPath": "warehouseId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
       "collectionGroup": "embarques",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "pedidoId", "order": "ASCENDING"},
-        {"fieldPath": "createdAt", "order": "DESCENDING"}
+        { "fieldPath": "pedidoId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
       "collectionGroup": "tarimas",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "embarqueId", "order": "ASCENDING"},
-        {"fieldPath": "status", "order": "ASCENDING"}
+        { "fieldPath": "embarqueId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
       ]
     },
     {
       "collectionGroup": "tarimas",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "embarqueId", "order": "ASCENDING"},
-        {"fieldPath": "tarimaIndex", "order": "ASCENDING"}
+        { "fieldPath": "embarqueId", "order": "ASCENDING" },
+        { "fieldPath": "tarimaIndex", "order": "ASCENDING" }
       ]
     },
     {
       "collectionGroup": "audit_events",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "entityType", "order": "ASCENDING"},
-        {"fieldPath": "entityId", "order": "ASCENDING"},
-        {"fieldPath": "occurredAt", "order": "DESCENDING"}
+        { "fieldPath": "entityType", "order": "ASCENDING" },
+        { "fieldPath": "entityId", "order": "ASCENDING" },
+        { "fieldPath": "occurredAt", "order": "DESCENDING" }
       ]
     },
     {
       "collectionGroup": "audit_events",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "actorUserId", "order": "ASCENDING"},
-        {"fieldPath": "occurredAt", "order": "DESCENDING"}
+        { "fieldPath": "actorUserId", "order": "ASCENDING" },
+        { "fieldPath": "occurredAt", "order": "DESCENDING" }
       ]
     },
     {
       "collectionGroup": "lotes_caducidades",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "warehouseId", "order": "ASCENDING"},
-        {"fieldPath": "createdAt", "order": "DESCENDING"}
+        { "fieldPath": "warehouseId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
       "collectionGroup": "lotes_caducidades",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "warehouseId", "order": "ASCENDING"},
-        {"fieldPath": "productId", "order": "ASCENDING"}
+        { "fieldPath": "warehouseId", "order": "ASCENDING" },
+        { "fieldPath": "productId", "order": "ASCENDING" }
       ]
     }
   ],
