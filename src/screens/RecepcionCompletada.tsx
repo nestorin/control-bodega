@@ -128,7 +128,7 @@ export default function RecepcionCompletada({
       if (!isOnline) {
         enqueue({
           type: "update",
-          collectionPath: `organizations/{orgId}/receptions`,
+          collectionPath: "organizations/{orgId}/receptions",
           docId: receptionId,
           data: { status: "CONFIRMED", receivedAt: Date.now() },
           operationId: `op-${Date.now()}-confirm`,

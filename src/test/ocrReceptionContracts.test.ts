@@ -150,7 +150,9 @@ describe("reception preview rules contract", () => {
     expect(previewRule).toContain(
       ".hasOnly(['invoicePreviewPath', 'invoicePreviewUrl', 'updatedAt'])",
     )
-    expect(previewRule).toContain("'receptions/' + receptionId")
+    expect(previewRule).toContain(
+      "invoicePreviewPath.matches('^receptions/' + receptionId + '/invoice-preview\\\\.(jpg|jpeg)$')",
+    )
     expect(
       rules.match(/isValidReception\(request\.resource\.data\)/g),
     ).toHaveLength(2)

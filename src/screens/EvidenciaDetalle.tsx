@@ -144,7 +144,7 @@ function EditablePhotoCard({
   )
 }
 
-function InfoRow({ label, value }: { label: string value: string }) {
+function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-4 py-[11px] border-b border-[#edf1f3] last:border-0">
       <p

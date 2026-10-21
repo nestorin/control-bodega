@@ -6,7 +6,7 @@ interface UseScannerReturn {
   // Estado
   scanning: boolean
   lastScanned: Tarima | null
-  autoFillData: { lote?: string caducidad?: Date } | null
+  autoFillData: { lote?: string; caducidad?: Date } | null
   error: string | null
 
   // Acciones

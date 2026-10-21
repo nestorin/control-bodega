@@ -7,12 +7,28 @@ interface Props {
   recId: string
   onBack: () => void
   onSave: () => void
+  readOnly?: boolean
+  initialData?: {
+    tarimas?: number
+    proveedor?: string
+    proveedorLogistico?: string
+  }
 }
 
-export default function EditarRecepcion({ recId, onBack, onSave }: Props) {
-  const [tarimas, setTarimas] = useState("20")
-  const [proveedor, setProveedor] = useState("Distribuidora del Norte")
-  const [proveedorLog, setProveedorLog] = useState("Logística Veloz")
+export default function EditarRecepcion({
+  recId,
+  onBack,
+  onSave,
+  readOnly = false,
+  initialData,
+}: Props) {
+  const [tarimas, setTarimas] = useState(String(initialData?.tarimas ?? 20))
+  const [proveedor, setProveedor] = useState(
+    initialData?.proveedor ?? "Distribuidora del Norte",
+  )
+  const [proveedorLog, setProveedorLog] = useState(
+    initialData?.proveedorLogistico ?? "Logística Veloz",
+  )
   const [saved, setSaved] = useState(false)
 
   function handleSave() {
@@ -52,7 +68,7 @@ export default function EditarRecepcion({ recId, onBack, onSave }: Props) {
             className="bg-[#fff5dd] text-[#8e592e] text-[11px] font-bold px-3 py-1 rounded-full"
             style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
           >
-            EDITANDO · {recId}
+            {readOnly ? "CONSULTANDO" : "EDITANDO"} · {recId}
           </span>
         </div>
 
@@ -77,7 +93,8 @@ export default function EditarRecepcion({ recId, onBack, onSave }: Props) {
             <input
               value={value}
               onChange={(e) => set(e.target.value)}
-              className="bg-white border border-[#dce4e7] min-h-12 px-[14px] py-3 rounded-lg w-full font-semibold text-[#172126] text-[15px] outline-none focus:border-[#3276a8] transition-colors"
+              readOnly={readOnly}
+              className={`bg-white border border-[#dce4e7] min-h-12 px-[14px] py-3 rounded-lg w-full font-semibold text-[#172126] text-[15px] outline-none focus:border-[#3276a8] transition-colors ${readOnly ? "cursor-default bg-[#f4f7f8]" : ""}`}
               style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}
             />
             {hint && (
@@ -118,27 +135,48 @@ export default function EditarRecepcion({ recId, onBack, onSave }: Props) {
               Cancelar
             </p>
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saved}
-            className="flex gap-2 h-[52px] items-center justify-center px-5 rounded-[14px] cursor-pointer transition-all"
-            style={{
-              background: saved ? "#e2f5ec" : "#16343f",
-              border: "none",
-            }}
-          >
-            <img alt="" className="size-[18px]" src={imgCheck} />
-            <p
-              className="font-bold text-[15px] whitespace-nowrap"
+          {readOnly ? (
+            <button
+              type="button"
+              disabled
+              aria-label="Editar recepción"
+              className="flex gap-2 h-[52px] items-center justify-center px-5 rounded-[14px] cursor-not-allowed transition-all"
+              style={{ background: "#e9eef0", border: "none" }}
+            >
+              <p
+                className="font-bold text-[15px] whitespace-nowrap"
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontWeight: 700,
+                  color: "#607078",
+                }}
+              >
+                Editar recepción
+              </p>
+            </button>
+          ) : (
+            <button
+              onClick={handleSave}
+              disabled={saved}
+              className="flex gap-2 h-[52px] items-center justify-center px-5 rounded-[14px] cursor-pointer transition-all"
               style={{
-                fontFamily: "'Inter', sans-serif",
-                fontWeight: 700,
-                color: saved ? "#16845b" : "white",
+                background: saved ? "#e2f5ec" : "#16343f",
+                border: "none",
               }}
             >
-              {saved ? "Guardado ✓" : "Guardar cambios"}
-            </p>
-          </button>
+              <img alt="" className="size-[18px]" src={imgCheck} />
+              <p
+                className="font-bold text-[15px] whitespace-nowrap"
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontWeight: 700,
+                  color: saved ? "#16845b" : "white",
+                }}
+              >
+                {saved ? "Guardado ✓" : "Guardar cambios"}
+              </p>
+            </button>
+          )}
         </div>
       </div>
 
@@ -160,7 +198,7 @@ export default function EditarRecepcion({ recId, onBack, onSave }: Props) {
           className="text-[#172126] text-lg text-center"
           style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
         >
-          Recepción en edición
+          {readOnly ? "Recepción en consulta" : "Recepción en edición"}
         </p>
         <p
           className="text-[#607078] text-[14px] text-center leading-relaxed"

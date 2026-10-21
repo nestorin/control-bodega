@@ -6,15 +6,19 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: "jsdom",
-    setupFiles: ["./vitest.setup.ts"],
+    setupFiles: ["./vitest.polyfill.ts", "./vitest.setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
-    exclude: ["src/test/ocrReceptionContracts.test.ts"], // Node.js only test
+    // Firestore emulator integration tests run only through `pnpm test:rules`.
+    // Keeping them out of the unit suite prevents a missing emulator from
+    // becoming skipped or misleading coverage.
+    exclude: ["src/test/services/palletService.getByQR.test.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html", "lcov"],
       exclude: [
         "node_modules/",
         "vitest.setup.ts",
+        "vitest.polyfill.ts",
         "src/main.tsx",
         "src/vite-env.d.ts",
         "src/**/*.test.{ts,tsx}",
@@ -36,16 +40,27 @@ export default defineConfig({
       },
     },
     globals: true,
-    // Fix React 19 act() compatibility
+    // Force development React build for act() support
     environmentOptions: {
-      customExportConditions: ["react-19"],
+      customExportConditions: ["development"],
     },
     testTimeout: 10000,
     hookTimeout: 10000,
+    pool: "vmThreads",
+    // Force NODE_ENV=development for test environment
+    env: {
+      NODE_ENV: "development",
+    },
   },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "react": path.resolve(__dirname, "./node_modules/react"),
+      "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
     },
+  },
+  // Ensure react plugin uses development build
+  define: {
+    "process.env.NODE_ENV": "\"development\"",
   },
 })

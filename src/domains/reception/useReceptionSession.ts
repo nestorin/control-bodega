@@ -68,7 +68,7 @@ type Action = {
   type: "START"
   data: ReceptionSessionData
   phase: ReceptionSessionPhase
-} | { type: "TRANSITION" phase: ReceptionSessionPhase } | { type: "END" }
+} | { type: "TRANSITION"; phase: ReceptionSessionPhase } | { type: "END" }
 
 function reducer(session: ReceptionSession, action: Action): ReceptionSession {
   if (action.type === "START") return { phase: action.phase, data: action.data }

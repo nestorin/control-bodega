@@ -239,10 +239,35 @@ export default function CapturaEvidencia({
   const [saved, setSaved] = useState(false)
   const [saveNotice, setSaveNotice] = useState(false)
 
+  // TEST-ONLY: Load test data from localStorage for legacy mode
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('test') === 'legacy-captura-evidencia') {
+      try {
+        const saved = localStorage.getItem('test-evidencia-form')
+        if (saved) {
+          const data = JSON.parse(saved)
+          setForm({
+            proveedor: data.proveedor || "",
+            item: data.item || "",
+            tarimas: data.tarimas || "",
+            caducidad: data.caducidad || "",
+            lote: data.lote || "",
+          })
+        }
+      } catch (e) {
+        console.warn('[TEST] No se pudo leer test-evidencia-form:', e)
+      }
+    }
+  }, [])
+
   // Firestore integration
   const { canQuery, user } = useAuthorization()
-  const useFirestore =
-    isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery
+  
+  // TEST-ONLY: Disable Firestore in test mode to avoid emulator connection issues
+  const isTestMode = new URLSearchParams(window.location.search).get('test') === 'legacy-captura-evidencia'
+  const useFirestore = !isTestMode && isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery
+  
   const [fsServices, setFsServices] =
     useState<ReturnType<typeof createFirestoreServices> | null>(null)
   const [firestoreReady, setFirestoreReady] = useState(false)

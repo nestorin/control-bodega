@@ -24,7 +24,7 @@ export async function uploadInvoicePreviewWithMetadata<T>(
   storage: FirebaseStorage,
   receptionId: string,
   dataUrl: string,
-  persistMetadata: (metadata: { path: string url: string }) => Promise<T>,
+  persistMetadata: (metadata: { path: string; url: string }) => Promise<T>,
 ): Promise<T> {
   const evidence = await uploadInvoicePreview(storage, receptionId, dataUrl)
   try {

@@ -11,6 +11,7 @@ import {
   writeBatch,
   runTransaction,
   collectionGroup,
+  documentId,
   updateDoc,
   setDoc,
   deleteDoc,
@@ -21,6 +22,7 @@ import {
 import { getFunctions, httpsCallable } from "firebase/functions"
 import { BaseService } from "./baseService"
 import { InventoryService } from "./inventoryService"
+import { WAREHOUSE_IDS } from "@/config/warehouses"
 import type {
   WarehouseDoc,
   SupplierDoc,
@@ -47,6 +49,18 @@ export class WarehouseService extends BaseService<WarehouseDoc> {
   }
   protected getAuditEntityType() {
     return "warehouse"
+  }
+
+  async getCanonical(): Promise<{ data: WarehouseDoc[] }> {
+    const q = query(
+      this.getCollectionRef(),
+      where(documentId(), "in", Object.values(WAREHOUSE_IDS)),
+    )
+    const snap = await getDocs(q)
+    const data = snap.docs
+      .map((warehouse) => this.fromFirestore(warehouse))
+      .sort((left, right) => (left.code ?? "").localeCompare(right.code ?? ""))
+    return { data }
   }
 }
 
@@ -349,17 +363,34 @@ export class PalletService extends BaseService<PalletDoc> {
     )
   }
 
-  async getByQR(qrIdentifier: string): Promise<PalletDoc | null> {
+  async getByQR(
+    qrIdentifier: string,
+    authorizedWarehouseIds: string[],
+  ): Promise<PalletDoc | null> {
+    if (authorizedWarehouseIds.length === 0) return null
     const results = await this.collectionGroupQuery("pallets", {
-      where: [["qrIdentifier", "==", qrIdentifier]],
+      where: [
+        ["qrIdentifier", "==", qrIdentifier],
+        ["warehouseId", authorizedWarehouseIds.length === 1 ? "==" : "in",
+          authorizedWarehouseIds.length === 1 ? authorizedWarehouseIds[0] : authorizedWarehouseIds],
+      ],
       limit: 1,
     })
     return results[0] || null
   }
 
-  async getByReception(receptionId: string): Promise<PalletDoc[]> {
+  async getByReception(
+    receptionId: string,
+    authorizedWarehouseIds: string[],
+  ): Promise<PalletDoc[]> {
+    if (authorizedWarehouseIds.length === 0) return []
     return this.collectionGroupQuery("pallets", {
-      where: [["receptionId", "==", receptionId]],
+      where: [
+        ["receptionId", "==", receptionId],
+        ["warehouseId", authorizedWarehouseIds.length === 1 ? "==" : "in",
+          authorizedWarehouseIds.length === 1 ? authorizedWarehouseIds[0] : authorizedWarehouseIds],
+      ],
+      limit: 43,
     })
   }
 
@@ -371,7 +402,7 @@ export class PalletService extends BaseService<PalletDoc> {
       ["warehouseId", "==", warehouseId],
     ]
     if (status) whereClauses.push(["status", "==", status])
-    return this.collectionGroupQuery("pallets", { where: whereClauses })
+    return this.collectionGroupQuery("pallets", { where: whereClauses, limit: 43 })
   }
 
   // Create multiple pallets in a transaction with inventory movements
@@ -551,7 +582,7 @@ export class ShipmentService extends BaseService<ShipmentDoc> {
   // Validate stock availability for all shipment lines
   async validateStock(warehouseId: string, lines: ShipmentLine[]): Promise<{
     valid: boolean
-    missing: Array<{ productId: string requested: number available: number }>
+    missing: Array<{ productId: string; requested: number; available: number }>
   }> {
     const inventoryService = new InventoryService(this.db, this.orgId)
     const missing: Array<{
@@ -950,7 +981,7 @@ export class LotCaducidadService extends BaseService<LotCaducidadDoc> {
           organizationId: this.orgId,
           createdAt: now,
           updatedAt: now,
-        } as LotCaducidadDoc & { createdAt: any updatedAt: any })
+        } as LotCaducidadDoc & { createdAt: any; updatedAt: any })
         batch.set(ref, docData)
         created.push(docData as LotCaducidadDoc)
       }

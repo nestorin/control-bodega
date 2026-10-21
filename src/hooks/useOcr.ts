@@ -74,7 +74,19 @@ export function useOcr() {
     setIsPdfPreview(false)
   }, [])
 
-  return { runOcr, loading, result, error, clear, previewDataUrl, previewFileName, isPdfPreview, setPreviewDataUrl, setPreviewFileName, setIsPdfPreview }
+  return {
+    runOcr,
+    loading,
+    result,
+    error,
+    clear,
+    previewDataUrl,
+    previewFileName,
+    isPdfPreview,
+    setPreviewDataUrl,
+    setPreviewFileName,
+    setIsPdfPreview,
+  }
 }
 
 function fileToBase64(file: File): Promise<string> {

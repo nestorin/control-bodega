@@ -27,7 +27,7 @@ export interface ProgramacionRecepcionData {
 
 export async function generateProgramacionRecepcionPdf(
   data: ProgramacionRecepcionData,
-): Promise<{ blob: Blob dataUrl: string filename: string }> {
+): Promise<{ blob: Blob; dataUrl: string; filename: string }> {
   const sections = [
     {
       title: "INFORMACIÓN GENERAL",

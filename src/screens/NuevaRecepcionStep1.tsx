@@ -5,7 +5,6 @@ import { isFeatureEnabled } from "@/config/featureFlags"
 import { createFirestoreServices } from "@/services/firestore"
 import { db, storage } from "@/lib/firebase"
 import { uploadInvoicePreviewWithMetadata } from "@/services/invoiceEvidence"
-import { useOfflineQueue } from "@/hooks/useFirestore"
 import {
   getReceptionOcrDocumentType,
   mapOcrProductsToReceptionForm,
@@ -13,6 +12,11 @@ import {
 } from "@/services/receptionMappers"
 import { useAuthorization } from "@/hooks/useAuthorization"
 import { WAREHOUSE_IDS } from "@/config/warehouses"
+import {
+  ReceptionSubmission,
+  type ReceptionSubmissionStatus,
+} from "@/domains/reception/receptionSubmission"
+import { Panel, TouchTarget } from "@/components/ui"
 
 const assetPathPrefix = "/assets"
 const imgFileUp = `${assetPathPrefix}/928ba.svg`
@@ -78,6 +82,18 @@ interface Props {
     proveedor: string
     proveedorLogistico: string
     receptionId?: string
+    conversionesTabla?: Array<{
+      producto: string
+      productId?: string | null
+      codigo: string
+      unidades: number
+      unidad: string
+      piezasPorCaja: number
+      cajasPorTarima: number
+      cajas: number
+      tarimas: number
+      stickers: number
+    }>
     productos?: Array<{
       productId: string | null
       codigo: string | null
@@ -96,17 +112,12 @@ interface Props {
     cajasPorTarima: number
   }>
 }
+type ReceptionFormData = Parameters<Props["onContinue"]>[0]
 
 export default function NuevaRecepcionStep1({
-  onContinue,
-  onBack,
-  initialData,
-  catalogos,
-  catalogosStatus,
-  conversiones,
+  ...props
 }: Props) {
-  // Guard: don't render until catalogs are loaded (prevents empty logistics provider list)
-  if (catalogosStatus?.loading) {
+  if (props.catalogosStatus?.loading) {
     return (
       <div
         className="flex flex-col gap-4 p-6"
@@ -123,6 +134,17 @@ export default function NuevaRecepcionStep1({
     )
   }
 
+  return <NuevaRecepcionStep1Form {...props} />
+}
+
+function NuevaRecepcionStep1Form({
+  onContinue,
+  onBack,
+  initialData,
+  catalogos,
+  catalogosStatus,
+  conversiones,
+}: Props) {
   const [hasOC, setHasOC] = useState<boolean | null>(initialData?.hasOC ?? true)
   const [showNoOCNotice, setShowNoOCNotice] = useState(false)
   const [ocFolio, setOcFolio] = useState(initialData?.ocFolio ?? "OC-24891")
@@ -146,10 +168,35 @@ export default function NuevaRecepcionStep1({
     useState<ReturnType<typeof createFirestoreServices> | null>(null)
   const [firestoreReady, setFirestoreReady] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [submissionStatus, setSubmissionStatus] =
+    useState<ReceptionSubmissionStatus>("idle")
+  const [submissionError, setSubmissionError] = useState<string | null>(null)
+  const operationIdRef = useRef<string | null>(null)
+  const submissionRef = useRef<ReceptionSubmission<{ id: string }> | null>(null)
+  const submissionFormRef = useRef<ReceptionFormData | null>(null)
+  const continuedRef = useRef(false)
+
+  function continueOnce(data: ReceptionFormData) {
+    if (continuedRef.current) return
+    continuedRef.current = true
+    onContinue(data)
+  }
+
+  function getOperationId() {
+    if (!operationIdRef.current) {
+      const randomPart = Array.from(
+        crypto.getRandomValues(new Uint8Array(16)),
+        (byte) => byte.toString(16).padStart(2, "0"),
+      ).join("")
+      operationIdRef.current = `REC-${Date.now()}-${randomPart}`
+    }
+    return operationIdRef.current
+  }
 
   // NUEVO: Tabla de conversiones y stickers calculados
   const [conversionesTabla, setConversionesTabla] = useState<Array<{
     producto: string
+    productId?: string | null
     codigo: string
     unidades: number
     unidad: string
@@ -158,13 +205,17 @@ export default function NuevaRecepcionStep1({
     cajas: number
     tarimas: number
     stickers: number // 4 stickers por tarima (2 caras × 2 copias)
-  }>>([])
+  }>>((initialData?.conversionesTabla ?? []).map((conversion) => ({
+    ...conversion,
+    productId: conversion.productId ?? null,
+  })))
 
   function matchProducts() {
-    return mapOcrProductsToReceptionForm(
-      result?.parsed.productos ?? [],
-      catalogos.productos,
-    )
+    const ocrProducts = result?.parsed.productos
+    if (!ocrProducts?.length && initialData?.productos) {
+      return initialData.productos
+    }
+    return mapOcrProductsToReceptionForm(ocrProducts ?? [], catalogos.productos)
   }
 
   function calcularConversionesYStickers() {
@@ -215,9 +266,6 @@ export default function NuevaRecepcionStep1({
       setFirestoreReady(true)
     }
   }, [useFirestore])
-
-  // Offline queue
-  const { enqueue, isOnline } = useOfflineQueue(db, ORG_ID)
 
   const proveedoresMercancia = catalogos.proveedores
     .filter((p) => p.tipo === "mercancia")
@@ -271,10 +319,18 @@ export default function NuevaRecepcionStep1({
       conversionesTabla: tablaConversiones,
     }
 
+    // A reception already created by the prior Step 1 mount must never be
+    // created again when returning from Step 2.
+    if (initialData?.receptionId) {
+      continueOnce({ ...formData, receptionId: initialData.receptionId })
+      return
+    }
+
     // If Firestore enabled, create reception in Firestore first
     if (useFirestore && firestoreReady && fsServices) {
       setCreating(true)
-      const operationId = `REC-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String(Date.now()).slice(-3)}`
+      setSubmissionError(null)
+      const operationId = getOperationId()
       const supplierId =
         catalogos.proveedores.find((p) => p.nombre === proveedor)?.id ||
         "prov_norte"
@@ -284,69 +340,76 @@ export default function NuevaRecepcionStep1({
           throw new Error("Authenticated user required to create a reception")
         }
 
-        const persistence = mapReceptionFormToPersistence({
-          products: matchedProducts,
-          warehouseId,
-          supplierId,
-          actorUserId: user.uid,
-          operationId,
-        })
-
-        // Create reception with lines in a transaction
-        const reception = await fsServices.receptions.createReception(
-          persistence.reception,
-          persistence.lines,
-          user.uid,
-          `op-${Date.now()}`,
-        )
-
-        if (storage && previewDataUrl) {
-          await uploadInvoicePreviewWithMetadata(
-            storage,
-            reception.id,
-            previewDataUrl,
-            (evidence) =>
-              fsServices.receptions.updateReception(
-                reception.id,
-                {
-                  invoicePreviewPath: evidence.path,
-                  invoicePreviewUrl: evidence.url,
-                },
-                user.uid,
-                `op-preview-${Date.now()}`,
-              ),
-          )
-        }
-
-        // Call onContinue with receptionId
-        onContinue({ ...formData, receptionId: reception.id })
-        return
-      } catch (e) {
-        console.error("Firestore create reception failed:", e)
-        // Fallback to local mode
-        // Queue for offline sync if not online
-        if (!isOnline && user) {
-          enqueue({
-            type: "create",
-            collectionPath: `organizations/{orgId}/receptions`,
-            data: {
-              warehouseId,
-              supplierId,
-              operationId,
-              status: "DRAFT",
-              actorUserId: user.uid,
-            },
-            operationId: `op-${Date.now()}`,
+        if (!submissionRef.current) {
+          const persistence = mapReceptionFormToPersistence({
+            products: matchedProducts,
+            warehouseId,
+            supplierId,
+            actorUserId: user.uid,
+            operationId,
           })
-        } else {
+          submissionFormRef.current = formData
+          submissionRef.current = new ReceptionSubmission(operationId, setSubmissionStatus)
+          const createAttempt = (stableOperationId: string) =>
+            fsServices.receptions.createReception(
+              persistence.reception,
+              persistence.lines,
+              user.uid,
+              stableOperationId,
+            )
+          const evidenceStorage = storage
+          const evidenceDataUrl = previewDataUrl
+          const evidenceAttempt =
+            evidenceDataUrl
+              ? async (reception: { id: string }, evidenceOperationId: string) => {
+                  if (!evidenceStorage) {
+                    throw new Error("Firebase Storage is unavailable")
+                  }
+                  await uploadInvoicePreviewWithMetadata(
+                    evidenceStorage,
+                    reception.id,
+                    evidenceDataUrl,
+                    (evidence) =>
+                      fsServices.receptions.updateReception(
+                        reception.id,
+                        {
+                          invoicePreviewPath: evidence.path,
+                          invoicePreviewUrl: evidence.url,
+                        },
+                        user.uid,
+                        `${evidenceOperationId}:metadata`,
+                      ),
+                  )
+                }
+              : undefined
+
+          const { reception } = await submissionRef.current.submit(
+            createAttempt,
+            evidenceAttempt,
+          )
+          continueOnce({ ...formData, receptionId: reception.id })
           return
         }
+
+        const { reception } = await submissionRef.current.submit(
+          () => Promise.reject(new Error("Reception submission is unavailable")),
+        )
+        continueOnce({ ...submissionFormRef.current!, receptionId: reception.id })
+        return
+      } catch (e) {
+        console.error("Firestore reception submission failed:", e)
+        setSubmissionError(
+          submissionRef.current?.receptionId
+            ? "La recepción ya se creó, pero no se pudo guardar la evidencia. Reintentá la evidencia o continuá sin ella."
+            : "No se pudo confirmar la creación de la recepción. Reintentá; se conservará la misma clave para evitar duplicados.",
+        )
+        return
       } finally {
         setCreating(false)
       }
     }
 
-    onContinue(formData)
+    continueOnce(formData)
   }
 
   return (
@@ -369,7 +432,11 @@ export default function NuevaRecepcionStep1({
         />
       </div>
 
-      <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col gap-4 md:gap-[14px] p-4 md:p-5 rounded-[20px] w-full">
+      <fieldset
+        disabled={Boolean(initialData?.receptionId) || submissionRef.current !== null}
+        className="contents"
+      >
+      <Panel className="flex flex-col gap-4 md:gap-[14px] p-4 md:p-5 w-full">
         <p
           className="font-extrabold text-[#172126] text-2xl md:text-[28px]"
           style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
@@ -384,7 +451,8 @@ export default function NuevaRecepcionStep1({
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 w-full">
-          <button
+          <TouchTarget
+            type="button"
             onClick={() => selectHasOC(true)}
             className={`flex flex-col items-center overflow-hidden p-4 rounded-[14px] flex-1 min-w-0 cursor-pointer transition-colors touch-target ${
               hasOC === true
@@ -403,9 +471,10 @@ export default function NuevaRecepcionStep1({
             >
               {hasOC === true ? "✓ Sí, tengo OC" : "Sí, tengo OC"}
             </p>
-          </button>
+          </TouchTarget>
 
-          <button
+          <TouchTarget
+            type="button"
             onClick={() => selectHasOC(false)}
             className={`flex flex-col items-center overflow-hidden p-4 rounded-[14px] flex-1 min-w-0 cursor-pointer transition-colors touch-target ${
               hasOC === false
@@ -424,7 +493,7 @@ export default function NuevaRecepcionStep1({
             >
               {hasOC === false ? "✓ No tengo OC" : "No tengo OC"}
             </p>
-          </button>
+          </TouchTarget>
         </div>
 
         {showNoOCNotice && (
@@ -789,7 +858,9 @@ export default function NuevaRecepcionStep1({
             </div>
           )}
         </div>
-      </div>
+      </Panel>
+
+      </fieldset>
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 md:gap-0 w-full">
         <div className="flex flex-col gap-1 md:gap-[3px] items-start w-full sm:w-auto">
@@ -806,6 +877,11 @@ export default function NuevaRecepcionStep1({
             19 Sep 2026 · 09:42
           </p>
         </div>
+        {submissionError && (
+          <p role="alert" className="text-sm text-red-700">
+            {submissionError}
+          </p>
+        )}
         <button
           onClick={handleContinue}
           disabled={creating}
@@ -816,9 +892,32 @@ export default function NuevaRecepcionStep1({
             className="font-bold text-white text-sm md:text-[15px] whitespace-nowrap"
             style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
           >
-            {creating ? "Creando..." : "Continuar"}
+            {creating
+              ? submissionStatus === "uploading_evidence"
+                ? "Guardando evidencia..."
+                : "Creando recepción..."
+              : submissionStatus === "evidence_failed"
+                ? "Reintentar evidencia"
+                : submissionStatus === "create_failed"
+                  ? "Reintentar creación"
+                : "Continuar"}
           </p>
         </button>
+        {submissionStatus === "evidence_failed" && submissionRef.current && (
+          <button
+            type="button"
+            disabled={creating}
+            className="text-sm underline"
+            onClick={() =>
+              continueOnce({
+                ...submissionFormRef.current!,
+                receptionId: submissionRef.current!.receptionId!,
+              })
+            }
+          >
+            Continuar sin evidencia
+          </button>
+        )}
       </div>
     </div>
   )

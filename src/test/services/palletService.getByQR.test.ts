@@ -1,7 +1,6 @@
 import {
   type RulesTestEnvironment,
   initializeTestEnvironment,
-  assertSucceeds,
 } from "@firebase/rules-unit-testing"
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
@@ -14,16 +13,21 @@ const warehouseId = "wh_tehuacan_1"
 const receptionId = "rec_test_001"
 const productId = "prod_test_001"
 const supplierId = "prov_test_001"
+const projectId = "demo-exepa-rules"
 
 const rules = readFileSync(resolve(process.cwd(), "firestore.rules"), "utf8")
-const rulesEmulatorConfigured = Boolean(process.env.FIRESTORE_EMULATOR_HOST)
-const rulesTest = it.skipIf(!rulesEmulatorConfigured).extend({ timeout: 30000 })
 
-let testEnv: RulesTestEnvironment | undefined
+let testEnv: RulesTestEnvironment | null = null
 
-async function seedTestData() {
-  if (!testEnv) return
-  await testEnv.withSecurityRulesDisabled(async (context) => {
+function getTestEnv(): RulesTestEnvironment {
+  if (!testEnv) {
+    throw new Error("Firestore test environment was not initialized.")
+  }
+  return testEnv
+}
+
+async function seedTestData(environment: RulesTestEnvironment) {
+  await environment.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore()
 
     // Seed organization
@@ -143,40 +147,25 @@ async function seedTestData() {
 }
 
 beforeAll(async () => {
-  if (!rulesEmulatorConfigured) {
-    console.warn(
-      'Firestore emulator tests skipped: run `firebase emulators:exec --only firestore --project exepa-almacen-safe "pnpm vitest run --config vitest.integration.config.ts"`',
-    )
-    return
-  }
-
-  try {
-    testEnv = await initializeTestEnvironment({
-      projectId: "exepa-almacen-safe",
-      firestore: { rules },
-    })
-    await seedTestData()
-  } catch (error) {
-    testEnv = undefined
-    console.warn(
-      "Firestore emulator unavailable; integration tests skipped.",
-      error,
-    )
-  }
+  testEnv = await initializeTestEnvironment({
+    projectId,
+    firestore: { rules },
+  })
+  await seedTestData(testEnv)
 })
 
 afterAll(async () => {
-  if (testEnv) await testEnv.cleanup()
+  await testEnv?.cleanup()
 })
 
 describe("PalletService.getByQR (integration)", () => {
-  rulesTest("returns PalletDoc when QR exists", async () => {
+  it("returns PalletDoc when QR exists", async () => {
     const { pallets } = createFirestoreServices(
-      testEnv!.authenticatedContext("test-user").firestore(),
+      getTestEnv().authenticatedContext("test-user").firestore(),
       orgId,
     )
 
-    const result = await pallets.getByQR("TQR-24891-003")
+    const result = await pallets.getByQR("TQR-24891-003", [warehouseId])
     expect(result).not.toBeNull()
     expect(result?.qrIdentifier).toBe("TQR-24891-003")
     expect(result?.productId).toBe(productId)
@@ -185,24 +174,24 @@ describe("PalletService.getByQR (integration)", () => {
     expect(result?.expiryDate).toBeDefined()
   })
 
-  rulesTest("returns null when QR not found", async () => {
+  it("returns null when QR not found", async () => {
     const { pallets } = createFirestoreServices(
-      testEnv!.authenticatedContext("test-user").firestore(),
+      getTestEnv().authenticatedContext("test-user").firestore(),
       orgId,
     )
 
-    const result = await pallets.getByQR("TQR-NOTEXIST-999")
+    const result = await pallets.getByQR("TQR-NOTEXIST-999", [warehouseId])
     expect(result).toBeNull()
   })
 
-  rulesTest("returns correct pallet for different QR codes", async () => {
+  it("returns correct pallet for different QR codes", async () => {
     const { pallets } = createFirestoreServices(
-      testEnv!.authenticatedContext("test-user").firestore(),
+      getTestEnv().authenticatedContext("test-user").firestore(),
       orgId,
     )
 
-    const pallet1 = await pallets.getByQR("TQR-24891-001")
-    const pallet2 = await pallets.getByQR("TQR-24891-002")
+    const pallet1 = await pallets.getByQR("TQR-24891-001", [warehouseId])
+    const pallet2 = await pallets.getByQR("TQR-24891-002", [warehouseId])
 
     expect(pallet1?.id).toBe("pallet_001")
     expect(pallet2?.id).toBe("pallet_002")

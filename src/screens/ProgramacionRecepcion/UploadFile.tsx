@@ -119,10 +119,8 @@ export default function UploadFile({
               </div>
               <TouchTarget
                 as="button"
-                onClick={() =>
-                  onUpload(new File([], ""))
+                onClick={() => onUpload(new File([], ""))}
                 // trigger re-upload
-                }
                 className="p-2 text-[#607078] hover:text-[#ef4444] hover:bg-[#fee2e2] rounded-lg transition-colors"
                 aria-label="Cambiar archivo"
               >

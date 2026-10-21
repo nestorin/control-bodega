@@ -51,7 +51,7 @@ export interface Producto {
   categoria: string
   unidad: "cajas" | "piezas" | "kg"
   activo: boolean
-  /** Codes printed by suppliers on invoices; normalized to uppercase. */
+  /** Codes printed by suppliers on invoices, normalized to uppercase. */
   codigosProveedor?: string[]
 }
 
@@ -359,7 +359,7 @@ function Badge({
   color: string
   className?: string
 }) {
-  const map: Record<string, { bg: string text: string }> = {
+  const map: Record<string, { bg: string; text: string }> = {
     green: { bg: "#e2f5ec", text: "#16845b" },
     gray: { bg: "#f0f4f5", text: "#607078" },
     blue: { bg: "#e8eef6", text: "#3276a8" },
@@ -392,7 +392,7 @@ function Select({
 }: {
   value: string
   onChange: (v: string) => void
-  options: { value: string label: string }[]
+  options: { value: string; label: string }[]
   placeholder?: string
   disabled?: boolean
   id?: string
@@ -553,7 +553,7 @@ function TabAlmacenes({
   }) => Promise<void>
   onUpdate: (
     editing: Almacen,
-    form: { nombre: string ubicacion: string responsable: string },
+    form: { nombre: string; ubicacion: string; responsable: string },
   ) => Promise<void>
   onDelete: (id: string) => Promise<void>
   firestoreReady: boolean
@@ -813,7 +813,7 @@ function TabAlmacenes({
         </Modal>
       )}
 
-      {/* Eliminar con confirmation text; authorization is enforced by Firestore rules. */}
+      {/* Eliminar con confirmation text, authorization is enforced by Firestore rules. */}
       {deleteTarget && (
         <Modal title="Eliminar almacén" onClose={() => setDeleteTarget(null)}>
           <div className="flex flex-col gap-4">
@@ -1173,7 +1173,7 @@ function TabProveedores({
   }) => Promise<void>
   onUpdate: (
     editing: Proveedor,
-    form: { nombre: string contacto: string telefono: string email: string },
+    form: { nombre: string; contacto: string; telefono: string; email: string },
   ) => Promise<void>
   onDelete: (id: string) => Promise<void>
 }) {
@@ -1734,7 +1734,7 @@ function TabProductos({
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-const TABS: { id: Tab label: string icon: React.ReactNode }[] = [
+const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
     id: "almacenes",
     label: "Almacenes",
@@ -1883,7 +1883,7 @@ export default function Configuracion({
 
     // Load almacenes
     fsServices.warehouses
-      .getAll({ orderBy: ["code", "asc"] })
+      .getCanonical()
       .then(({ data }) => {
         setAlmacenes(
           data.map((w) => ({
@@ -2019,7 +2019,7 @@ export default function Configuracion({
 
   const handleUpdateAlmacen = async (
     editing: Almacen,
-    form: { nombre: string ubicacion: string responsable: string },
+    form: { nombre: string; ubicacion: string; responsable: string },
   ) => {
     setAlmacenes((prev) =>
       prev.map((a) => (a.id === editing.id ? { ...a, ...form } : a)),
@@ -2136,14 +2136,16 @@ export default function Configuracion({
   }
 
   const handleDeleteProducto = async (id: string) => {
-    setProductos((prev) => prev.filter((p) => p.id !== id))
+    if (!firestoreReady || !fsServices) {
+      setProductos((prev) => prev.filter((p) => p.id !== id))
+      return
+    }
 
-    if (firestoreReady && fsServices) {
-      try {
-        await fsServices.products.delete(id, "user", `op-${Date.now()}`)
-      } catch (e) {
-        console.error("Firestore delete producto failed:", e)
-      }
+    try {
+      await fsServices.products.delete(id, "user", `op-${Date.now()}`)
+      setProductos((prev) => prev.filter((p) => p.id !== id))
+    } catch (e) {
+      console.error("Firestore delete producto failed:", e)
     }
   }
 
@@ -2155,7 +2157,7 @@ export default function Configuracion({
 
   const handleCreateProveedor = async (
     tipo: "mercancia" | "logistica",
-    form: { nombre: string contacto: string telefono: string email: string },
+    form: { nombre: string; contacto: string; telefono: string; email: string },
   ) => {
     const nuevo: Proveedor = {
       id: `P-${String(proveedores.length + 1).padStart(3, "0")}`,
@@ -2189,7 +2191,7 @@ export default function Configuracion({
 
   const handleUpdateProveedor = async (
     editing: Proveedor,
-    form: { nombre: string contacto: string telefono: string email: string },
+    form: { nombre: string; contacto: string; telefono: string; email: string },
   ) => {
     setProveedores((prev) =>
       prev.map((p) => (p.id === editing.id ? { ...p, ...form } : p)),
@@ -2216,14 +2218,16 @@ export default function Configuracion({
   }
 
   const handleDeleteProveedor = async (id: string) => {
-    setProveedores((prev) => prev.filter((p) => p.id !== id))
+    if (!firestoreReady || !fsServices) {
+      setProveedores((prev) => prev.filter((p) => p.id !== id))
+      return
+    }
 
-    if (firestoreReady && fsServices) {
-      try {
-        await fsServices.suppliers.delete(id, "user", `op-${Date.now()}`)
-      } catch (e) {
-        console.error("Firestore delete proveedor failed:", e)
-      }
+    try {
+      await fsServices.suppliers.delete(id, "user", `op-${Date.now()}`)
+      setProveedores((prev) => prev.filter((p) => p.id !== id))
+    } catch (e) {
+      console.error("Firestore delete proveedor failed:", e)
     }
   }
 

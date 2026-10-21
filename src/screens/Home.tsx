@@ -1,3 +1,5 @@
+import { Panel, QuickActionCard, StatCard, StatusBadge } from "@/components/ui"
+
 const assetPathPrefix = "/assets"
 const imgPlus = `${assetPathPrefix}/68eab.svg`
 const imgSquarePlus = `${assetPathPrefix}/76004.svg`
@@ -31,6 +33,7 @@ export default function Home({ onNewReception, onRecepciones }: HomeProps) {
           </p>
         </div>
         <button
+          type="button"
           onClick={onNewReception}
           className="bg-[#16343f] border border-[#16343f] flex gap-2 h-11 md:h-[52px] items-center justify-center px-4 md:px-5 rounded-[14px] cursor-pointer hover:bg-[#1e4456] transition-colors touch-target w-full md:w-auto"
         >
@@ -46,93 +49,32 @@ export default function Home({ onNewReception, onRecepciones }: HomeProps) {
 
       {/* Quick actions grid - responsive */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 w-full">
-        <button
+        <QuickActionCard
           onClick={onNewReception}
-          className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col items-start p-4 md:p-5 rounded-[20px] cursor-pointer hover:shadow-[0px_12px_20px_rgba(22,52,63,0.12)] transition-shadow text-left touch-target"
-        >
-          <div className="flex gap-3 md:gap-[14px] items-center w-full">
-            <div className="bg-[#fff5dd] flex flex-col items-center justify-center rounded-[14px] size-10 md:size-12 flex-shrink-0">
-              <img
-                alt=""
-                className="size-5 md:size-[22px]"
-                src={imgSquarePlus}
-              />
-            </div>
-            <div className="flex flex-col gap-1 items-start min-w-0">
-              <p
-                className="text-[#172126] text-base md:text-lg truncate"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
-              >
-                Programar recepción
-              </p>
-              <p
-                className="text-[#607078] text-sm md:text-[13px]"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
-              >
-                Planificar y verificar datos
-              </p>
-            </div>
-          </div>
-        </button>
-        <button
+          iconSrc={imgSquarePlus}
+          iconBackgroundClassName="bg-[#fff5dd]"
+          title="Programar recepción"
+          description="Planificar y verificar datos"
+        />
+        <QuickActionCard
           onClick={onRecepciones}
-          className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col items-start p-4 md:p-5 rounded-[20px] cursor-pointer hover:shadow-[0px_12px_20px_rgba(22,52,63,0.12)] transition-shadow text-left touch-target"
-        >
-          <div className="flex gap-3 md:gap-[14px] items-center w-full">
-            <div className="bg-[#e7f0f2] flex flex-col items-center justify-center rounded-[14px] size-10 md:size-12 flex-shrink-0">
-              <img
-                alt=""
-                className="size-5 md:size-[22px]"
-                src={imgClipboardList}
-              />
-            </div>
-            <div className="flex flex-col gap-1 items-start min-w-0">
-              <p
-                className="text-[#172126] text-base md:text-lg truncate"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
-              >
-                Recepciones
-              </p>
-              <p
-                className="text-[#607078] text-sm md:text-[13px]"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
-              >
-                Consultar y editar
-              </p>
-            </div>
-          </div>
-        </button>
-        <button className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col items-start p-4 md:p-5 rounded-[20px] cursor-pointer hover:shadow-[0px_12px_20px_rgba(22,52,63,0.12)] transition-shadow text-left touch-target">
-          <div className="flex gap-3 md:gap-[14px] items-center w-full">
-            <div className="bg-[#e7f0f2] flex flex-col items-center justify-center rounded-[14px] size-10 md:size-12 flex-shrink-0">
-              <img
-                alt=""
-                className="size-5 md:size-[22px]"
-                src={imgScanQrCode}
-              />
-            </div>
-            <div className="flex flex-col gap-1 items-start min-w-0">
-              <p
-                className="text-[#172126] text-base md:text-lg truncate"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
-              >
-                Escanear QR
-              </p>
-              <p
-                className="text-[#607078] text-sm md:text-[13px]"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
-              >
-                Abrir ficha de tarima
-              </p>
-            </div>
-          </div>
-        </button>
+          iconSrc={imgClipboardList}
+          iconBackgroundClassName="bg-[#e7f0f2]"
+          title="Recepciones"
+          description="Consultar y editar"
+        />
+        <QuickActionCard
+          iconSrc={imgScanQrCode}
+          iconBackgroundClassName="bg-[#e7f0f2]"
+          title="Escanear QR"
+          description="Abrir ficha de tarima"
+        />
       </div>
 
       {/* Stats + Info cards - responsive grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-5 w-full">
         {/* Today summary card */}
-        <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col gap-3 md:gap-[14px] p-4 md:p-5 rounded-[20px] w-full">
+        <Panel className="flex flex-col gap-3 md:gap-[14px] p-4 md:p-5 w-full">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 w-full">
             <p
               className="text-[#172126] text-base md:text-lg"
@@ -148,48 +90,13 @@ export default function Home({ onNewReception, onRecepciones }: HomeProps) {
             </p>
           </div>
           <div className="grid grid-cols-3 gap-3 md:gap-7 items-start w-full">
-            <div className="flex flex-col gap-0.5 items-start">
-              <p
-                className="font-extrabold text-[#16343f] text-2xl md:text-[32px]"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
-              >
-                6
-              </p>
-              <p
-                className="text-[#607078] text-sm md:text-[13px]"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
-              >
-                Recepciones
-              </p>
-            </div>
-            <div className="flex flex-col gap-0.5 items-start">
-              <p
-                className="font-extrabold text-[#16343f] text-2xl md:text-[32px]"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
-              >
-                84
-              </p>
-              <p
-                className="text-[#607078] text-sm md:text-[13px]"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
-              >
-                Tarimas
-              </p>
-            </div>
-            <div className="flex flex-col gap-0.5 items-start">
-              <p
-                className="font-extrabold text-[#c54b45] text-2xl md:text-[32px]"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
-              >
-                3
-              </p>
-              <p
-                className="text-[#607078] text-sm md:text-[13px]"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
-              >
-                Incidencias
-              </p>
-            </div>
+            <StatCard value="6" label="Recepciones" />
+            <StatCard value="84" label="Tarimas" />
+            <StatCard
+              value="3"
+              label="Incidencias"
+              valueClassName="text-[#c54b45]"
+            />
           </div>
           <div className="bg-[#e9eef0] flex flex-col md:flex-row md:items-center md:justify-between gap-2 p-3 md:p-[14px] rounded-[12px] w-full">
             <p
@@ -198,20 +105,12 @@ export default function Home({ onNewReception, onRecepciones }: HomeProps) {
             >
               OC-24891 · Distribuidora del Norte
             </p>
-            <div className="bg-[#e2f5ec] flex gap-[7px] items-center px-[11px] py-[7px] rounded-full flex-shrink-0">
-              <img alt="" className="size-[7px]" src={imgIndicador} />
-              <p
-                className="font-bold text-[#16845b] text-sm md:text-[13px] whitespace-nowrap"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
-              >
-                Completada
-              </p>
-            </div>
+            <StatusBadge label="Completada" indicatorSrc={imgIndicador} />
           </div>
-        </div>
+        </Panel>
 
         {/* Status card */}
-        <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col gap-3 md:gap-[18px] p-4 md:p-5 rounded-[20px] w-full">
+        <Panel className="flex flex-col gap-3 md:gap-[18px] p-4 md:p-5 w-full">
           <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-[18px] w-full">
             <div className="bg-[#fff5dd] flex flex-col gap-2 items-center justify-center rounded-[28px] size-[140px] md:size-[170px] flex-shrink-0">
               <img
@@ -227,15 +126,10 @@ export default function Home({ onNewReception, onRecepciones }: HomeProps) {
               </p>
             </div>
             <div className="flex flex-col gap-1 items-start md:items-center text-center md:text-left min-w-0 flex-1">
-              <div className="bg-[#e2f5ec] flex gap-[7px] items-center px-[11px] py-[7px] rounded-full flex-shrink-0">
-                <img alt="" className="size-[7px]" src={imgIndicador} />
-                <p
-                  className="font-bold text-[#16845b] text-sm md:text-[13px] whitespace-nowrap"
-                  style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
-                >
-                  Operación estable
-                </p>
-              </div>
+              <StatusBadge
+                label="Operación estable"
+                indicatorSrc={imgIndicador}
+              />
               <p
                 className="text-[#172126] text-base md:text-lg truncate"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
@@ -250,7 +144,7 @@ export default function Home({ onNewReception, onRecepciones }: HomeProps) {
               </p>
             </div>
           </div>
-        </div>
+        </Panel>
       </div>
     </div>
   )

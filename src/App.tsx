@@ -2,6 +2,11 @@ import { useState, useEffect } from "react"
 import { BrowserRouter, Route, Routes } from "react-router-dom"
 import { AuthProvider } from "@/context/AuthContext"
 import { useAuthorization } from "@/hooks/useAuthorization"
+import {
+  CANONICAL_WAREHOUSE_IDS,
+  isGlobalMembershipRole,
+  normalizeMembershipWarehouses,
+} from "@/schemas/membership"
 import Home from "./screens/Home"
 import Login from "./screens/Login"
 import Unauthorized from "./screens/Unauthorized"
@@ -88,6 +93,11 @@ function AppLayout() {
   const [screen, setScreen] = useState<Screen>("home")
   const [activeNav, setActiveNav] = useState<NavItem>("home")
   const [editId, setEditId] = useState<string>("OC-24891")
+  const [editReceptionData, setEditReceptionData] = useState<{
+    tarimas: number
+    proveedor: string
+    proveedorLogistico: string
+  } | null>(null)
   const [selectedEvidencia, setSelectedEvidencia] =
     useState<EvidenciaData | null>(null)
   const [tarimaActual, setTarimaActual] = useState(3)
@@ -95,6 +105,219 @@ function AppLayout() {
     null,
   )
   const [scannedQrCode, setScannedQrCode] = useState<string | null>(null)
+
+// TEST-ONLY: Legacy mode for TarimaDetalle (bypasses Firestore query)
+  // Enable with: ?test=legacy-tarima-detalle
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const testMode = params.get('test')
+    if (testMode === 'legacy-tarima-detalle') {
+      setScreen('tarima-detalle')
+      setActiveNav('qr')
+      // Don't set scannedQrCode - TarimaDetalle will use legacy mode
+      
+      // Set up conversionesTabla for CapturaTarima (legacy mode)
+      const conversiones = [
+        {
+          producto: 'Agua mineral 600 ml',
+          productId: 'prod-test-1',
+          codigo: 'AGUA-600ML',
+          unidades: 48,
+          unidad: 'cajas',
+          piezasPorCaja: 24,
+          cajasPorTarima: 2,
+          cajas: 48,
+          tarimas: 2,
+          stickers: 8,
+          conversionMatch: true,
+        },
+        {
+          producto: 'Refresco Cola 500 ml',
+          productId: 'prod-test-2',
+          codigo: 'COLA-500ML',
+          unidades: 50,
+          unidad: 'cajas',
+          piezasPorCaja: 25,
+          cajasPorTarima: 2,
+          cajas: 50,
+          tarimas: 2,
+          stickers: 8,
+          conversionMatch: true,
+        },
+        {
+          producto: 'Jugo Naranja 1L',
+          productId: 'prod-test-3',
+          codigo: 'JUGO-1L',
+          unidades: 45,
+          unidad: 'cajas',
+          piezasPorCaja: 15,
+          cajasPorTarima: 3,
+          cajas: 45,
+          tarimas: 1,
+          stickers: 4,
+          conversionMatch: true,
+        },
+      ]
+      try {
+        localStorage.setItem('conversionesTabla', JSON.stringify(conversiones))
+      } catch (e) {
+        console.warn('[TEST] No se pudo setear localStorage conversionesTabla:', e)
+      }
+      
+      // Dispatch event to set currentReception state for CapturaTarima
+      const receptionData = {
+        ocFolio: 'OC-TEST-001',
+        tarimas: 5,
+        proveedor: 'Proveedor Test',
+        proveedorLogistico: 'Logística Test',
+        conversionesTabla: conversiones,
+        receptionId: 'reception-test-e2e',
+      }
+      window.dispatchEvent(new CustomEvent('TEST_SET_RECEPTION', { detail: receptionData }))
+    } else if (testMode === 'escanear-qr') {
+      setScreen('escanear-qr')
+      setActiveNav('qr')
+    } else if (testMode === 'legacy-captura-evidencia') {
+      setScreen('captura-evidencia')
+      setActiveNav('home')
+      
+      // Set up currentReception for CapturaEvidencia (needs receptionId for Firestore)
+      const currentReceptionData = {
+        proveedor: 'Distribuidora del Norte',
+        item: 'Agua mineral 600 ml',
+        tarimas: 20,
+        caducidad: '15 Mar 2027',
+        lote: 'LT-0926-A',
+        proveedorLogistico: 'Logística Veloz',
+        ocFolio: 'OC-TEST-001',
+        receptionId: 'reception-test-e2e',
+        productos: [{
+          productId: null,
+          codigo: null,
+          nombre: 'Agua mineral 600 ml',
+          unidad: null,
+          cantidad: 0,
+          precio: 0,
+          importe: 0,
+          estadoMatch: 'manual' as const,
+        }],
+      }
+      setCurrentReception(currentReceptionData)
+      
+      // Also set localStorage for form prefill
+      const receptionData = {
+        proveedor: 'Distribuidora del Norte',
+        item: 'Agua mineral 600 ml',
+        tarimas: '20',
+        caducidad: '15 Mar 2027',
+        lote: 'LT-0926-A',
+      }
+      try {
+        localStorage.setItem('test-evidencia-form', JSON.stringify(receptionData))
+      } catch (e) {
+        console.warn('[TEST] No se pudo setear localStorage test-evidencia-form:', e)
+      }
+    } else if (testMode === 'legacy-evidencia-detalle') {
+      setScreen('evidencia-detalle')
+      setActiveNav('evidencias')
+      
+      // Set up test data for legacy evidencia detalle
+      const evidenciaData = {
+        id: 'EVD-QA-12345',
+        fotoTrailer: null,
+        fotoProducto: null,
+        proveedor: 'Distribuidora del Norte',
+        proveedorLogistico: 'Logística Veloz',
+        item: 'Agua mineral 600 ml',
+        tarimas: 20,
+        caducidad: '15 Mar 2027',
+        lote: 'LT-0926-A',
+        ocFolio: 'OC-24891',
+        fecha: '19 Sep 2026',
+        hora: '09:42',
+        estado: 'COMPLETADA',
+        color: '#16845b',
+        bg: '#e2f5ec',
+        img: '/assets/08d70.svg',
+      }
+      setSelectedEvidencia(evidenciaData)
+    } else if (testMode === 'legacy-captura-tarima') {
+      setScreen('captura-tarima')
+      setActiveNav('qr')
+      
+      // Set up currentReception for CapturaTarima (legacy mode)
+      const conversiones = [
+        {
+          producto: 'Agua mineral 600 ml',
+          productId: 'prod-test-1',
+          codigo: 'AGUA-600ML',
+          unidades: 48,
+          unidad: 'cajas',
+          piezasPorCaja: 24,
+          cajasPorTarima: 2,
+          cajas: 48,
+          tarimas: 2,
+          stickers: 8,
+          conversionMatch: true,
+        },
+        {
+          producto: 'Refresco Cola 500 ml',
+          productId: 'prod-test-2',
+          codigo: 'COLA-500ML',
+          unidades: 50,
+          unidad: 'cajas',
+          piezasPorCaja: 25,
+          cajasPorTarima: 2,
+          cajas: 50,
+          tarimas: 2,
+          stickers: 8,
+          conversionMatch: true,
+        },
+        {
+          producto: 'Jugo Naranja 1L',
+          productId: 'prod-test-3',
+          codigo: 'JUGO-1L',
+          unidades: 45,
+          unidad: 'cajas',
+          piezasPorCaja: 15,
+          cajasPorTarima: 3,
+          cajas: 45,
+          tarimas: 1,
+          stickers: 4,
+          conversionMatch: true,
+        },
+      ]
+      try {
+        localStorage.setItem('conversionesTabla', JSON.stringify(conversiones))
+      } catch (e) {
+        console.warn('[TEST] No se pudo setear localStorage conversionesTabla:', e)
+      }
+      
+      // Set up currentReception for CapturaTarima
+      const currentReceptionData = {
+        proveedor: 'Distribuidora del Norte',
+        item: 'Agua mineral 600 ml',
+        tarimas: 5,
+        caducidad: '15 Mar 2027',
+        lote: 'LT-0926-A',
+        proveedorLogistico: 'Logística Veloz',
+        ocFolio: 'OC-TEST-001',
+        receptionId: 'reception-test-e2e',
+        productos: [{
+          productId: null,
+          codigo: null,
+          nombre: 'Agua mineral 600 ml',
+          unidad: null,
+          cantidad: 0,
+          precio: 0,
+          importe: 0,
+          estadoMatch: 'manual' as const,
+        }],
+        conversionesTabla: conversiones,
+      }
+      setCurrentReception(currentReceptionData)
+    }
+  }, [])
   const TARIMA_TOTAL = 20
   const [catalogoProductos, setCatalogoProductos] =
     useState<Producto[]>(PRODUCTOS_INIT)
@@ -200,6 +423,7 @@ function AppLayout() {
 
   // Estado para la recepción actual en proceso
   const [currentReception, setCurrentReception] = useState<{
+    hasOC?: boolean
     ocFolio: string
     tarimas: number
     proveedor: string
@@ -660,7 +884,10 @@ function AppLayout() {
             <div className="flex items-center gap-4">
               {screen === "nueva-step1" && (
                 <button
-                  onClick={() => navigate("captura-evidencia", "home")}
+                  onClick={() => {
+                    setCurrentReception(null)
+                    navigate("captura-evidencia", "home")
+                  }}
                   className="flex items-center justify-center size-9 rounded-[10px] border border-[#dce4e7] bg-white hover:bg-[#f4f7f8] transition-colors shrink-0 touch-target"
                   title="Volver a captura de evidencia"
                 >
@@ -821,14 +1048,15 @@ function AppLayout() {
         >
           {screen === "home" && (
             <Home
-              onNewReception={() =>
+              onNewReception={() => {
+                setCurrentReception(null)
                 navigate(
                   isFeatureEnabled("USE_NEW_RECEPTION_FLOW")
                     ? "programacion-recepcion"
                     : "nueva-step1",
                   "home",
                 )
-              }
+              }}
               onRecepciones={() => navigate("recepciones", "recepciones")}
             />
           )}
@@ -950,10 +1178,31 @@ function AppLayout() {
           )}
           {screen === "nueva-step1" && (
             <NuevaRecepcionStep1
-              onBack={() => navigate("home", "home")}
+              onBack={() => {
+                setCurrentReception(null)
+                navigate("home", "home")
+              }}
+              initialData={
+                currentReception?.receptionId
+                  ? {
+                      hasOC: currentReception.hasOC ?? true,
+                      ocFolio: currentReception.ocFolio,
+                      tarimas: String(currentReception.tarimas),
+                      proveedor: currentReception.proveedor,
+                      proveedorLogistico: currentReception.proveedorLogistico,
+                      receptionId: currentReception.receptionId,
+                      productos: currentReception.productos.map((product) => ({
+                        ...product,
+                        importe: product.importe,
+                      })),
+                      conversionesTabla: currentReception.conversionesTabla,
+                    }
+                  : undefined
+              }
               onContinue={(data) => {
                 setCurrentReception((prev) => ({
                   ...prev,
+                  hasOC: data.hasOC,
                   ocFolio: data.ocFolio,
                   tarimas: parseInt(data.tarimas) || 20,
                   proveedor: data.proveedor,
@@ -1015,8 +1264,13 @@ function AppLayout() {
             <CapturaTarima
               onBack={() => navigate("nueva-step2")}
               onFinish={() => {
-                receptionSession.transition("CONFIRMED")
-                receptionSession.transition("COMPLETED")
+                if (
+                  receptionSession.session.data &&
+                  receptionSession.session.phase === "PALLETS"
+                ) {
+                  receptionSession.transition("CONFIRMED")
+                  receptionSession.transition("COMPLETED")
+                }
                 navigate("completada")
               }}
               almacenActivo={almacenActivo ?? null}
@@ -1052,6 +1306,7 @@ function AppLayout() {
               }}
               onEdit={(id) => {
                 setEditId(id)
+                setEditReceptionData(null)
                 navigate("editar-recepcion", "recepciones")
               }}
             />
@@ -1069,16 +1324,36 @@ function AppLayout() {
           {screen === "editar-recepcion" && (
             <EditarRecepcion
               recId={editId}
-              onBack={() => navigate("recepciones", "recepciones")}
-              onSave={() => navigate("recepciones", "recepciones")}
+              readOnly={!!editReceptionData}
+              initialData={editReceptionData ?? undefined}
+              onBack={() => {
+                setEditReceptionData(null)
+                navigate("recepciones", "recepciones")
+              }}
+              onSave={() => {
+                setEditReceptionData(null)
+                navigate("recepciones", "recepciones")
+              }}
             />
           )}
           {screen === "tarima-detalle" && (
             <TarimaDetalle
+              authorizedWarehouseIds={profile && isGlobalMembershipRole(profile.role)
+                ? [...CANONICAL_WAREHOUSE_IDS]
+                : profile ? normalizeMembershipWarehouses(profile) ?? [] : []}
               onBack={() => {
                 setScannedQrCode(null)
                 setSelectedReception(null)
                 navigate("recepciones", "recepciones")
+              }}
+              onViewReference={(reference) => {
+                setEditId(reference.recId)
+                setEditReceptionData({
+                  tarimas: reference.tarimas,
+                  proveedor: reference.proveedor,
+                  proveedorLogistico: reference.proveedorLogistico,
+                })
+                navigate("editar-recepcion", "recepciones")
               }}
               currentReception={
                 currentReception ||

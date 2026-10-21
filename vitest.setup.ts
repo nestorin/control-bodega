@@ -54,9 +54,6 @@ global.ResizeObserver = vi.fn().mockImplementation(() => ({
   disconnect: vi.fn(),
 }))
 
-// Mock React.act for React 19 compatibility
-global.act = vi.fn((callback) => callback())
-
 // Mock IntersectionObserver
 global.IntersectionObserver = vi.fn().mockImplementation(() => ({
   observe: vi.fn(),

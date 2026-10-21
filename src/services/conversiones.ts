@@ -195,9 +195,9 @@ export async function validarStockDisponible(
   getStockFn: (almacenId: string, productoId: string) => Promise<number>,
 ): Promise<{
   disponible: boolean
-  faltantes: { productoId: string faltante: number }[]
+  faltantes: { productoId: string; faltante: number }[]
 }> {
-  const faltantes: { productoId: string faltante: number }[] = []
+  const faltantes: { productoId: string; faltante: number }[] = []
 
   for (const item of items) {
     // Convertir a cajas para comparar con stock (asumiendo stock en cajas)

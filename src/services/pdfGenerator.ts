@@ -122,7 +122,7 @@ export async function generateStructuredPdf(
     subtitle?: string
     sections: Array<{
       title: string
-      rows: Array<{ label: string value: string }>
+      rows: Array<{ label: string; value: string }>
     }>
     footer?: string
   },

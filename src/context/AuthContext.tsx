@@ -29,25 +29,19 @@ import {
 } from "@/schemas/membership"
 
 // Mock authentication is intentionally opt-in, including in local development.
-// SAFETY: Force real auth on production domain regardless of env var.
-const IS_PROD_DOMAIN =
+  // SAFETY: Force real auth on production domain regardless of env var.
+  // This is evaluated at build time via Vite's import.meta.env replacement.
+  const IS_MOCK_MODE = import.meta.env.VITE_USE_MOCK_AUTH === "true"
+
+// Runtime check for production domain - evaluated inside component
+const isProdDomain = () =>
   typeof window !== "undefined" &&
   window.location.hostname === "exepa-almacen-safe.web.app"
-const IS_LOCALHOST =
-  typeof window !== "undefined" &&
-  (window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1" ||
-    window.location.hostname.startsWith("192.168."))
-const IS_MOCK_MODE = !IS_PROD_DOMAIN && import.meta.env.VITE_USE_MOCK_AUTH === "true"
 
-// Warn if mock mode is accidentally enabled outside localhost
-if (
-  IS_MOCK_MODE &&
-  !IS_LOCALHOST &&
-  typeof console !== "undefined"
-) {
+// Warn if mock mode is accidentally enabled on production
+if (IS_MOCK_MODE && isProdDomain() && typeof console !== "undefined") {
   console.warn(
-    "[Auth] ⚠️ MOCK MODE ACTIVO en entorno no-local. Desactiva VITE_USE_MOCK_AUTH para auth real."
+    "[Auth] ⚠️ MOCK MODE ACTIVO en producción. Desactiva VITE_USE_MOCK_AUTH para auth real.",
   )
 }
 
@@ -134,7 +128,7 @@ const AuthContext = createContext<AuthContextType | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   // MODO MOCK: para testing sin Firebase real
-  if (IS_MOCK_MODE) {
+  if (IS_MOCK_MODE && !isProdDomain()) {
     const mockUser = Object.assign(Object.create(null), {
       uid: "test-user-123",
       email: "test@exepa.com",

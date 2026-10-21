@@ -12,6 +12,8 @@ export default defineConfig({
     },
   },
   build: {
+    // vendor-pdf (1MB) and vendor-firebase (662kB) are expected to be large.
+    chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -62,8 +64,5 @@ export default defineConfig({
         },
       },
     },
-    // Increase chunk size warning limit since we now have meaningful chunks
-    // vendor-pdf (1MB) and vendor-firebase (662kB) are expected to be large
-    chunkSizeWarningLimit: 1200,
   },
 })

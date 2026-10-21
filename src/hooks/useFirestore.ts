@@ -214,6 +214,16 @@ interface QueuedOperation {
   operationId: string
 }
 
+export function resolveOfflineQueuePath(path: string, orgId: string): string {
+  const resolvedPath = path.split("{orgId}").join(orgId)
+  if (/\{[^}]+\}/.test(resolvedPath)) {
+    throw new Error(
+      `Offline queue path contains an unresolved token: ${resolvedPath}`,
+    )
+  }
+  return resolvedPath
+}
+
 interface UseOfflineQueueResult {
   queue: QueuedOperation[]
   isOnline: boolean
@@ -323,7 +333,7 @@ async function executeOperation(
   orgId: string,
   op: QueuedOperation,
 ) {
-  const fullPath = op.collectionPath.replace("{orgId}", orgId)
+  const fullPath = resolveOfflineQueuePath(op.collectionPath, orgId)
   const ref = op.docId
     ? doc(db, fullPath, op.docId)
     : doc(collection(db, fullPath))

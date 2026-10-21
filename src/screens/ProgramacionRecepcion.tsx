@@ -363,7 +363,7 @@ interface Props {
     }>
     codigosQR: string[]
   }) => void
-  catalogos: { proveedores: Proveedor[] productos: Producto[] }
+  catalogos: { proveedores: Proveedor[]; productos: Producto[] }
 }
 
 function generateFolio(): string {
@@ -726,7 +726,7 @@ export default function ProgramacionRecepcion({
         receptionId = reception.id
       } catch (e) {
         console.error("Error guardando programación:", e)
-        const error = e as { code?: unknown message?: unknown }
+        const error = e as { code?: unknown; message?: unknown }
         const code = typeof error.code === "string" ? error.code : ""
         const message = typeof error.message === "string" ? error.message : ""
         const detail = code.includes("permission-denied")

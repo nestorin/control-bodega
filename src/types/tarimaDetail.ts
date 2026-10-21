@@ -22,7 +22,7 @@ export interface TarimaDetailView {
 export type TarimaDetailState = { status: "loading" } | {
   status: "success"
   data: TarimaDetailView
-} | { status: "not-found" qrCode: string } | {
+} | { status: "not-found"; qrCode: string } | {
   status: "error"
   message: string
   retry: () => void

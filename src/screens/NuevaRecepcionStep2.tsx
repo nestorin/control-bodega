@@ -4,6 +4,7 @@ import { createFirestoreServices } from "@/services/firestore"
 import { db } from "@/lib/firebase"
 import { useAuthorization } from "@/hooks/useAuthorization"
 import { useState, useEffect } from "react"
+import { Panel } from "@/components/ui"
 
 const assetPathPrefix = "/assets"
 const imgCheck = `${assetPathPrefix}/3eae4.svg`
@@ -39,8 +40,8 @@ interface Props {
     piezasPorCaja: number
     cajasPorTarima: number
   }>
-  catalogos: { proveedores: Proveedor[] productos: Producto[] }
-  catalogosStatus?: { loading: boolean error: Error | null }
+  catalogos: { proveedores: Proveedor[]; productos: Producto[] }
+  catalogosStatus?: { loading: boolean; error: Error | null }
 }
 
 export default function NuevaRecepcionStep2({
@@ -193,7 +194,7 @@ export default function NuevaRecepcionStep2({
 
   return (
     <div className="flex flex-col gap-4 md:gap-6 p-4 md:p-7 size-full overflow-auto">
-      <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col gap-4 md:gap-[14px] p-4 md:p-5 rounded-[20px] w-full">
+      <Panel className="flex flex-col gap-4 md:gap-[14px] p-4 md:p-5 w-full">
         <p
           className="font-extrabold text-[#172126] text-2xl md:text-[28px]"
           style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
@@ -420,9 +421,9 @@ export default function NuevaRecepcionStep2({
             </p>
           </button>
         </div>
-      </div>
+      </Panel>
 
-      <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-1 flex-col items-center justify-center min-w-0 p-4 md:p-5 rounded-[20px]">
+      <Panel className="flex flex-1 flex-col items-center justify-center min-w-0 p-4 md:p-5">
         <div className="flex flex-col gap-2 md:gap-[18px] items-center w-full">
           <div className="bg-[#fff5dd] flex flex-col gap-2 items-center justify-center rounded-[28px] size-[180px] md:size-[230px]">
             <img
@@ -450,7 +451,7 @@ export default function NuevaRecepcionStep2({
             Generaremos un ID único para cada tarima.
           </p>
         </div>
-      </div>
+      </Panel>
     </div>
   )
 }

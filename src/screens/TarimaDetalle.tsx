@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useMemo } from "react"
 
-import { PalletDoc } from '@/services/firestore/types'
-import { TarimaDetailView, TarimaDetailState } from '@/types/tarimaDetail'
-import { parseTarimaQR } from '@/types/qrcode'
-import { createFirestoreServices } from '@/services/firestore'
-import { db } from '@/lib/firebase'
+import { PalletDoc } from "@/services/firestore/types"
+import { TarimaDetailView, TarimaDetailState } from "@/types/tarimaDetail"
+import { parseTarimaQR } from "@/types/qrcode"
+import { createFirestoreServices } from "@/services/firestore"
+import { db } from "@/lib/firebase"
 
 const assetPathPrefix = "/assets"
 const imgWarehouse = `${assetPathPrefix}/fc229.svg`
@@ -17,16 +17,32 @@ type Format = typeof FORMATS[number]
 
 const ORG_ID = "org_exepa_001"
 
+interface ReceptionReference {
+  recId: string
+  tarimas: number
+  proveedor: string
+  proveedorLogistico: string
+}
+
 interface Props {
   onBack: () => void
-  currentReception?: { ocFolio: string; tarimas: number } | null
+  onViewReference?: (reference: ReceptionReference) => void
+  currentReception?: {
+    ocFolio: string
+    tarimas: number
+    proveedor?: string
+    proveedorLogistico?: string
+  } | null
   qrCode?: string
+  authorizedWarehouseIds?: string[]
 }
 
 export default function TarimaDetalle({
   onBack,
+  onViewReference,
   currentReception,
   qrCode,
+  authorizedWarehouseIds,
 }: Props) {
   const [showFormats, setShowFormats] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -54,25 +70,31 @@ export default function TarimaDetalle({
   async function fetchTarimaDetail(qrIdentifier: string) {
     setDetailState({ status: "loading" })
     try {
-      const pallet = await pallets.getByQR(qrIdentifier)
+      const pallet = await pallets.getByQR(qrIdentifier, authorizedWarehouseIds ?? [])
       if (!pallet) {
         setDetailState({ status: "not-found", qrCode: qrIdentifier })
         return
       }
 
       // Fetch related product
-      const product = pallet.productId ? await products.getById(pallet.productId) : null
+      const product = pallet.productId
+        ? await products.getById(pallet.productId)
+        : null
 
       // Fetch reception to get supplierId and folio
-      const reception = pallet.receptionId ? await receptions.getById(pallet.receptionId) : null
+      const reception = pallet.receptionId
+        ? await receptions.getById(pallet.receptionId)
+        : null
 
       // Fetch supplier from reception.supplierId
-      const supplier = reception?.supplierId ? await suppliers.getById(reception.supplierId) : null
+      const supplier = reception?.supplierId
+        ? await suppliers.getById(reception.supplierId)
+        : null
 
       const detail: TarimaDetailView = {
         qrIdentifier: pallet.qrIdentifier,
         lot: pallet.lot || "",
-        expiryDate: pallet.expiryDate ?? ({ toDate: () => new Date() } as any),
+        expiryDate: pallet.expiryDate ?? { toDate: () => new Date() } as any,
         quantity: pallet.quantity,
         unit: pallet.unit,
         status: pallet.status,
@@ -83,7 +105,10 @@ export default function TarimaDetalle({
         supplierName: supplier?.name || "Proveedor desconocido",
         supplierCode: supplier?.code || "",
         receptionFolio: reception?.purchaseOrderId || reception?.id || "",
-        receptionDate: reception?.receivedAt ?? reception?.createdAt ?? ({ toDate: () => new Date() } as any),
+        receptionDate:
+          reception?.receivedAt ??
+          reception?.createdAt ??
+          { toDate: () => new Date() } as any,
       }
 
       setDetailState({ status: "success", data: detail })
@@ -151,7 +176,9 @@ export default function TarimaDetalle({
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 p-4 lg:p-7 size-full overflow-y-auto">
         <div className="flex-1 flex flex-col items-center justify-center py-12">
           <div className="w-24 h-24 border-3 border-[#3276a8] border-t-transparent rounded-full animate-spin" />
-          <p className="mt-4 text-lg font-medium text-gray-900">Cargando tarima…</p>
+          <p className="mt-4 text-lg font-medium text-gray-900">
+            Cargando tarima…
+          </p>
         </div>
       </div>
     )
@@ -161,11 +188,25 @@ export default function TarimaDetalle({
     return (
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 p-4 lg:p-7 size-full overflow-y-auto">
         <div className="flex-1 flex flex-col items-center justify-center py-12">
-          <svg className="w-24 h-24 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <svg
+            className="w-24 h-24 text-gray-300"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
           </svg>
-          <p className="mt-4 text-lg font-medium text-gray-900">Tarima no encontrada</p>
-          <p className="mt-1 text-sm text-gray-500">El código QR "{qrCode}" no corresponde a ninguna tarima registrada.</p>
+          <p className="mt-4 text-lg font-medium text-gray-900">
+            Tarima no encontrada
+          </p>
+          <p className="mt-1 text-sm text-gray-500">
+            El código QR "{qrCode}" no corresponde a ninguna tarima registrada.
+          </p>
           <button
             onClick={onBack}
             className="mt-6 px-6 py-2 bg-[#16343f] text-white rounded-[10px] font-bold hover:bg-[#1e4456] transition-colors touch-target"
@@ -181,10 +222,22 @@ export default function TarimaDetalle({
     return (
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 p-4 lg:p-7 size-full overflow-y-auto">
         <div className="flex-1 flex flex-col items-center justify-center py-12">
-          <svg className="w-24 h-24 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          <svg
+            className="w-24 h-24 text-red-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            />
           </svg>
-          <p className="mt-4 text-lg font-medium text-gray-900">Error al cargar la tarima</p>
+          <p className="mt-4 text-lg font-medium text-gray-900">
+            Error al cargar la tarima
+          </p>
           <p className="mt-1 text-sm text-gray-500">{message}</p>
           <div className="mt-6 flex gap-4">
             <button
@@ -239,7 +292,16 @@ export default function TarimaDetalle({
                         fontWeight: 800,
                       }}
                     >
-                      TARIMA {data.qrIdentifier.split("-").pop()?.padStart(2, "0") || "03"} / {data.receptionFolio ? data.receptionFolio.split("·")[1]?.trim().split(" ")[0] : "20"}
+                      TARIMA{" "}
+                      {data.qrIdentifier.split("-").pop()?.padStart(2, "0") ||
+                        "03"}{" "}
+                      /{" "}
+                      {data.receptionFolio
+                        ? data.receptionFolio
+                            .split("·")[1]
+                            ?.trim()
+                            .split(" ")[0]
+                        : "20"}
                     </p>
                   </>
                 )}
@@ -290,7 +352,10 @@ export default function TarimaDetalle({
                   <img alt="" className="size-[7px]" src={imgIndicador} />
                   <p
                     className="font-bold text-[#16845b] text-[13px] whitespace-nowrap"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 700,
+                    }}
                   >
                     Sistema en línea
                   </p>
@@ -300,14 +365,26 @@ export default function TarimaDetalle({
                   className="flex items-center gap-2 bg-[#f2b84b] text-white px-3 py-2 rounded-[8px] font-bold text-[11px] hover:bg-[#d9a03e] transition-colors touch-target"
                   style={{ fontFamily: "'Inter', sans-serif" }}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="7 10 12 15 17 10" />
                     <line x1="12" y1="15" x2="12" y2="3" />
                   </svg>
                   <span
                     className="text-[11px] lg:text-[12px] text-white whitespace-nowrap"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 700,
+                    }}
                   >
                     Descargar
                   </span>
@@ -351,10 +428,10 @@ export default function TarimaDetalle({
                           {fmt === "SVG"
                             ? "Vector (SVG)"
                             : fmt === "PNG"
-                            ? "Imagen PNG"
-                            : fmt === "JPEG"
-                            ? "Imagen JPEG"
-                            : "Documento PDF"}
+                              ? "Imagen PNG"
+                              : fmt === "JPEG"
+                                ? "Imagen JPEG"
+                                : "Documento PDF"}
                         </span>
                       </button>
                     ))}
@@ -397,23 +474,28 @@ export default function TarimaDetalle({
 
             <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col gap-4 p-4 lg:p-5 rounded-[20px] w-full">
               <div className="flex items-center gap-3 w-full">
-                <div className="bg-[#e7f0f2] flex items-center justify-center rounded-[12px] shrink-0" style={{ width: 48, height: 48 }}>
-                  <img
-                    alt=""
-                    className="size-[30px]"
-                    src={imgQrCode}
-                  />
+                <div
+                  className="bg-[#e7f0f2] flex items-center justify-center rounded-[12px] shrink-0"
+                  style={{ width: 48, height: 48 }}
+                >
+                  <img alt="" className="size-[30px]" src={imgQrCode} />
                 </div>
                 <div className="flex flex-col gap-1 w-full">
                   <p
                     className="font-bold text-[#607078] text-[11px] uppercase"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 700,
+                    }}
                   >
                     Código QR
                   </p>
                   <p
                     className="font-extrabold text-[#172126] text-[14px] truncate"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 800,
+                    }}
                   >
                     {data.qrIdentifier}
                   </p>
@@ -424,13 +506,19 @@ export default function TarimaDetalle({
                 <div className="flex-1 bg-[#f0f5fa] rounded-[14px] p-3">
                   <p
                     className="font-bold text-[#607078] text-[11px] uppercase"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 700,
+                    }}
                   >
                     Lote
                   </p>
                   <p
                     className="font-extrabold text-[#172126] text-[15px] truncate"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 800,
+                    }}
                   >
                     {data.lot || "—"}
                   </p>
@@ -438,27 +526,41 @@ export default function TarimaDetalle({
                 <div className="flex-1 bg-[#f0f5fa] rounded-[14px] p-3">
                   <p
                     className="font-bold text-[#607078] text-[11px] uppercase"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 700,
+                    }}
                   >
                     Caducidad
                   </p>
                   <p
                     className="font-extrabold text-[#172126] text-[15px] truncate"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 800,
+                    }}
                   >
-                    {data.expiryDate?.toDate?.() ? data.expiryDate.toDate().toLocaleDateString("es-MX") : "—"}
+                    {data.expiryDate?.toDate?.()
+                      ? data.expiryDate.toDate().toLocaleDateString("es-MX")
+                      : "—"}
                   </p>
                 </div>
                 <div className="flex-1 bg-[#f0f5fa] rounded-[14px] p-3">
                   <p
                     className="font-bold text-[#607078] text-[11px] uppercase"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 700,
+                    }}
                   >
                     Cantidad
                   </p>
                   <p
                     className="font-extrabold text-[#172126] text-[15px] truncate"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 800,
+                    }}
                   >
                     {data.quantity} {data.unit}
                   </p>
@@ -469,13 +571,19 @@ export default function TarimaDetalle({
                 <div className="flex-1 bg-[#e2f5ec] rounded-[14px] p-3">
                   <p
                     className="font-bold text-[#16845b] text-[11px] uppercase"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 700,
+                    }}
                   >
                     Ubicación
                   </p>
                   <p
                     className="font-extrabold text-[#172126] text-[15px] truncate"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 800,
+                    }}
                   >
                     {data.location || "—"}
                   </p>
@@ -483,13 +591,19 @@ export default function TarimaDetalle({
                 <div className="flex-1 bg-[#e7f0f2] rounded-[14px] p-3">
                   <p
                     className="font-bold text-[#3276a8] text-[11px] uppercase"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 700,
+                    }}
                   >
                     Estado
                   </p>
                   <p
                     className="font-extrabold text-[#3276a8] text-[15px] truncate"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 800,
+                    }}
                   >
                     {data.status}
                   </p>
@@ -497,15 +611,23 @@ export default function TarimaDetalle({
                 <div className="flex-1 bg-[#fff5dd] rounded-[14px] p-3">
                   <p
                     className="font-bold text-[#8e592e] text-[11px] uppercase"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 700,
+                    }}
                   >
                     Registrado
                   </p>
                   <p
                     className="font-extrabold text-[#8e592e] text-[15px] truncate"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 800,
+                    }}
                   >
-                    {data.createdAt?.toDate?.() ? data.createdAt.toDate().toLocaleDateString("es-MX") : "—"}
+                    {data.createdAt?.toDate?.()
+                      ? data.createdAt.toDate().toLocaleDateString("es-MX")
+                      : "—"}
                   </p>
                 </div>
               </div>
@@ -520,13 +642,19 @@ export default function TarimaDetalle({
                   />
                   <p
                     className="font-extrabold text-[#172126] text-[8px] lg:text-[9px] whitespace-nowrap"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 800,
+                    }}
                   >
                     {data.qrIdentifier}
                   </p>
                   <p
                     className="text-[#607078] text-[7px] lg:text-[8px] whitespace-nowrap"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontWeight: 400,
+                    }}
                   >
                     ETIQUETA IMPRIMIBLE
                   </p>
@@ -553,7 +681,10 @@ export default function TarimaDetalle({
                     </svg>
                     <span
                       className="text-[11px] lg:text-[12px] text-[#172126] whitespace-nowrap"
-                      style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
+                      style={{
+                        fontFamily: "'Inter', sans-serif",
+                        fontWeight: 700,
+                      }}
                     >
                       Imprimir
                     </span>
@@ -578,7 +709,10 @@ export default function TarimaDetalle({
                     </svg>
                     <span
                       className="text-[11px] lg:text-[12px] text-[#172126] whitespace-nowrap"
-                      style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
+                      style={{
+                        fontFamily: "'Inter', sans-serif",
+                        fontWeight: 700,
+                      }}
                     >
                       Descargar
                     </span>
@@ -617,11 +751,29 @@ export default function TarimaDetalle({
                   className="font-extrabold text-[#172126] text-[15px] lg:text-lg whitespace-nowrap"
                   style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
                 >
-                  {data.receptionFolio?.split("·")[0]?.trim() || data.productCode || "OC-24891"} · {data.receptionFolio?.split("·")[1]?.trim().split(" ")[0] || "20"} tarimas
+                  {data.receptionFolio?.split("·")[0]?.trim() ||
+                    data.productCode ||
+                    "OC-24891"}{" "}
+                  ·{" "}
+                  {data.receptionFolio?.split("·")[1]?.trim().split(" ")[0] ||
+                    "20"}{" "}
+                  tarimas
                 </p>
               </div>
               <button
-                onClick={onBack}
+                onClick={() =>
+                  onViewReference?.({
+                    recId:
+                      currentReception?.ocFolio ||
+                      data.receptionFolio?.split("·")[0]?.trim() ||
+                      "OC-24891",
+                    tarimas: currentReception?.tarimas ?? 20,
+                    proveedor:
+                      currentReception?.proveedor || data.supplierName || "—",
+                    proveedorLogistico:
+                      currentReception?.proveedorLogistico || "Logística Veloz",
+                  })
+                }
                 className="font-extrabold text-[#16343f] text-[14px] lg:text-[15px] whitespace-nowrap hover:underline touch-target"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
               >
@@ -635,7 +787,9 @@ export default function TarimaDetalle({
   }
 
   if (detailState.status === "loading") return renderLoading()
-  if (detailState.status === "not-found") return renderNotFound(detailState.qrCode)
-  if (detailState.status === "error") return renderError(detailState.message, detailState.retry)
+  if (detailState.status === "not-found")
+    return renderNotFound(detailState.qrCode)
+  if (detailState.status === "error")
+    return renderError(detailState.message, detailState.retry)
   return renderSuccess(detailState.data)
 }

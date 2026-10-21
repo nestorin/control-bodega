@@ -76,7 +76,7 @@ export type ReceptionData = z.infer<typeof ReceptionDataSchema>
  */
 export function validateReceptionData(
   data: any,
-): { valid: boolean errors?: string[] } {
+): { valid: boolean; errors?: string[] } {
   try {
     const parsed = ReceptionDataSchema.parse(data)
     return { valid: true }
@@ -99,7 +99,7 @@ export function validateReceptionData(
  */
 export function validateReceptionDoc(
   data: any,
-): { valid: boolean errors?: string[] } {
+): { valid: boolean; errors?: string[] } {
   try {
     const parsed = ReceptionDocSchema.parse(data)
     return { valid: true }
@@ -122,7 +122,7 @@ export function validateReceptionDoc(
  */
 export function validateReceptionLine(
   data: any,
-): { valid: boolean errors?: string[] } {
+): { valid: boolean; errors?: string[] } {
   try {
     const parsed = ReceptionLineSchema.parse(data)
     return { valid: true }

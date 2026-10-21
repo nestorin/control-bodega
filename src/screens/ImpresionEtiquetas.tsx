@@ -17,7 +17,7 @@ interface Tarima {
 
 interface Props {
   onClose: () => void
-  currentReception?: { ocFolio: string tarimas: number } | null
+  currentReception?: { ocFolio: string; tarimas: number } | null
   conversionesTabla?: Array<{
     producto: string
     codigo: string

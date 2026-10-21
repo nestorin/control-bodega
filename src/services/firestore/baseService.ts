@@ -58,7 +58,7 @@ export abstract class BaseService<T extends { id: string }> {
       limit?: number
       startAfter?: DocumentSnapshot
     } = {},
-  ): Promise<{ data: T[] lastDoc?: DocumentSnapshot hasMore: boolean }> {
+  ): Promise<{ data: T[]; lastDoc?: DocumentSnapshot; hasMore: boolean }> {
     const constraints: QueryConstraint[] = []
 
     if (options.where) {
@@ -101,6 +101,7 @@ export abstract class BaseService<T extends { id: string }> {
     } = {},
   ): Promise<T[]> {
     const constraints: QueryConstraint[] = []
+    const isPalletQuery = subcollectionName === "pallets"
 
     if (options.where) {
       options.where.forEach(([field, op, value]) => {
@@ -108,10 +109,18 @@ export abstract class BaseService<T extends { id: string }> {
       })
     }
     constraints.push(where("organizationId", "==", this.orgId))
+    if (isPalletQuery) {
+      const warehouseScope = options.where?.some(([field]) => field === "warehouseId")
+      if (!warehouseScope) {
+        throw new Error("Pallet collection-group queries require a warehouse scope")
+      }
+    }
     if (options.orderBy) {
       constraints.push(orderBy(options.orderBy[0], options.orderBy[1]))
     }
-    if (options.limit) {
+    if (isPalletQuery) {
+      constraints.push(limit(Math.min(options.limit ?? 43, 43)))
+    } else if (options.limit) {
       constraints.push(limit(options.limit))
     }
 
@@ -144,7 +153,7 @@ export abstract class BaseService<T extends { id: string }> {
       id,
       createdAt: now,
       updatedAt: now,
-    } as T & { createdAt: any updatedAt: any })
+    } as T & { createdAt: any; updatedAt: any })
 
     await runTransaction(this.db, async (tx) => {
       tx.set(this.getDocRef(id), docData)

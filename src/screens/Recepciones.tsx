@@ -8,6 +8,7 @@ import { useOfflineQueue } from "@/hooks/useFirestore"
 import type { ReceptionDoc } from "@/services/firestore/types"
 import { WAREHOUSE_IDS } from "@/config/warehouses"
 import { useAuthorization, isPermissionDenied } from "@/hooks/useAuthorization"
+import { Panel, StatusBadge, TouchTarget } from "@/components/ui"
 
 const imgIndicador = "/assets/08d70.svg"
 const imgIndicadorRed = "/assets/9d6fd.svg"
@@ -216,9 +217,10 @@ function RowMenu({
 
   return (
     <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
-      <button
+      <TouchTarget
+        type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center justify-center size-8 rounded-lg hover:bg-[#edf1f3] transition-colors text-[#607078]"
+        className="!min-h-8 !min-w-8 size-8 rounded-lg hover:bg-[#edf1f3] transition-colors text-[#607078]"
         title="Opciones"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -226,7 +228,7 @@ function RowMenu({
           <circle cx="12" cy="12" r="1.5" />
           <circle cx="12" cy="19" r="1.5" />
         </svg>
-      </button>
+      </TouchTarget>
 
       {open && (
         <div className="absolute right-0 top-10 z-50 bg-white border border-[#dce4e7] rounded-[14px] shadow-[0px_12px_28px_rgba(22,52,63,0.14)] overflow-hidden min-w-[160px]">
@@ -718,10 +720,19 @@ export default function Recepciones({
 
         <div className="flex flex-col gap-3 w-full">
           {listaFiltrada.map((rec) => (
-            <div
+            <Panel
               key={rec.id}
-              className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex items-center justify-between px-4 md:px-5 py-3 md:py-4 rounded-[20px] w-full hover:shadow-[0px_12px_20px_rgba(22,52,63,0.12)] transition-shadow touch-target"
+              role="button"
+              tabIndex={0}
+              aria-label={`Abrir recepción ${rec.id}`}
+              className="flex items-center justify-between px-4 md:px-5 py-3 md:py-4 w-full hover:shadow-[0px_12px_20px_rgba(22,52,63,0.12)] transition-shadow touch-target cursor-pointer"
               onClick={() => onSelectTarima(rec.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault()
+                  onSelectTarima(rec.id)
+                }
+              }}
             >
               <div className="flex flex-col gap-1 items-start flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -788,29 +799,19 @@ export default function Recepciones({
               </div>
 
               <div className="flex items-center gap-3 shrink-0 ml-4 md:ml-4">
-                <div
-                  className="flex gap-[7px] items-center px-[11px] py-[7px] rounded-full flex-shrink-0"
-                  style={{ backgroundColor: rec.bg }}
-                >
-                  <img alt="" className="size-[7px]" src={rec.img} />
-                  <p
-                    className="font-bold text-sm md:text-[13px] whitespace-nowrap"
-                    style={{
-                      fontFamily: "'Inter', sans-serif",
-                      fontWeight: 700,
-                      color: rec.color,
-                    }}
-                  >
-                    {rec.estado}
-                  </p>
-                </div>
+                <StatusBadge
+                  label={rec.estado}
+                  indicatorSrc={rec.img}
+                  backgroundColor={rec.bg}
+                  labelColor={rec.color}
+                />
                 <RowMenu
                   recId={rec.id}
                   onEdit={() => onEdit(rec.id)}
                   onDelete={() => setDeleteTarget(rec.id)}
                 />
               </div>
-            </div>
+            </Panel>
           ))}
         </div>
       </div>

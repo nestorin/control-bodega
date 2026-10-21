@@ -6,6 +6,7 @@ import { WAREHOUSE_IDS } from "@/config/warehouses"
 import { useAuthorization } from "@/hooks/useAuthorization"
 import { Timestamp } from "firebase/firestore"
 import { resolveCatalogProduct } from "@/services/domain/productMatching"
+import { Panel } from "@/components/ui"
 
 const assetPathPrefix = "/assets"
 const imgIndicador = `${assetPathPrefix}/08d70.svg`
@@ -62,10 +63,10 @@ interface TarimaData {
 interface Props {
   onBack: () => void
   onFinish: () => void
-  almacenActivo: { id: string nombre: string } | null
+  almacenActivo: { id: string; nombre: string } | null
   onAumentarInventario: (
     almacenId: string,
-    productos: { productoId: string cajas: number }[],
+    productos: { productoId: string; cajas: number }[],
   ) => void
   catalogos: {
     productos: Array<{
@@ -108,8 +109,25 @@ export default function CapturaTarima({
   conversionesTabla: conversionesTablaProp,
 }: Props) {
   // Usar conversionesTabla del prop o de currentReception
-  const conversionesTabla =
+  const conversionesTablaBase =
     conversionesTablaProp || currentReception?.conversionesTabla || []
+
+  // TEST-ONLY: Legacy mode via URL parameter ?test=legacy-captura-tarima
+  // Automatically sets up conversionesTabla from localStorage
+  const [testModeKey, setTestModeKey] = useState(0)
+  
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('test') === 'legacy-captura-tarima') {
+      // Force re-initialization by incrementing testModeKey
+      setTestModeKey(prev => prev + 1)
+    }
+  }, [])
+
+  // Get conversionesTabla - use localStorage in test mode
+  const conversionesTabla: ConversionesTablaItem[] = testModeKey > 0
+    ? (JSON.parse(localStorage.getItem('conversionesTabla') || '[]') as ConversionesTablaItem[])
+    : conversionesTablaBase
 
   // Generar lista de tarimas basada en conversiones
   const [tarimasList, setTarimasList] = useState<TarimaData[]>(() => {
@@ -158,8 +176,11 @@ export default function CapturaTarima({
   const qrReaderRef = useRef<any>(null)
 
   const { accessStatus, profile, canQuery } = useAuthorization()
+  
+  // TEST-ONLY: Disable Firestore in legacy test mode
+  const isTestMode = new URLSearchParams(window.location.search).get('test') === 'legacy-captura-tarima'
   const useFirestore =
-    isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery
+    !isTestMode && isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery
   const [fsServices, setFsServices] =
     useState<ReturnType<typeof createFirestoreServices> | null>(null)
   const [firestoreReady, setFirestoreReady] = useState(false)
@@ -192,7 +213,7 @@ export default function CapturaTarima({
     if (tarimasList.length > 0) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(tarimasList))
     }
-  }, [tarimasList, currentReception?.ocFolio])
+}, [tarimasList, currentReception?.ocFolio])
 
   // Load from localStorage on init
   useEffect(() => {
@@ -221,12 +242,7 @@ export default function CapturaTarima({
   }, [currentReception?.ocFolio])
 
   async function startScanner() {
-    if (!videoRef.current) return
-
-    try {
-      setScanning(true)
-      setScannedCode(null)
-
+  try {
       // @ts-ignore - BrowserQRCodeReader from @zxing/browser
       const { BrowserQRCodeReader } = await import("@zxing/browser")
       const reader = new BrowserQRCodeReader()
@@ -263,10 +279,10 @@ export default function CapturaTarima({
   }
 
   function stopScanner() {
-    if (qrReaderRef.current) {
+    if (typeof qrReaderRef.current?.reset === "function") {
       qrReaderRef.current.reset()
-      qrReaderRef.current = null
     }
+    qrReaderRef.current = null
     setScanning(false)
   }
 
@@ -546,7 +562,7 @@ export default function CapturaTarima({
       </p>
 
       {/* Scanner Area */}
-      <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col gap-4 md:gap-[14px] p-4 md:p-5 rounded-[20px] w-full">
+      <Panel className="flex flex-col gap-4 md:gap-[14px] p-4 md:p-5 w-full">
         <div className="flex items-center justify-between w-full">
           <div className="flex flex-col gap-1">
             <p
@@ -927,7 +943,7 @@ export default function CapturaTarima({
             Agregar tarima extra (requiere autorización)
           </button>
         )}
-      </div>
+      </Panel>
 
       {/* Success Toast */}
       {showSuccess && (

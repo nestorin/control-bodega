@@ -12,7 +12,7 @@ export interface InventoryImportRow {
 
 export interface InventoryImportPreview {
   validRows: InventoryImportRow[]
-  errors: Array<{ rowNumber: number message: string }>
+  errors: Array<{ rowNumber: number; message: string }>
 }
 
 const aliases: Record<string, string> = {

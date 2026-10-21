@@ -9,9 +9,10 @@ vi.mock("@/hooks/useAuthorization", () => ({
 describe("NuevaRecepcionStep2 persistence contract", () => {
   it("keeps a valid selected product and advances without rejecting it", () => {
     const onContinue = vi.fn()
+    const onBack = vi.fn()
     render(
       <NuevaRecepcionStep2
-        onBack={vi.fn()}
+        onBack={onBack}
         onContinue={onContinue}
         catalogos={{
           proveedores: [],
@@ -49,6 +50,8 @@ describe("NuevaRecepcionStep2 persistence contract", () => {
     )
 
     expect(screen.getByText(/Producto canónico/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Atrás" }))
+    expect(onBack).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByRole("button", { name: "Crear recepción" }))
     expect(onContinue).toHaveBeenCalledTimes(1)
   })
