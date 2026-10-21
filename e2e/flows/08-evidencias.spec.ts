@@ -31,8 +31,8 @@ test.describe("Flujo: Evidencias Fotográficas (P0)", () => {
 
     // ===== PASO 2: Subir fotos =====
     // Subir archivos de fixture
-    const trailerFixture = "tests/e2e/fixtures/sample-trailer.jpg";
-    const productoFixture = "tests/e2e/fixtures/sample-producto.jpg";
+    const trailerFixture = "e2e/fixtures/sample-trailer.jpg";
+    const productoFixture = "e2e/fixtures/sample-producto.jpg";
 
     // Slot 1: Foto del tráiler
     await page.getByText("Foto de la mercancía dentro del tráiler").click();

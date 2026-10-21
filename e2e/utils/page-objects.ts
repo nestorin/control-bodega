@@ -789,8 +789,8 @@ function fieldToLabel(field: string): string {
  * Fixtures de prueba para evidencias
  */
 export const EVIDENCIA_TEST = {
-  fotoTrailer: "tests/e2e/fixtures/sample-trailer.jpg",
-  fotoProducto: "tests/e2e/fixtures/sample-producto.jpg",
+  fotoTrailer: "e2e/fixtures/sample-trailer.jpg",
+  fotoProducto: "e2e/fixtures/sample-producto.jpg",
 };
 
 /**
