@@ -104,6 +104,12 @@ jobs:
           python -m venv functions/venv
           functions/venv/bin/python -m pip install --disable-pip-version-check -r functions/requirements.txt
 
+      - name: Set up Java for Firebase emulators
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
       - name: Install Firebase CLI
         run: npm install --global firebase-tools@15.30.2
 
