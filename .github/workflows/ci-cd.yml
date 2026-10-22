@@ -223,12 +223,12 @@ jobs:
           # firebase.json lives at the repo root; hosting.public points at dist.
           entryPoint: .
 
-      - name: Deploy Firestore Rules & Indexes
+      - name: Deploy Firestore & Storage Rules and Indexes
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa/sa.json
         run: |
           npm install -g firebase-tools
-          firebase deploy --only firestore:rules,firestore:indexes --project exepa-almacen-safe
+          firebase deploy --only firestore:rules,firestore:indexes,storage --project exepa-almacen-safe
 
       # The firebase CLI requires the Python functions source to ship a venv
       # containing the Functions SDK (same requirement the E2E job satisfies
