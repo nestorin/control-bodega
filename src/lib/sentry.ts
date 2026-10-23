@@ -10,7 +10,7 @@ import * as Sentry from "@sentry/react";
 const version = "1.0.0";
 
 // Configuración base de Sentry
-const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN || process.env.SENTRY_DSN;
+const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 
 // Solo inicializar si tenemos DSN
 if (SENTRY_DSN) {
@@ -19,7 +19,7 @@ if (SENTRY_DSN) {
     integrations: [Sentry.browserTracingIntegration()],
     tracesSampleRate: 1.0,
     release: `tarimaqr@${version}`,
-    environment: import.meta.env.MODE || process.env.NODE_ENV || "development",
+    environment: import.meta.env.MODE || "development",
     beforeSend(event, hint) {
       // Filtrar errores comunes que no son críticos
       if (
@@ -61,7 +61,7 @@ export function captureError(error: Error, context?: Record<string, any>) {
         ...context,
         app: {
           version: version,
-          environment: import.meta.env.MODE || process.env.NODE_ENV || "development",
+          environment: import.meta.env.MODE || "development",
         },
       },
     });
