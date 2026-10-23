@@ -96,21 +96,18 @@ describe("ProtectedRoute", () => {
     expect(screen.getByText("Login page")).toBeInTheDocument();
   });
 
-  it.each(["PENDING", "INACTIVE"] as const)(
-    "redirects %s memberships to unauthorized",
-    (accessStatus) => {
-      vi.mocked(useAuth).mockReturnValue(
-        authState({
-          profile: { ...activeProfile, status: accessStatus },
-          accessStatus,
-        }),
-      );
+  it("redirects inactive memberships to unauthorized", () => {
+    vi.mocked(useAuth).mockReturnValue(
+      authState({
+        profile: { ...activeProfile, status: "INACTIVE" },
+        accessStatus: "INACTIVE",
+      }),
+    );
 
-      renderRoute();
+    renderRoute();
 
-      expect(screen.getByText("Unauthorized page")).toBeInTheDocument();
-    },
-  );
+    expect(screen.getByText("Unauthorized page")).toBeInTheDocument();
+  });
 
   it("renders protected content for an active authorized membership", () => {
     renderRoute({
@@ -135,12 +132,12 @@ describe("ProtectedRoute", () => {
 
   it("carries the access-status reason when the membership is not active", () => {
     vi.mocked(useAuth).mockReturnValue(
-      authState({ profile: { ...activeProfile, status: "PENDING" }, accessStatus: "PENDING" }),
+      authState({ profile: { ...activeProfile, status: "INACTIVE" }, accessStatus: "INACTIVE" }),
     );
 
     renderRoute();
 
-    expect(screen.getByTestId("redirect-reason")).toHaveTextContent('"PENDING"');
+    expect(screen.getByTestId("redirect-reason")).toHaveTextContent('"INACTIVE"');
   });
 
   it("carries the role reason when the role check fails", () => {

@@ -8,7 +8,7 @@ import {
   updateProfile,
   type User,
 } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, type Firestore } from "firebase/firestore";
 import { ORGANIZATION_ID } from "@/config/organization";
 import { normalizeWarehouseId, WAREHOUSE_IDS } from "@/config/warehouses";
 import { auth, db, googleProvider } from "@/lib/firebase";
@@ -48,7 +48,14 @@ export interface UserProfile {
   status: MembershipStatus;
 }
 
-export type AccessStatus = "UNAUTHENTICATED" | "PENDING" | "ACTIVE" | "INACTIVE" | "ERROR";
+export type AccessStatus = "UNAUTHENTICATED" | "ACTIVE" | "INACTIVE" | "ERROR";
+
+// Open sign-up: every authenticated account gets an immediately usable
+// profile. The writer cannot pick role, status or warehouse scope - they are
+// fixed here and independently enforced by firestore.rules, so a self-serve
+// signup can never become ADMIN.
+const PROVISIONED_ROLE: MembershipRole = "GERENTE_ALMACEN";
+const PROVISIONED_WAREHOUSES = [...Object.values(WAREHOUSE_IDS)];
 
 export function isValidMembership(value: unknown, uid: string): value is UserProfile {
   if (!value || typeof value !== "object") return false;
@@ -57,7 +64,7 @@ export function isValidMembership(value: unknown, uid: string): value is UserPro
     membership.userId === uid &&
     membership.organizationId === ORGANIZATION_ID &&
     membershipRoleSchema.safeParse(membership.role).success &&
-    ["ACTIVE", "INACTIVE", "PENDING"].includes(membership.status ?? "") &&
+    ["ACTIVE", "INACTIVE"].includes(membership.status ?? "") &&
     (membership.warehouseId == null ||
       (typeof membership.warehouseId === "string" &&
         normalizeWarehouseId(membership.warehouseId) != null)) &&
@@ -91,6 +98,66 @@ export function normalizeMembership(profile: UserProfile): UserProfile {
     warehouseId: warehouseIds?.[0] ?? null,
     warehouseIds: warehouseIds ?? undefined,
   };
+}
+
+function requireMembership(value: unknown, uid: string): UserProfile {
+  if (!isValidMembership(value, uid)) {
+    throw new Error("The membership record is invalid or does not match the signed-in user.");
+  }
+  return normalizeMembership(value);
+}
+
+/**
+ * Resolve the membership for a signed-in user, creating it on first login.
+ *
+ * Provisioning happens here instead of in a sign-up handler so that every
+ * auth provider (password, Google, any future one) follows the same path.
+ * `setDoc` on an existing profile is an update, which the rules reserve for
+ * admins, so an existing membership can never be overwritten or self-elevated.
+ */
+async function provisionMembership(firestore: Firestore, user: User): Promise<UserProfile> {
+  const profileRef = doc(firestore, "organizations", ORGANIZATION_ID, "users", user.uid);
+  const existing = await getDoc(profileRef);
+
+  if (!existing.exists()) {
+    try {
+      await setDoc(profileRef, {
+        userId: user.uid,
+        organizationId: ORGANIZATION_ID,
+        role: PROVISIONED_ROLE,
+        status: "ACTIVE",
+        warehouseIds: PROVISIONED_WAREHOUSES,
+        displayName: user.displayName ?? "",
+        email: user.email ?? "",
+      });
+    } catch (error) {
+      // A concurrent session may have provisioned the profile first; the rules
+      // reject overwriting an existing membership, so re-read it instead.
+      const concurrent = await getDoc(profileRef);
+      if (!concurrent.exists()) throw error;
+      return requireMembership(concurrent.data(), user.uid);
+    }
+    return normalizeMembership({
+      userId: user.uid,
+      organizationId: ORGANIZATION_ID,
+      role: PROVISIONED_ROLE,
+      status: "ACTIVE",
+      warehouseIds: PROVISIONED_WAREHOUSES,
+    });
+  }
+
+  const stored = existing.data();
+  const membership = requireMembership(stored, user.uid);
+
+  // Firebase Auth resolves displayName/email after the profile exists (register
+  // calls updateProfile afterwards), so mirror them once they arrive.
+  const displayName = user.displayName ?? "";
+  const email = user.email ?? "";
+  if ((displayName && stored.displayName !== displayName) || (email && stored.email !== email)) {
+    await updateDoc(profileRef, { displayName, email });
+  }
+
+  return membership;
 }
 
 interface AuthContextType {
@@ -178,33 +245,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return;
           }
 
-          const profileRef = doc(
-            firestore,
-            "organizations",
-            ORGANIZATION_ID,
-            "users",
-            firebaseUser.uid,
-          );
-          const profileSnap = await getDoc(profileRef);
+          const membership = await provisionMembership(firestore, firebaseUser);
           if (!active) return;
 
-          if (!profileSnap.exists()) {
-            // Memberships are provisioned by an administrator/backend only.
-            setProfile(null);
-            setAccessStatus("PENDING");
-            return;
-          }
-
-          const membership = profileSnap.data();
-          if (!isValidMembership(membership, firebaseUser.uid)) {
-            throw new Error(
-              "The membership record is invalid or does not match the signed-in user.",
-            );
-          }
-
-          const normalizedMembership = normalizeMembership(membership);
-          setProfile(normalizedMembership);
-          setAccessStatus(normalizedMembership.status);
+          setProfile(membership);
+          setAccessStatus(membership.status);
         } catch (error) {
           if (!active) return;
           setProfile(null);
@@ -238,10 +283,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (email: string, password: string, displayName: string) => {
-    if (!auth) throw new Error("Firebase is not configured.");
+    if (!auth || !db) throw new Error("Firebase is not configured.");
     const result = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(result.user, { displayName });
-    // An administrator/backend must create organizations/{orgId}/users/{uid}.
+    // The auth listener provisions the ACTIVE membership in parallel; this
+    // second pass mirrors the display name that updateProfile just resolved.
+    await provisionMembership(db, result.user);
   };
 
   const loginWithGoogle = async () => {

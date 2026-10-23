@@ -8,8 +8,6 @@ const imgLogo = `${assetPathPrefix}/4cca0.svg`;
 
 function messageFor(reason: string | undefined, accessStatus: string): string {
   switch (reason ?? accessStatus) {
-    case "PENDING":
-      return "Tu cuenta no tiene acceso asignado todavía. Pide a tu administrador que active tu usuario con la referencia que aparece abajo.";
     case "INACTIVE":
       return "Tu cuenta está inactiva. Contacta a tu supervisor o administrador.";
     case "ERROR":
@@ -67,7 +65,7 @@ export default function Unauthorized() {
           </p>
         )}
 
-        {accessRef && (cause === "PENDING" || cause === "ERROR") && (
+        {accessRef && cause === "ERROR" && (
           <div className="bg-[#f4f7f8] border border-[#dce4e7] rounded-[12px] p-3 mb-6 text-left">
             <p
               className="text-[#607078] text-[11px] uppercase font-bold mb-2"

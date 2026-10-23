@@ -28,7 +28,9 @@ ROLES = {
     "OPERATOR", "SUPERVISOR", "AUDITOR", "ADMIN",
     "AUXILIAR_ALMACENISTA", "GERENTE_ALMACEN",
 }
-MEMBERSHIP_STATUSES = {"PENDING", "ACTIVE", "INACTIVE"}
+# PENDING is gone: open sign-up provisions ACTIVE profiles directly, so there
+# is no approval queue for an admin to move anyone out of.
+MEMBERSHIP_STATUSES = {"ACTIVE", "INACTIVE"}
 
 # CORS configuration for production domain
 ALLOWED_ORIGIN = "https://exepa-almacen-safe.web.app"

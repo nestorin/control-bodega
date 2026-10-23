@@ -15,7 +15,9 @@ export const ROLE_VALUES = [
 export const membershipRoleSchema = z.enum(ROLE_VALUES);
 export type MembershipRole = z.infer<typeof membershipRoleSchema>;
 
-export const membershipStatusSchema = z.enum(["ACTIVE", "INACTIVE", "PENDING"]);
+// Open sign-up provisions ACTIVE profiles directly; there is no approval queue,
+// so PENDING is no longer a reachable state.
+export const membershipStatusSchema = z.enum(["ACTIVE", "INACTIVE"]);
 export type MembershipStatus = z.infer<typeof membershipStatusSchema>;
 
 export const membershipSchema = z

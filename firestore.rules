@@ -132,18 +132,46 @@ service cloud.firestore {
         // The owner may read status before ACTIVE, but cannot list memberships.
         allow get: if request.auth != null && request.auth.uid == userId;
         allow list: if isMemberOf(orgId);
-        // Allow users to create their own profile on first login
+        // Open sign-up: the first login provisions an immediately usable
+        // profile. The writer cannot choose role, status or warehouse scope,
+        // so this cannot be used to self-elevate, and only ACTIVE is ever
+        // created - there is no approval queue to wait in.
         allow create: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.keys().hasOnly([
+               'userId', 'organizationId', 'role', 'status',
+               'warehouseId', 'warehouseIds', 'displayName', 'email'
+             ])
           && request.resource.data.userId == request.auth.uid
           && request.resource.data.organizationId == orgId
-          && request.resource.data.status == 'PENDING'
-          && request.resource.data.role in ['AUXILIAR_ALMACENISTA', 'OPERATOR']
+          && request.resource.data.status == 'ACTIVE'
+          && request.resource.data.role == 'GERENTE_ALMACEN'
           && (!('warehouseId' in request.resource.data) ||
               request.resource.data.warehouseId == null)
-          && (!('warehouseIds' in request.resource.data) ||
-              (request.resource.data.warehouseIds is list &&
-               request.resource.data.warehouseIds.size() == 0));
-        allow update: if isOrgAdmin(orgId);
+          && request.resource.data.warehouseIds is list
+          && request.resource.data.warehouseIds.size() == 2
+          && request.resource.data.warehouseIds.hasAll(['wh_tehuacan_1', 'wh_tehuacan_2'])
+          && request.resource.data.warehouseIds.hasOnly(['wh_tehuacan_1', 'wh_tehuacan_2'])
+          && (!('displayName' in request.resource.data) ||
+              (request.resource.data.displayName is string &&
+               request.resource.data.displayName.size() <= 120))
+          && (!('email' in request.resource.data) ||
+              (request.resource.data.email is string &&
+               request.resource.data.email.size() <= 254));
+        // Admins own the membership lifecycle. The owner may only reconcile
+        // their own display fields (display names arrive asynchronously from
+        // Firebase Auth after the profile was provisioned), so role, status
+        // and warehouse scope can never be self-elevated.
+        allow update: if isOrgAdmin(orgId)
+          || (request.auth != null && request.auth.uid == userId
+              && resource.data.userId == request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['displayName', 'email'])
+              && (!('displayName' in request.resource.data) ||
+                  (request.resource.data.displayName is string &&
+                   request.resource.data.displayName.size() <= 120))
+              && (!('email' in request.resource.data) ||
+                  (request.resource.data.email is string &&
+                   request.resource.data.email.size() <= 254)));
         allow delete: if isOrgAdmin(orgId);
       }
 

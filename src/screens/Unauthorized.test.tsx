@@ -20,7 +20,7 @@ function authState(overrides: Record<string, unknown> = {}) {
     user,
     profile: null,
     loading: false,
-    accessStatus: "PENDING",
+    accessStatus: "INACTIVE",
     authError: null,
     login: vi.fn(),
     register: vi.fn(),
@@ -55,17 +55,21 @@ describe("Unauthorized", () => {
     });
   });
 
-  it("shows the access reference for pending memberships", () => {
-    renderPage({ reason: "PENDING" });
+  it("does not offer an access reference for inactive memberships", () => {
+    vi.mocked(useAuth).mockReturnValue(authState({ accessStatus: "INACTIVE" }));
 
-    expect(screen.getByText(/no tiene acceso asignado todavía/)).toBeInTheDocument();
-    expect(screen.getByTestId("access-ref")).toHaveTextContent(
-      "organizations/org_exepa_001/users/uid-abc-123",
-    );
+    renderPage({ reason: "INACTIVE" });
+
+    expect(screen.getByText(/Tu cuenta está inactiva/)).toBeInTheDocument();
+    expect(screen.queryByTestId("access-ref")).not.toBeInTheDocument();
   });
 
   it("copies the access reference to the clipboard", async () => {
-    renderPage({ reason: "PENDING" });
+    vi.mocked(useAuth).mockReturnValue(
+      authState({ accessStatus: "ERROR", authError: new Error("boom") }),
+    );
+
+    renderPage({ reason: "ERROR" });
 
     await userEvent.click(screen.getByRole("button", { name: "Copiar referencia" }));
 

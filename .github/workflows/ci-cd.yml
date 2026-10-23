@@ -217,6 +217,16 @@ jobs:
           mkdir -p "$RUNNER_TEMP/firebase-sa"
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-sa/sa.json"
 
+      # Rules must land before the client that depends on them: open sign-up
+      # writes a membership on first login, and deploying Hosting first would
+      # briefly reject that write against the previous rules.
+      - name: Deploy Firestore & Storage Rules and Indexes
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa/sa.json
+        run: |
+          npm install --global firebase-tools@15.30.2
+          firebase deploy --only firestore:rules,firestore:indexes,storage --project exepa-almacen-safe
+
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
@@ -226,13 +236,6 @@ jobs:
           channelId: live
           # firebase.json lives at the repo root; hosting.public points at dist.
           entryPoint: .
-
-      - name: Deploy Firestore & Storage Rules and Indexes
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa/sa.json
-        run: |
-          npm install --global firebase-tools@15.30.2
-          firebase deploy --only firestore:rules,firestore:indexes,storage --project exepa-almacen-safe
 
       # The firebase CLI requires the Python functions source to ship a venv
       # containing the Functions SDK (same requirement the E2E job satisfies

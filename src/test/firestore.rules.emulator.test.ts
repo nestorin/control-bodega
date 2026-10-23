@@ -481,4 +481,134 @@ describe("Firestore security rules (emulator)", () => {
       }),
     );
   });
+
+  describe("open sign-up self-provisioning", () => {
+    const userPath = (uid: string) => `organizations/${orgId}/users/${uid}`;
+    const provisionedProfile = (uid: string, overrides: Record<string, unknown> = {}) => ({
+      userId: uid,
+      organizationId: orgId,
+      role: "GERENTE_ALMACEN",
+      status: "ACTIVE",
+      warehouseIds: [wh1, wh2],
+      displayName: "Nuevo Usuario",
+      email: "nuevo@example.com",
+      ...overrides,
+    });
+
+    rulesTest("lets a brand-new user provision an immediately usable profile", async () => {
+      const db = testEnv!.authenticatedContext("new-user-1").firestore();
+      await assertSucceeds(
+        setDoc(doc(db, userPath("new-user-1")), provisionedProfile("new-user-1")),
+      );
+    });
+
+    rulesTest("denies self-provisioning when unauthenticated", async () => {
+      const db = testEnv!.unauthenticatedContext().firestore();
+      await assertFails(setDoc(doc(db, userPath("anon-1")), provisionedProfile("anon-1")));
+    });
+
+    rulesTest("denies self-provisioning for another uid", async () => {
+      const db = testEnv!.authenticatedContext("attacker-1").firestore();
+      await assertFails(setDoc(doc(db, userPath("victim-1")), provisionedProfile("victim-1")));
+    });
+
+    rulesTest("denies a pending status because there is no approval queue", async () => {
+      const db = testEnv!.authenticatedContext("new-user-2").firestore();
+      await assertFails(
+        setDoc(
+          doc(db, userPath("new-user-2")),
+          provisionedProfile("new-user-2", { status: "PENDING" }),
+        ),
+      );
+    });
+
+    rulesTest("denies self-elevation to admin or super admin", async () => {
+      const db = testEnv!.authenticatedContext("new-user-3").firestore();
+      await assertFails(
+        setDoc(
+          doc(db, userPath("new-user-3")),
+          provisionedProfile("new-user-3", { role: "ADMIN" }),
+        ),
+      );
+      await assertFails(
+        setDoc(
+          doc(db, userPath("new-user-4")),
+          provisionedProfile("new-user-4", { role: "SUPER_ADMIN" }),
+        ),
+      );
+    });
+
+    rulesTest("denies narrowing or widening the warehouse scope", async () => {
+      const db = testEnv!.authenticatedContext("new-user-5").firestore();
+      await assertFails(
+        setDoc(
+          doc(db, userPath("new-user-5")),
+          provisionedProfile("new-user-5", { warehouseIds: [wh1] }),
+        ),
+      );
+      await assertFails(
+        setDoc(
+          doc(db, userPath("new-user-6")),
+          provisionedProfile("new-user-6", { warehouseIds: [wh1, wh2, "wh_other"] }),
+        ),
+      );
+    });
+
+    rulesTest("denies unknown fields and a non-null legacy warehouseId", async () => {
+      const db = testEnv!.authenticatedContext("new-user-7").firestore();
+      await assertFails(
+        setDoc(
+          doc(db, userPath("new-user-7")),
+          provisionedProfile("new-user-7", { isAdmin: true }),
+        ),
+      );
+      await assertFails(
+        setDoc(
+          doc(db, userPath("new-user-8")),
+          provisionedProfile("new-user-8", { warehouseId: wh1 }),
+        ),
+      );
+    });
+
+    rulesTest("denies overlong display fields", async () => {
+      const db = testEnv!.authenticatedContext("new-user-9").firestore();
+      await assertFails(
+        setDoc(
+          doc(db, userPath("new-user-9")),
+          provisionedProfile("new-user-9", { displayName: "x".repeat(121) }),
+        ),
+      );
+      await assertFails(
+        setDoc(
+          doc(db, userPath("new-user-10")),
+          provisionedProfile("new-user-10", { email: `${"x".repeat(250)}@a.io` }),
+        ),
+      );
+    });
+
+    rulesTest("lets the owner reconcile display fields but not role or scope", async () => {
+      const db = testEnv!.authenticatedContext("operator-1").firestore();
+      await assertSucceeds(
+        updateDoc(doc(db, userPath("operator-1")), {
+          displayName: "Operador Uno",
+          email: "op1@example.com",
+        }),
+      );
+      await assertFails(updateDoc(doc(db, userPath("operator-1")), { role: "ADMIN" }));
+      await assertFails(updateDoc(doc(db, userPath("operator-1")), { status: "INACTIVE" }));
+      await assertFails(updateDoc(doc(db, userPath("operator-1")), { warehouseIds: [wh1, wh2] }));
+    });
+
+    rulesTest("lets an admin drive the membership lifecycle", async () => {
+      const db = testEnv!.authenticatedContext("admin-1").firestore();
+      await assertSucceeds(updateDoc(doc(db, userPath("operator-1")), { role: "SUPERVISOR" }));
+    });
+
+    rulesTest("denies a non-admin editing another member's lifecycle", async () => {
+      const db = testEnv!.authenticatedContext("operator-1").firestore();
+      await assertFails(updateDoc(doc(db, userPath("supervisor-1")), { role: "ADMIN" }));
+      await assertFails(updateDoc(doc(db, userPath("supervisor-1")), { status: "INACTIVE" }));
+      await assertFails(deleteDoc(doc(db, userPath("supervisor-1"))));
+    });
+  });
 });
