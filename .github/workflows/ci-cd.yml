@@ -257,7 +257,11 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa/sa.json
         run: |
-          firebase deploy --only functions --project exepa-almacen-safe
+          # Deploy only the reception callables changed in this release. The
+          # existing Auth before-create trigger is unchanged and updating its
+          # Identity Toolkit config requires a separate permission not granted
+          # to this deployment identity.
+          firebase deploy --only functions:create_reception,functions:register_reception_pallet,functions:confirm_reception,functions:save_evidence,functions:save_reception_pallet_capture,functions:validate_reception_pallet_scan --project exepa-almacen-safe
 
       # Publish the frontend only after the rules and callable backend it uses.
       - name: Deploy to Firebase Hosting
