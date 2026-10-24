@@ -292,9 +292,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!auth || !db) throw new Error("Firebase is not configured.");
     const result = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(result.user, { displayName });
-    // The auth listener provisions the ACTIVE membership in parallel; this
-    // second pass mirrors the display name that updateProfile just resolved.
-    await provisionMembership(db, result.user);
+    // The auth listener (onAuthStateChanged) will provision the ACTIVE membership
+    // and sync the displayName/email once they resolve.
   };
 
   const loginWithGoogle = async () => {

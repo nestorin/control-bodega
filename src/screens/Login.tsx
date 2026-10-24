@@ -114,12 +114,15 @@ export default function Login() {
           {mode === "register" && (
             <div>
               <label
+                htmlFor="register-displayName"
                 className="block text-[12px] font-bold text-[#607078] mb-1"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
               >
                 Nombre completo
               </label>
               <input
+                id="register-displayName"
+                name="displayName"
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
@@ -127,18 +130,22 @@ export default function Login() {
                 className="w-full px-4 py-3 border border-[#dce4e7] rounded-[12px] text-[14px] outline-none focus:border-[#3276a8] transition-colors"
                 style={{ fontFamily: "'Inter', sans-serif" }}
                 required
+                autoComplete="name"
               />
             </div>
           )}
 
           <div>
             <label
+              htmlFor="register-email"
               className="block text-[12px] font-bold text-[#607078] mb-1"
               style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
             >
               Email
             </label>
             <input
+              id="register-email"
+              name="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -146,17 +153,21 @@ export default function Login() {
               className="w-full px-4 py-3 border border-[#dce4e7] rounded-[12px] text-[14px] outline-none focus:border-[#3276a8] transition-colors"
               style={{ fontFamily: "'Inter', sans-serif" }}
               required
+              autoComplete="email"
             />
           </div>
 
           <div>
             <label
+              htmlFor="register-password"
               className="block text-[12px] font-bold text-[#607078] mb-1"
               style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
             >
               Contraseña
             </label>
             <input
+              id="register-password"
+              name="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -165,18 +176,22 @@ export default function Login() {
               style={{ fontFamily: "'Inter', sans-serif" }}
               required
               minLength={6}
+              autoComplete="new-password"
             />
           </div>
 
           {mode === "register" && (
             <div>
               <label
+                htmlFor="register-confirmPassword"
                 className="block text-[12px] font-bold text-[#607078] mb-1"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
               >
                 Confirmar contraseña
               </label>
               <input
+                id="register-confirmPassword"
+                name="confirmPassword"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -184,6 +199,7 @@ export default function Login() {
                 className="w-full px-4 py-3 border border-[#dce4e7] rounded-[12px] text-[14px] outline-none focus:border-[#3276a8] transition-colors"
                 style={{ fontFamily: "'Inter', sans-serif" }}
                 required
+                autoComplete="new-password"
               />
             </div>
           )}
