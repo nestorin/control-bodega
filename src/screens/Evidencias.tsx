@@ -90,7 +90,12 @@ export function mapReceptionEvidence(reception: any): EvidenciaData {
     .slice(0, 8);
   const evidenceId =
     reception.evidenceId ||
-    "EV-" + (dateKey || "SINFECHA") + "-" + String(reception.id || "").slice(-6).toUpperCase();
+    "EV-" +
+      (dateKey || "SINFECHA") +
+      "-" +
+      String(reception.id || "")
+        .slice(-6)
+        .toUpperCase();
   return {
     id: evidenceId,
     evidenceId,
@@ -101,16 +106,36 @@ export function mapReceptionEvidence(reception: any): EvidenciaData {
     proveedorLogistico: reception.logisticsProvider || "Sin dato",
     item: reception.productName || "Sin producto",
     tarimas: planned.length ? receivedPallets.length : reception.palletCount || 0,
-    caducidad: receivedPallets.map((pallet: any) => pallet.expiryDate).filter(Boolean).join(", "),
-    lote: receivedPallets.map((pallet: any) => pallet.lot).filter(Boolean).join(", "),
-    ocFolio: reception.purchaseOrderNumber || reception.folio || reception.purchaseOrderId || reception.id,
-    purchaseOrderNumber: reception.purchaseOrderNumber || reception.folio || reception.purchaseOrderId || "Sin dato",
+    caducidad: receivedPallets
+      .map((pallet: any) => pallet.expiryDate)
+      .filter(Boolean)
+      .join(", "),
+    lote: receivedPallets
+      .map((pallet: any) => pallet.lot)
+      .filter(Boolean)
+      .join(", "),
+    ocFolio:
+      reception.purchaseOrderNumber || reception.folio || reception.purchaseOrderId || reception.id,
+    purchaseOrderNumber:
+      reception.purchaseOrderNumber || reception.folio || reception.purchaseOrderId || "Sin dato",
     fecha: dateValue?.toLocaleDateString?.("es-ES") || reception.scheduledDate || "",
     hora: dateValue?.toLocaleTimeString?.("es-ES") || "",
-    estado: reception.evidencePhotos?.trailer && reception.evidencePhotos?.product ? "Completa" : "Incompleta",
-    color: reception.evidencePhotos?.trailer && reception.evidencePhotos?.product ? "#16845b" : "#c54b45",
-    bg: reception.evidencePhotos?.trailer && reception.evidencePhotos?.product ? "#e2f5ec" : "#fce9e7",
-    img: reception.evidencePhotos?.trailer && reception.evidencePhotos?.product ? imgIndicador : imgIndicadorRed,
+    estado:
+      reception.evidencePhotos?.trailer && reception.evidencePhotos?.product
+        ? "Completa"
+        : "Incompleta",
+    color:
+      reception.evidencePhotos?.trailer && reception.evidencePhotos?.product
+        ? "#16845b"
+        : "#c54b45",
+    bg:
+      reception.evidencePhotos?.trailer && reception.evidencePhotos?.product
+        ? "#e2f5ec"
+        : "#fce9e7",
+    img:
+      reception.evidencePhotos?.trailer && reception.evidencePhotos?.product
+        ? imgIndicador
+        : imgIndicadorRed,
     pallets: receivedPallets.map((pallet: any) => ({
       palletNumber: pallet.palletNumber,
       qrIdentifier: pallet.qrIdentifier,
@@ -197,11 +222,23 @@ function RowMenu({
             }}
             className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-[#f4f7f8] transition-colors border-b border-[#edf1f3]"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#172126" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#172126"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <path d="m7 10 5 5 5-5M12 15V3" />
             </svg>
-            <span className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: "#172126" }}>
+            <span
+              className="text-[13px]"
+              style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: "#172126" }}
+            >
               Descargar evidencia PDF
             </span>
           </button>
@@ -315,7 +352,7 @@ export default function Evidencias({ onSelect }: Props) {
       .then((receptions: any[]) => {
         const converted = receptions
           .filter((r: any) => r.evidencePhotos?.trailer || r.evidencePhotos?.product)
-        .map(mapReceptionEvidence);
+          .map(mapReceptionEvidence);
         setListaLocal(converted);
         setLoadingFs(false);
       })
@@ -333,12 +370,16 @@ export default function Evidencias({ onSelect }: Props) {
     try {
       let pallets = evidence.pallets || [];
       if (fsServices && evidence.receptionId) {
-        const docs = await fsServices.pallets.getByReception(evidence.receptionId, [WAREHOUSE_IDS.NORTH]);
+        const docs = await fsServices.pallets.getByReception(evidence.receptionId, [
+          WAREHOUSE_IDS.NORTH,
+        ]);
         const received = docs.filter((pallet) => ["RECEIVED", "STORED"].includes(pallet.status));
         pallets = received.map((pallet, index) => ({
-          palletNumber: pallet.palletNumber
-            ?? evidence.pallets?.find((planned) => planned.qrIdentifier === pallet.qrIdentifier)?.palletNumber
-            ?? index + 1,
+          palletNumber:
+            pallet.palletNumber ??
+            evidence.pallets?.find((planned) => planned.qrIdentifier === pallet.qrIdentifier)
+              ?.palletNumber ??
+            index + 1,
           qrIdentifier: pallet.qrIdentifier,
           lot: pallet.lot,
           expiryDate: pallet.expiryDate,
@@ -359,7 +400,8 @@ export default function Evidencias({ onSelect }: Props) {
         productPhoto: evidence.fotoProducto,
         pallets,
       });
-      const filename = "Evidencia-" + (evidence.evidenceId || evidence.id).replace(/[^a-zA-Z0-9-]/g, "-") + ".pdf";
+      const filename =
+        "Evidencia-" + (evidence.evidenceId || evidence.id).replace(/[^a-zA-Z0-9-]/g, "-") + ".pdf";
       downloadBlob(blob, filename);
     } catch (error) {
       console.error("Evidence PDF generation failed:", error);
@@ -494,7 +536,9 @@ export default function Evidencias({ onSelect }: Props) {
         </div>
       )}
       {downloadError && (
-        <p className="text-sm text-red-700" role="alert">{downloadError}</p>
+        <p className="text-sm text-red-700" role="alert">
+          {downloadError}
+        </p>
       )}
 
       <div className="flex flex-col gap-3 w-full">

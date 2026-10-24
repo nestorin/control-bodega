@@ -308,12 +308,17 @@ export default function CapturaTarima({
     setScanning(true);
     try {
       if (!window.isSecureContext && window.location.hostname !== "localhost") {
-        throw new Error("La cámara requiere una conexión segura (HTTPS). Abre la aplicación con HTTPS.");
+        throw new Error(
+          "La cámara requiere una conexión segura (HTTPS). Abre la aplicación con HTTPS.",
+        );
       }
       if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("Este navegador no permite usar la cámara. Prueba con Safari o Chrome actualizado.");
+        throw new Error(
+          "Este navegador no permite usar la cámara. Prueba con Safari o Chrome actualizado.",
+        );
       }
-      if (!videoRef.current) throw new Error("No se pudo preparar la vista de cámara. Vuelve a intentarlo.");
+      if (!videoRef.current)
+        throw new Error("No se pudo preparar la vista de cámara. Vuelve a intentarlo.");
       // @ts-ignore - BrowserQRCodeReader from @zxing/browser
       const { BrowserQRCodeReader } = await import("@zxing/browser");
       const reader = new BrowserQRCodeReader();
@@ -327,13 +332,17 @@ export default function CapturaTarima({
       // Prefer back camera
       const backCamera = devices.find((d) => /back|rear|environment/i.test(d.label)) || devices[0];
 
-      const controls = await reader.decodeFromVideoDevice(backCamera.deviceId, videoRef.current, (result) => {
-        if (result) {
-          const code = result.getText();
-          stopScanner();
-          handleScannedCode(code);
-        }
-      });
+      const controls = await reader.decodeFromVideoDevice(
+        backCamera.deviceId,
+        videoRef.current,
+        (result) => {
+          if (result) {
+            const code = result.getText();
+            stopScanner();
+            handleScannedCode(code);
+          }
+        },
+      );
       scannerControlsRef.current = controls;
       if (videoRef.current) {
         videoRef.current.muted = true;
@@ -343,13 +352,15 @@ export default function CapturaTarima({
     } catch (e) {
       console.error("Scanner error:", e);
       const error = e as { name?: string; message?: string };
-      const message = error.name === "NotAllowedError" || error.name === "PermissionDeniedError"
-        ? "El navegador bloqueó el permiso de cámara. Habilítalo en los ajustes del sitio y vuelve a intentar."
-        : error.name === "NotFoundError" || error.name === "DevicesNotFoundError"
-          ? "No se encontró una cámara disponible en este dispositivo."
-          : error.name === "NotReadableError" || error.name === "TrackStartError"
-            ? "La cámara está siendo usada por otra aplicación. Ciérrala e inténtalo de nuevo."
-            : error.message || "No se pudo iniciar la cámara. Revisa los permisos del navegador e inténtalo de nuevo.";
+      const message =
+        error.name === "NotAllowedError" || error.name === "PermissionDeniedError"
+          ? "El navegador bloqueó el permiso de cámara. Habilítalo en los ajustes del sitio y vuelve a intentar."
+          : error.name === "NotFoundError" || error.name === "DevicesNotFoundError"
+            ? "No se encontró una cámara disponible en este dispositivo."
+            : error.name === "NotReadableError" || error.name === "TrackStartError"
+              ? "La cámara está siendo usada por otra aplicación. Ciérrala e inténtalo de nuevo."
+              : error.message ||
+                "No se pudo iniciar la cámara. Revisa los permisos del navegador e inténtalo de nuevo.";
       setScannerError(message);
       stopScanner();
     } finally {
@@ -401,11 +412,17 @@ export default function CapturaTarima({
           code,
           almacenActivo?.id || WAREHOUSE_IDS.NORTH,
         );
-        setTarimasList((prev) => prev.map((pallet, index) => index === tarimaIndex ? {
-          ...pallet,
-          lote: validated.lot ?? pallet.lote,
-          caducidad: validated.expiryDate ?? pallet.caducidad,
-        } : pallet));
+        setTarimasList((prev) =>
+          prev.map((pallet, index) =>
+            index === tarimaIndex
+              ? {
+                  ...pallet,
+                  lote: validated.lot ?? pallet.lote,
+                  caducidad: validated.expiryDate ?? pallet.caducidad,
+                }
+              : pallet,
+          ),
+        );
       }
       setScannedCode(code);
       setCurrentIndex(tarimaIndex);
@@ -436,7 +453,9 @@ export default function CapturaTarima({
       setCaptureError(null);
     } catch (error) {
       console.error("Pallet capture checkpoint failed:", error);
-      setCaptureError("No se pudo guardar el avance de esta tarima. Revisá la conexión y reintentá.");
+      setCaptureError(
+        "No se pudo guardar el avance de esta tarima. Revisá la conexión y reintentá.",
+      );
     }
   }
 
@@ -735,7 +754,16 @@ export default function CapturaTarima({
               className="absolute inset-0 bg-[#172126] flex flex-col items-center justify-center gap-3 p-4"
               style={{ opacity: 0.9 }}
             >
-              <svg aria-hidden="true" className="size-16 md:size-20 text-[#f2b84b]" viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                aria-hidden="true"
+                className="size-16 md:size-20 text-[#f2b84b]"
+                viewBox="0 0 64 64"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M8 24V12a4 4 0 0 1 4-4h12M40 8h12a4 4 0 0 1 4 4v12M56 40v12a4 4 0 0 1-4 4H40M24 56H12a4 4 0 0 1-4-4V40" />
                 <path d="M20 20h10v10H20zM34 20h10v10H34zM20 34h10v10H20zM36 36h3v3h-3zM43 43h3v3h-3zM34 43h3v3h-3z" />
               </svg>
@@ -756,9 +784,17 @@ export default function CapturaTarima({
             </div>
           )}
           {scannerError && (
-            <div className="absolute inset-x-3 bottom-3 rounded-lg bg-white p-3 text-sm text-red-700 shadow-lg" role="alert">
+            <div
+              className="absolute inset-x-3 bottom-3 rounded-lg bg-white p-3 text-sm text-red-700 shadow-lg"
+              role="alert"
+            >
               <p>{scannerError}</p>
-              <button onClick={startScanner} className="mt-2 min-h-11 rounded-lg bg-[#f2b84b] px-4 font-semibold text-[#16343f]">Reintentar cámara</button>
+              <button
+                onClick={startScanner}
+                className="mt-2 min-h-11 rounded-lg bg-[#f2b84b] px-4 font-semibold text-[#16343f]"
+              >
+                Reintentar cámara
+              </button>
             </div>
           )}
 
@@ -848,11 +884,14 @@ export default function CapturaTarima({
               <input
                 type="text"
                 value={currentTarima?.lote || autoLote}
-                onBlur={() => currentTarima && void persistCaptureCheckpoint({
-                  ...currentTarima,
-                  lote: currentTarima.lote || autoLote,
-                  caducidad: currentTarima.caducidad || autoCaducidad,
-                })}
+                onBlur={() =>
+                  currentTarima &&
+                  void persistCaptureCheckpoint({
+                    ...currentTarima,
+                    lote: currentTarima.lote || autoLote,
+                    caducidad: currentTarima.caducidad || autoCaducidad,
+                  })
+                }
                 onChange={(e) => {
                   if (currentTarima) {
                     setTarimasList((prev) => {
@@ -880,11 +919,14 @@ export default function CapturaTarima({
               <input
                 type="date"
                 value={currentTarima?.caducidad || autoCaducidad}
-                onBlur={() => currentTarima && void persistCaptureCheckpoint({
-                  ...currentTarima,
-                  lote: currentTarima.lote || autoLote,
-                  caducidad: currentTarima.caducidad || autoCaducidad,
-                })}
+                onBlur={() =>
+                  currentTarima &&
+                  void persistCaptureCheckpoint({
+                    ...currentTarima,
+                    lote: currentTarima.lote || autoLote,
+                    caducidad: currentTarima.caducidad || autoCaducidad,
+                  })
+                }
                 onChange={(e) => {
                   if (currentTarima) {
                     setTarimasList((prev) => {
@@ -903,7 +945,9 @@ export default function CapturaTarima({
             </div>
           </div>
           {captureError && (
-            <p className="mt-2 text-sm text-red-700" role="alert">{captureError}</p>
+            <p className="mt-2 text-sm text-red-700" role="alert">
+              {captureError}
+            </p>
           )}
 
           <div className="flex flex-col gap-1 mt-2">

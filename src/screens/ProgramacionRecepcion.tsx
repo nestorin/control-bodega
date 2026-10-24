@@ -16,7 +16,10 @@ import { useAuthorization } from "@/hooks/useAuthorization";
 import { WAREHOUSE_IDS } from "@/config/warehouses";
 import { CANONICAL_SUPPLIER_SEED, mergeSupplierCatalog } from "@/config/supplierCatalog";
 import { buildTarimaQR } from "@/types/qrcode";
-import type { PlannedReceptionPallet, PlannedReceptionPalletDraft } from "@/services/firestore/types";
+import type {
+  PlannedReceptionPallet,
+  PlannedReceptionPalletDraft,
+} from "@/services/firestore/types";
 
 // PDF.js para preview de PDF
 import * as pdfjsLib from "pdfjs-dist";
@@ -452,7 +455,12 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
   const [codigosQR, setCodigosQR] = useState<string[]>([]);
   const [plannedPallets, setPlannedPallets] = useState<PlannedReceptionPallet[]>([]);
   const [canonicalStickerHeader, setCanonicalStickerHeader] = useState<{
-    receptionId: string; folio: string; purchaseOrderId?: string; purchaseOrderNumber?: string; supplierCode: string; scheduledDate: string;
+    receptionId: string;
+    folio: string;
+    purchaseOrderId?: string;
+    purchaseOrderNumber?: string;
+    supplierCode: string;
+    scheduledDate: string;
   } | null>(null);
 
   useEffect(() => {
@@ -592,9 +600,14 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
     let palletNumber = 1;
     return productos.flatMap((product, lineIndex) =>
       Array.from({ length: product.tarimas }, (_, index) => ({
-        palletNumber: palletNumber++, lineIndex, productId: product.productId || "",
+        palletNumber: palletNumber++,
+        lineIndex,
+        productId: product.productId || "",
         productName: product.nombre,
-        quantity: Math.min(product.cajasPorTarima, product.cantidad - index * product.cajasPorTarima),
+        quantity: Math.min(
+          product.cajasPorTarima,
+          product.cantidad - index * product.cajasPorTarima,
+        ),
         unit: product.unidad || "cajas",
       })),
     );
@@ -608,7 +621,11 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
   function appendStickerPages(pdf: import("jspdf").jsPDF, qrDataUrls: string[]) {
     const total = plannedPallets.length;
     const supplierKey = canonicalStickerHeader?.supplierCode || getSupplierKey();
-    const receptionId = canonicalStickerHeader?.purchaseOrderNumber || canonicalStickerHeader?.folio || savedReceptionId || folio;
+    const receptionId =
+      canonicalStickerHeader?.purchaseOrderNumber ||
+      canonicalStickerHeader?.folio ||
+      savedReceptionId ||
+      folio;
 
     const pageWidth = 297;
     const pageHeight = 210;
@@ -657,9 +674,14 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
           pdf.setFontSize(7.5);
           pdf.text(productLines, centerX, y + 81, { align: "center" });
           pdf.setFontSize(7);
-          pdf.text(`${product.quantity} ${product.unit}  ·  ${canonicalStickerHeader?.scheduledDate || fechaRecepcion}`, centerX, y + 89, {
-            align: "center",
-          });
+          pdf.text(
+            `${product.quantity} ${product.unit}  ·  ${canonicalStickerHeader?.scheduledDate || fechaRecepcion}`,
+            centerX,
+            y + 89,
+            {
+              align: "center",
+            },
+          );
         }
       }
     });
@@ -765,7 +787,8 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
         operationId,
         folio,
         scheduledDate: fechaRecepcion,
-        purchaseOrderNumber: ocrResult?.tipo === "oc" ? ocrResult.parsed.folio ?? undefined : undefined,
+        purchaseOrderNumber:
+          ocrResult?.tipo === "oc" ? (ocrResult.parsed.folio ?? undefined) : undefined,
         supplierCode: getSupplierKey(),
         plannedPallets: buildPalletPlan(),
       });
@@ -783,12 +806,15 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
           operationId,
         );
         receptionId = reception.id;
-        if (!reception.plannedPallets?.length) throw new Error("El servidor no devolvió el plan canónico de tarimas");
+        if (!reception.plannedPallets?.length)
+          throw new Error("El servidor no devolvió el plan canónico de tarimas");
         setPlannedPallets(reception.plannedPallets);
         nextQrCodes = reception.plannedPallets.map((pallet) => pallet.qrIdentifier);
         setCanonicalStickerHeader({
-          receptionId: reception.id, folio: reception.folio || folio,
-          purchaseOrderId: reception.purchaseOrderId, purchaseOrderNumber: reception.purchaseOrderNumber,
+          receptionId: reception.id,
+          folio: reception.folio || folio,
+          purchaseOrderId: reception.purchaseOrderId,
+          purchaseOrderNumber: reception.purchaseOrderNumber,
           supplierCode: reception.supplierCode || getSupplierKey(),
           scheduledDate: reception.scheduledDate || fechaRecepcion,
         });
@@ -812,11 +838,18 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
 
     if (!useFirestore) {
       const plan = buildPalletPlan().map((pallet, index) => ({
-        ...pallet, qrIdentifier: buildTarimaQR(folio, index + 1), status: "PLANNED" as const,
+        ...pallet,
+        qrIdentifier: buildTarimaQR(folio, index + 1),
+        status: "PLANNED" as const,
       }));
       setPlannedPallets(plan);
       nextQrCodes = plan.map((pallet) => pallet.qrIdentifier);
-      setCanonicalStickerHeader({ receptionId: folio, folio, supplierCode: getSupplierKey(), scheduledDate: fechaRecepcion });
+      setCanonicalStickerHeader({
+        receptionId: folio,
+        folio,
+        supplierCode: getSupplierKey(),
+        scheduledDate: fechaRecepcion,
+      });
     }
 
     setSavedReceptionId(receptionId);
@@ -1319,9 +1352,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
       {step === 1 && (
         <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col gap-4 sm:gap-[14px] items-start p-4 sm:p-5 rounded-2xl sm:rounded-[20px] w-full min-w-0">
           <div className="flex items-center gap-4 w-full">
-            <div
-              className="bg-[#e7f0f2] flex items-center justify-center rounded-[18px] shrink-0 size-14 sm:size-[72px]"
-            >
+            <div className="bg-[#e7f0f2] flex items-center justify-center rounded-[18px] shrink-0 size-14 sm:size-[72px]">
               <svg
                 width="52"
                 height="52"
@@ -1940,9 +1971,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
       {step === 2 && (
         <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col gap-4 sm:gap-[14px] items-start p-4 sm:p-5 rounded-2xl sm:rounded-[20px] w-full min-w-0">
           <div className="flex items-center gap-4 w-full">
-            <div
-              className="bg-[#e7f0f2] flex items-center justify-center rounded-[18px] shrink-0 size-14 sm:size-[72px]"
-            >
+            <div className="bg-[#e7f0f2] flex items-center justify-center rounded-[18px] shrink-0 size-14 sm:size-[72px]">
               <svg
                 width="52"
                 height="52"
@@ -2486,9 +2515,9 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
 
           {/* Footer */}
           <div className="flex flex-col gap-3 w-full md:flex-row md:items-end md:justify-between">
-              <button
-                onClick={() => setStep(1)}
-                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 touch-target transition-colors w-full md:w-auto"
+            <button
+              onClick={() => setStep(1)}
+              className="flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 touch-target transition-colors w-full md:w-auto"
               style={{ background: "white", borderColor: "#dce4e7" }}
             >
               <svg
@@ -2534,9 +2563,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
       {step === 3 && (
         <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col gap-4 sm:gap-[14px] items-start p-4 sm:p-5 rounded-2xl sm:rounded-[20px] w-full min-w-0">
           <div className="flex items-center gap-4 w-full">
-            <div
-              className="bg-[#e2f5ec] flex items-center justify-center rounded-[18px] shrink-0 size-14 sm:size-[72px]"
-            >
+            <div className="bg-[#e2f5ec] flex items-center justify-center rounded-[18px] shrink-0 size-14 sm:size-[72px]">
               <svg
                 width="52"
                 height="52"
@@ -2686,7 +2713,10 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                 }}
               >
                 <img src={imgPrint} alt="" className="size-4 sm:size-5 shrink-0" />
-                <span className="text-center font-bold text-xs sm:text-sm leading-tight" style={{ fontFamily: "'Inter', sans-serif" }}>
+                <span
+                  className="text-center font-bold text-xs sm:text-sm leading-tight"
+                  style={{ fontFamily: "'Inter', sans-serif" }}
+                >
                   Imprimir
                 </span>
               </button>
@@ -2713,7 +2743,10 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                 }}
               >
                 <img src={imgWhatsApp} alt="" className="size-4 sm:size-5 shrink-0" />
-                <span className="text-center font-bold text-xs sm:text-sm leading-tight" style={{ fontFamily: "'Inter', sans-serif" }}>
+                <span
+                  className="text-center font-bold text-xs sm:text-sm leading-tight"
+                  style={{ fontFamily: "'Inter', sans-serif" }}
+                >
                   WhatsApp
                 </span>
               </button>
@@ -2727,7 +2760,10 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                 }}
               >
                 <img src={imgEmail} alt="" className="size-4 sm:size-5 shrink-0" />
-                <span className="text-center font-bold text-xs sm:text-sm leading-tight" style={{ fontFamily: "'Inter', sans-serif" }}>
+                <span
+                  className="text-center font-bold text-xs sm:text-sm leading-tight"
+                  style={{ fontFamily: "'Inter', sans-serif" }}
+                >
                   Email
                 </span>
               </button>

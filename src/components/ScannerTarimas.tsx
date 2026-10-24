@@ -75,13 +75,18 @@ export function ScannerTarimas({
         throw new Error("La cámara requiere una conexión segura (HTTPS).");
       }
       if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("Este navegador no permite acceder a la cámara. Usa Chrome o Safari actualizado.");
+        throw new Error(
+          "Este navegador no permite acceder a la cámara. Usa Chrome o Safari actualizado.",
+        );
       }
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
       });
       streamRef.current = stream;
-      if (!videoRef.current) { stream.getTracks().forEach((track) => track.stop()); return; }
+      if (!videoRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       videoRef.current.srcObject = stream;
       videoRef.current.muted = true;
       videoRef.current.playsInline = true;
@@ -89,13 +94,15 @@ export function ScannerTarimas({
     } catch (err) {
       console.warn("No se pudo acceder a la cámara:", err);
       const cameraError = err as { name?: string };
-      setError(cameraError.name === "NotAllowedError" || cameraError.name === "PermissionDeniedError"
-        ? "Permiso de cámara bloqueado. Habilítalo en los ajustes del sitio; también puedes ingresar el QR manualmente."
-        : cameraError.name === "NotFoundError" || cameraError.name === "DevicesNotFoundError"
-          ? "No se encontró una cámara. Puedes ingresar el QR manualmente."
-          : cameraError.name === "NotReadableError" || cameraError.name === "TrackStartError"
-            ? "La cámara está ocupada por otra aplicación. Ciérrala o ingresa el QR manualmente."
-            : "No se pudo iniciar la cámara. Puedes ingresar el QR manualmente.");
+      setError(
+        cameraError.name === "NotAllowedError" || cameraError.name === "PermissionDeniedError"
+          ? "Permiso de cámara bloqueado. Habilítalo en los ajustes del sitio; también puedes ingresar el QR manualmente."
+          : cameraError.name === "NotFoundError" || cameraError.name === "DevicesNotFoundError"
+            ? "No se encontró una cámara. Puedes ingresar el QR manualmente."
+            : cameraError.name === "NotReadableError" || cameraError.name === "TrackStartError"
+              ? "La cámara está ocupada por otra aplicación. Ciérrala o ingresa el QR manualmente."
+              : "No se pudo iniciar la cámara. Puedes ingresar el QR manualmente.",
+      );
     }
   };
 
@@ -300,7 +307,13 @@ export function ScannerTarimas({
         {/* Scanner area */}
         <div className="mb-6">
           <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-            <video ref={videoRef} autoPlay className="w-full h-full object-cover" playsInline muted />
+            <video
+              ref={videoRef}
+              autoPlay
+              className="w-full h-full object-cover"
+              playsInline
+              muted
+            />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="w-3/4 h-3/4 border-2 border-blue-500 rounded-lg relative">
                 <div className="absolute -top-3 -left-3 w-6 h-6 border-t-2 border-l-2 border-blue-500 rounded-tl-lg" />

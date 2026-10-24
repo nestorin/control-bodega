@@ -326,7 +326,13 @@ export class ReceptionService extends BaseService<ReceptionDoc> {
     operationId: string,
   ): Promise<void> {
     const save = httpsCallable(getFunctions(), "save_reception_pallet_capture");
-    await save({ receptionId, qrIdentifier, lot: lot || null, expiryDate: expiryDate || null, operationId });
+    await save({
+      receptionId,
+      qrIdentifier,
+      lot: lot || null,
+      expiryDate: expiryDate || null,
+      operationId,
+    });
   }
 
   // Delete reception (and its lines/pallets)
@@ -489,11 +495,12 @@ export class PalletService extends BaseService<PalletDoc> {
         quantity: pallet.quantity,
         unit: pallet.unit,
         lot: pallet.lot || null,
-        expiryDate: pallet.expiryDate instanceof Date
-          ? pallet.expiryDate.toISOString().slice(0, 10)
-          : pallet.expiryDate instanceof Timestamp
-            ? pallet.expiryDate.toDate().toISOString().slice(0, 10)
-            : null,
+        expiryDate:
+          pallet.expiryDate instanceof Date
+            ? pallet.expiryDate.toISOString().slice(0, 10)
+            : pallet.expiryDate instanceof Timestamp
+              ? pallet.expiryDate.toDate().toISOString().slice(0, 10)
+              : null,
         operationId: operation,
       });
       const palletId = (result.data as { palletId?: string })?.palletId;

@@ -15,7 +15,9 @@ export default function EscanearQR({ onFound, onClose }: Props) {
   const [scanning, setScanning] = useState(true);
   const [manualId, setManualId] = useState("");
 
-  useEffect(() => { onFoundRef.current = onFound; }, [onFound]);
+  useEffect(() => {
+    onFoundRef.current = onFound;
+  }, [onFound]);
 
   useEffect(() => {
     const reader = new BrowserMultiFormatReader();
@@ -23,20 +25,32 @@ export default function EscanearQR({ onFound, onClose }: Props) {
     let active = true;
     if (!window.isSecureContext && window.location.hostname !== "localhost") {
       setError("La cámara requiere una conexión segura (HTTPS). Abre la aplicación con HTTPS.");
-      return () => { active = false; (reader as any).reset?.(); };
+      return () => {
+        active = false;
+        (reader as any).reset?.();
+      };
     }
     if (!navigator.mediaDevices?.getUserMedia || !videoRef.current) {
-      setError("Este navegador no permite acceder a la cámara. Prueba con Chrome o Safari actualizado.");
-      return () => { active = false; (reader as any).reset?.(); };
+      setError(
+        "Este navegador no permite acceder a la cámara. Prueba con Chrome o Safari actualizado.",
+      );
+      return () => {
+        active = false;
+        (reader as any).reset?.();
+      };
     }
-    reader.decodeFromVideoDevice(undefined, videoRef.current, (result) => {
+    reader
+      .decodeFromVideoDevice(undefined, videoRef.current, (result) => {
         if (result) {
           setScanning(false);
           onFoundRef.current(result.getText());
         }
       })
       .then((controls) => {
-        if (!active) { controls.stop(); return; }
+        if (!active) {
+          controls.stop();
+          return;
+        }
         controlsRef.current = controls;
         if (videoRef.current) {
           videoRef.current.muted = true;
@@ -46,13 +60,15 @@ export default function EscanearQR({ onFound, onClose }: Props) {
       })
       .catch((cause: unknown) => {
         const cameraError = cause as { name?: string };
-        setError(cameraError.name === "NotAllowedError" || cameraError.name === "PermissionDeniedError"
-          ? "El permiso de cámara está bloqueado. Habilítalo en los ajustes del sitio y vuelve a intentar."
-          : cameraError.name === "NotFoundError" || cameraError.name === "DevicesNotFoundError"
-            ? "No se encontró una cámara disponible en este dispositivo."
-            : cameraError.name === "NotReadableError" || cameraError.name === "TrackStartError"
-              ? "La cámara está siendo usada por otra aplicación. Ciérrala e inténtalo de nuevo."
-              : "No se pudo iniciar la cámara. Revisa los permisos del navegador e inténtalo de nuevo.");
+        setError(
+          cameraError.name === "NotAllowedError" || cameraError.name === "PermissionDeniedError"
+            ? "El permiso de cámara está bloqueado. Habilítalo en los ajustes del sitio y vuelve a intentar."
+            : cameraError.name === "NotFoundError" || cameraError.name === "DevicesNotFoundError"
+              ? "No se encontró una cámara disponible en este dispositivo."
+              : cameraError.name === "NotReadableError" || cameraError.name === "TrackStartError"
+                ? "La cámara está siendo usada por otra aplicación. Ciérrala e inténtalo de nuevo."
+                : "No se pudo iniciar la cámara. Revisa los permisos del navegador e inténtalo de nuevo.",
+        );
       });
 
     return () => {
