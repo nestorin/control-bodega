@@ -11,7 +11,7 @@ import {
 import { doc, getDoc, setDoc, updateDoc, type Firestore } from "firebase/firestore";
 import { ORGANIZATION_ID } from "@/config/organization";
 import { normalizeWarehouseId, WAREHOUSE_IDS } from "@/config/warehouses";
-import { auth, db, googleProvider } from "@/lib/firebase";
+import { auth, db, googleProvider, isFirebaseConfigured } from "@/lib/firebase";
 import {
   isGlobalMembershipRole,
   membershipRoleSchema,
