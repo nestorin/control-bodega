@@ -278,7 +278,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    if (!auth) throw new Error("Firebase is not configured.");
+    console.debug("[Auth] login called, auth =", auth);
+    if (!auth) {
+      console.error("[Auth] Firebase auth is null — isFirebaseConfigured =", isFirebaseConfigured);
+      throw new Error("Firebase no configurado: faltan variables de entorno VITE_FIREBASE_* en el build.");
+    }
     await signInWithEmailAndPassword(auth, email, password);
   };
 
