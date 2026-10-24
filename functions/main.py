@@ -5,6 +5,7 @@ from ocr.main import health
 from ocr.main_secure import extract_ocr_secure
 from shipments import confirm_shipment
 from rbac import adjust_inventory, import_inventory, update_membership
+from membership_provisioning import provision_membership_before_auth_user_created
 from receptions import (
     confirm_reception,
     create_reception,
