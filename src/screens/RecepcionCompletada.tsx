@@ -54,8 +54,13 @@ export default function RecepcionCompletada({ onHome, onPrint, currentReception 
   const receptionId = currentReception?.receptionId;
   const docPath = receptionId ? `organizations/${ORG_ID}/receptions/${receptionId}` : null;
 
-  const { data: receptionDoc, loading } = useDocument(db, docPath || "", {
-    enabled: useFirestore && !!receptionId,
+  const observeReception = useFirestore && !!receptionId;
+  const {
+    data: receptionDoc,
+    loading,
+    error: receptionError,
+  } = useDocument(db, docPath || "", {
+    enabled: observeReception,
     mapFn: (snap) => snap.data(),
   });
 
@@ -79,7 +84,7 @@ export default function RecepcionCompletada({ onHome, onPrint, currentReception 
   const fecha = "19 Sep 2026 · 09:42";
   const evidencia = `orden_${ocFolio}.pdf`;
 
-  if (loading) {
+  if (loading && observeReception) {
     return (
       <div className="flex flex-col gap-5 p-4 md:p-7 size-full items-center justify-center">
         <div className="bg-[#fff5dd] flex flex-col gap-2 items-center justify-center rounded-[28px] w-full max-w-[190px] py-5">
@@ -124,6 +129,11 @@ export default function RecepcionCompletada({ onHome, onPrint, currentReception 
 
   return (
     <div className="flex flex-col gap-5 p-4 md:p-7 size-full">
+      {receptionError && (
+        <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+          No se pudo cargar el detalle desde Firestore. Se muestra el resumen local.
+        </p>
+      )}
       <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col items-center p-4 md:p-5 rounded-[20px] w-full">
         <div className="flex flex-col gap-[14px] items-center w-full">
           <div className="bg-[#fff5dd] flex flex-col gap-2 items-center justify-center rounded-[28px] w-full max-w-[190px] py-5">

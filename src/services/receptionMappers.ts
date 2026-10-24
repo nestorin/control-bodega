@@ -1,5 +1,9 @@
 import type { DocTipo, OcrProduct } from "./paddleOcr";
-import type { ReceptionDoc, ReceptionLineDoc } from "./firestore/types";
+import type {
+  PlannedReceptionPalletDraft,
+  ReceptionCreateInput,
+  ReceptionLineDoc,
+} from "./firestore/types";
 
 export interface CatalogProduct {
   id: string;
@@ -20,7 +24,7 @@ export interface ReceptionFormProduct {
 }
 
 export interface ReceptionPersistenceRequest {
-  reception: Omit<ReceptionDoc, "id" | "createdAt" | "updatedAt" | "organizationId">;
+  reception: ReceptionCreateInput;
   lines: Array<
     Omit<ReceptionLineDoc, "id" | "createdAt" | "updatedAt" | "organizationId" | "receptionId">
   >;
@@ -77,6 +81,14 @@ export function mapReceptionFormToPersistence(input: {
   products: ReceptionFormProduct[];
   warehouseId: string;
   supplierId?: string;
+  supplierCode?: string;
+  supplierName?: string;
+  logisticsProvider?: string;
+  folio?: string;
+  scheduledDate?: string;
+  purchaseOrderId?: string;
+  purchaseOrderNumber?: string;
+  plannedPallets?: PlannedReceptionPalletDraft[];
   actorUserId: string;
   operationId: string;
 }): ReceptionPersistenceRequest {
@@ -84,6 +96,14 @@ export function mapReceptionFormToPersistence(input: {
     reception: {
       warehouseId: input.warehouseId,
       ...(input.supplierId ? { supplierId: input.supplierId } : {}),
+      ...(input.supplierCode ? { supplierCode: input.supplierCode } : {}),
+      ...(input.supplierName ? { supplierName: input.supplierName } : {}),
+      ...(input.logisticsProvider ? { logisticsProvider: input.logisticsProvider } : {}),
+      ...(input.folio ? { folio: input.folio } : {}),
+      ...(input.scheduledDate ? { scheduledDate: input.scheduledDate } : {}),
+      ...(input.purchaseOrderId ? { purchaseOrderId: input.purchaseOrderId } : {}),
+      ...(input.purchaseOrderNumber ? { purchaseOrderNumber: input.purchaseOrderNumber } : {}),
+      ...(input.plannedPallets ? { plannedPallets: input.plannedPallets } : {}),
       status: "DRAFT",
       actorUserId: input.actorUserId,
       operationId: input.operationId,

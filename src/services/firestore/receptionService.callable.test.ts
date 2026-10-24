@@ -45,8 +45,83 @@ describe("Reception write services", () => {
     });
   });
 
+  it("validates a QR against its current reception without activating it", async () => {
+    const callable = vi.fn().mockResolvedValue({
+      data: {
+        receptionId: "reception-op-1",
+        palletId: "pallet-reception-op-1-001",
+        qrIdentifier: "TQR-reception-op-1-001",
+        status: "IN_CAPTURE",
+        lot: "LOT-1",
+        expiryDate: "2027-03-15",
+        activated: false,
+      },
+    });
+    vi.mocked(httpsCallable).mockReturnValue(callable as never);
+
+    const result = await new ReceptionService({} as never, "org_exepa_001").validatePalletScan(
+      "reception-op-1",
+      "TQR-reception-op-1-001",
+      "wh-1",
+    );
+
+    expect(httpsCallable).toHaveBeenCalledWith(undefined, "validate_reception_pallet_scan");
+    expect(callable).toHaveBeenCalledWith({
+      receptionId: "reception-op-1",
+      qrIdentifier: "TQR-reception-op-1-001",
+      warehouseId: "wh-1",
+    });
+    expect(result.activated).toBe(false);
+    expect(result.status).toBe("IN_CAPTURE");
+  });
+
+  it("persists lot and expiry checkpoints through the authorized callable", async () => {
+    const callable = vi.fn().mockResolvedValue({ data: { status: "IN_CAPTURE" } });
+    vi.mocked(httpsCallable).mockReturnValue(callable as never);
+
+    await new ReceptionService({} as never, "org_exepa_001").savePalletCapture(
+      "reception-op-1",
+      "TQR-reception-op-1-001",
+      "LOT-1",
+      "2027-03-15",
+      "checkpoint-1",
+    );
+
+    expect(httpsCallable).toHaveBeenCalledWith(undefined, "save_reception_pallet_capture");
+    expect(callable).toHaveBeenCalledWith({
+      receptionId: "reception-op-1",
+      qrIdentifier: "TQR-reception-op-1-001",
+      lot: "LOT-1",
+      expiryDate: "2027-03-15",
+      operationId: "checkpoint-1",
+    });
+  });
+
   it("creates a reception through the callable without a second client write/read", async () => {
-    const callable = vi.fn().mockResolvedValue({ data: { receptionId: "reception-op-2" } });
+    const plannedPallets = [
+      {
+        palletNumber: 1,
+        lineIndex: 0,
+        productId: "product-1",
+        productName: "Agua mineral",
+        quantity: 4,
+        unit: "cajas",
+        qrIdentifier: "TQR-reception-op-2-001",
+        status: "PLANNED",
+      },
+    ];
+    const callable = vi.fn().mockResolvedValue({
+      data: {
+        receptionId: "reception-op-2",
+        folio: "REC-2026-1234",
+        scheduledDate: "24/10/2026",
+        purchaseOrderNumber: "OC-24891",
+        supplierCode: "SUP-EFL",
+        supplierName: "El Florido",
+        logisticsProvider: "Transportes Herrera",
+        plannedPallets,
+      },
+    });
     vi.mocked(httpsCallable).mockReturnValue(callable as never);
 
     const service = new ReceptionService({} as never, "org_exepa_001");
@@ -56,6 +131,22 @@ describe("Reception write services", () => {
         status: "DRAFT",
         operationId: "op-reception-2",
         actorUserId: "ignored-client-actor",
+        folio: "REC-2026-1234",
+        scheduledDate: "24/10/2026",
+        purchaseOrderNumber: "OC-24891",
+        supplierCode: "SUP-EFL",
+        supplierName: "El Florido",
+        logisticsProvider: "Transportes Herrera",
+        plannedPallets: [
+          {
+            palletNumber: 1,
+            lineIndex: 0,
+            productId: "product-1",
+            productName: "Agua mineral",
+            quantity: 4,
+            unit: "cajas",
+          },
+        ],
       } as never,
       [
         {
@@ -74,10 +165,30 @@ describe("Reception write services", () => {
       expect.objectContaining({
         operationId: "op-reception-2",
         warehouseId: "wh-1",
+        folio: "REC-2026-1234",
+        scheduledDate: "24/10/2026",
+        purchaseOrderNumber: "OC-24891",
+        supplierCode: "SUP-EFL",
+        supplierName: "El Florido",
+        logisticsProvider: "Transportes Herrera",
+        plannedPallets: [
+          {
+            palletNumber: 1,
+            lineIndex: 0,
+            productId: "product-1",
+            productName: "Agua mineral",
+            quantity: 4,
+            unit: "cajas",
+          },
+        ],
         lines: [{ productId: "product-1", quantity: 4, unit: "cajas", lot: null }],
       }),
     );
     expect(reception.id).toBe("reception-op-2");
+    expect(reception.plannedPallets).toEqual(plannedPallets);
+    expect(reception.folio).toBe("REC-2026-1234");
+    expect(reception.supplierName).toBe("El Florido");
+    expect(reception.logisticsProvider).toBe("Transportes Herrera");
   });
 
   it("registers pallets through the callable and never falls back to client writes", async () => {
@@ -90,7 +201,7 @@ describe("Reception write services", () => {
         {
           warehouseId: "wh-1",
           productId: "product-1",
-          qrIdentifier: "QR-1",
+          qrIdentifier: "TQR-reception-op-1-001",
           quantity: 3,
           unit: "cajas",
           status: "RECEIVED",
@@ -108,8 +219,11 @@ describe("Reception write services", () => {
         receptionId: "reception-op-1",
         warehouseId: "wh-1",
         productId: "product-1",
+        qrIdentifier: "TQR-reception-op-1-001",
         quantity: 3,
         operationId: "op-pallet-1",
+        lot: "LOT-1",
+        expiryDate: null,
       }),
     );
     expect(pallets[0].id).toBe("pallet-op-1");

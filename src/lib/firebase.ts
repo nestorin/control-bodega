@@ -110,7 +110,7 @@ const app = isFirebaseConfigured
 export const appCheck =
   app && import.meta.env.PROD && !useFirebaseEmulators
     ? initializeAppCheck(app, {
-        provider: new ReCaptchaEnterpriseProvider("6Le5Y-otAAAAACdTTc9C4uQa2A2mQJZp8OBDPUb_"),
+        provider: new ReCaptchaEnterpriseProvider("6LcdhP4tAAAAALeq2aFA9Z-0zXdAAsH8nfk6Q4hs"),
         isTokenAutoRefreshEnabled: true,
       })
     : null;

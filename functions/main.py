@@ -10,6 +10,8 @@ from receptions import (
     create_reception,
     register_reception_pallet,
     save_evidence,
+    save_reception_pallet_capture,
+    validate_reception_pallet_scan,
 )
 
 # Firebase Functions Gen2 detecta automáticamente las funciones decoradas

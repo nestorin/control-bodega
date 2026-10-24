@@ -132,4 +132,23 @@ describe("ProgramacionRecepcion controlled inputs", () => {
       screen.queryByText("Relaciona al menos un producto antes de guardar"),
     ).not.toBeInTheDocument();
   });
+
+  it("keeps product cards spacious and product actions touch-friendly on mobile", () => {
+    render(<ProgramacionRecepcion onBack={vi.fn()} onFinish={vi.fn()} catalogos={catalogs} />);
+    fireEvent.click(screen.getByRole("button", { name: /No tengo Orden de Compra/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agregar primer producto" }));
+
+    const productInput = screen.getAllByPlaceholderText("Escribe para buscar...")[0];
+    fireEvent.change(productInput, { target: { value: "Producto Seleccionable" } });
+    fireEvent.click(screen.getByRole("button", { name: /Producto Seleccionable/ }));
+
+    const card = screen.getByTestId("reception-product-card");
+    expect(card.className).toContain("rounded-2xl");
+    expect(card.className).toContain("p-4");
+    expect(card.className).toContain("shadow-sm");
+    const confirm = screen.getAllByRole("button", { name: /Confirmar producto/ })[0];
+    expect(confirm.className).toContain("min-h-11");
+    expect(confirm.className).toContain("w-full");
+  });
 });

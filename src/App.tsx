@@ -15,6 +15,7 @@ import ProgramacionRecepcion from "./screens/ProgramacionRecepcion";
 import NuevaRecepcionStep1 from "./screens/NuevaRecepcionStep1";
 import NuevaRecepcionStep2 from "./screens/NuevaRecepcionStep2";
 import CapturaTarima from "./screens/CapturaTarima";
+import type { PlannedReceptionPallet } from "@/services/firestore/types";
 import RecepcionCompletada from "./screens/RecepcionCompletada";
 import Recepciones from "./screens/Recepciones";
 import TarimaDetalle from "./screens/TarimaDetalle";
@@ -450,6 +451,13 @@ function AppLayout() {
     lote?: string;
     caducidad?: string;
     codigosQR?: string[];
+    plannedPallets?: PlannedReceptionPallet[];
+    purchaseOrderId?: string;
+    purchaseOrderNumber?: string;
+    supplierCode?: string;
+    supplierName?: string;
+    logisticsProvider?: string;
+    scheduledDate?: string;
     productos: Array<{
       productId: string | null;
       codigo: string | null;
@@ -473,6 +481,72 @@ function AppLayout() {
       stickers: number;
     }>;
   } | null>(null);
+
+  async function resumeReception(receptionId: string) {
+    if (!db || !canQuery) {
+      window.alert("No se puede reanudar sin conexión autorizada a Firestore.");
+      return;
+    }
+    try {
+      const services = createFirestoreServices(db, "org_exepa_001");
+      const reception = await services.receptions.getById(receptionId);
+      if (!reception || !["DRAFT", "IN_PROGRESS"].includes(reception.status)) {
+        window.alert("La recepción ya no está disponible para reanudar.");
+        return;
+      }
+      const pallets = reception.plannedPallets ?? [];
+      if (pallets.length === 0) {
+        window.alert("Esta recepción no tiene un plan de tarimas recuperable.");
+        return;
+      }
+      const productsByLine = new Map<number, (typeof pallets)[number]>();
+      pallets.forEach((pallet) => productsByLine.set(pallet.lineIndex, pallet));
+      setCurrentReception({
+        ocFolio: reception.folio || reception.purchaseOrderNumber || reception.id,
+        tarimas: pallets.length,
+        proveedor: reception.supplierName || reception.supplierCode || "Sin proveedor",
+        proveedorLogistico: reception.logisticsProvider || "",
+        receptionId: reception.id,
+        fechaRecepcion: reception.scheduledDate,
+        codigosQR: pallets.map((pallet) => pallet.qrIdentifier),
+        plannedPallets: pallets,
+        purchaseOrderId: reception.purchaseOrderId,
+        purchaseOrderNumber: reception.purchaseOrderNumber,
+        supplierCode: reception.supplierCode,
+        supplierName: reception.supplierName,
+        logisticsProvider: reception.logisticsProvider,
+        scheduledDate: reception.scheduledDate,
+        productos: [...productsByLine.entries()].map(([, pallet]) => ({
+          productId: pallet.productId,
+          codigo: null,
+          nombre: pallet.productName,
+          unidad: pallet.unit,
+          cantidad: pallets
+            .filter((item) => item.lineIndex === pallet.lineIndex)
+            .reduce((sum, item) => sum + item.quantity, 0),
+          precio: 0,
+          importe: 0,
+          estadoMatch: "confirmado" as const,
+        })),
+      });
+      receptionSession.startSession(
+        {
+          receptionId: reception.id,
+          folio: reception.folio || reception.id,
+          warehouseId: reception.warehouseId,
+          provider: reception.supplierName || reception.supplierCode || "",
+          logisticsProvider: reception.logisticsProvider || "",
+          productIds: [...new Set(pallets.map((pallet) => pallet.productId))],
+          totalPallets: pallets.length,
+        },
+        "PALLETS",
+      );
+      navigate("captura-tarima");
+    } catch (error) {
+      console.error("Unable to resume reception:", error);
+      window.alert("No se pudo cargar la recepción. Revisá la conexión y los permisos.");
+    }
+  }
 
   // Mobile state
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -762,7 +836,7 @@ function AppLayout() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-[#edf1f3] overflow-hidden">
+    <div className="flex h-[100dvh] w-full min-h-0 bg-[#edf1f3] overflow-hidden">
       {/* ─── Sidebar Overlay (mobile) ─── */}
       {isMobile && sidebarOpen && (
         <div
@@ -842,7 +916,7 @@ function AppLayout() {
       <main className="flex flex-col flex-1 min-w-0 overflow-hidden">
         {/* ─── Mobile Header ─── */}
         {isMobile && (
-          <header className="bg-white border-b border-[#dce4e7] flex items-center justify-between px-4 h-[64px] shrink-0 safe-top">
+          <header className="bg-white border-b border-[#dce4e7] flex items-center justify-between gap-2 px-3 min-h-[64px] py-2 shrink-0 safe-top">
             <button
               onClick={() => setSidebarOpen(true)}
               className="flex items-center justify-center size-10 rounded-[10px] border border-[#dce4e7] bg-white touch-target"
@@ -872,7 +946,7 @@ function AppLayout() {
                 {header.subtitle}
               </p>
               <p
-                className="text-[#172126] text-[20px] truncate"
+                className="text-[#172126] text-[18px] sm:text-[20px] truncate"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
               >
                 {header.title}
@@ -1045,7 +1119,7 @@ function AppLayout() {
         )}
 
         {/* ─── Content ─── */}
-        <div className={`flex-1 overflow-auto ${isMobile ? "content-padded safe-bottom" : ""}`}>
+        <div className={`flex-1 min-h-0 overflow-y-auto overscroll-y-contain ${isMobile ? "content-padded" : ""}`}>
           {screen === "home" && (
             <Home
               onNewReception={() => {
@@ -1119,6 +1193,11 @@ function AppLayout() {
                   productos: appReception.lineas,
                   fechaRecepcion: data.fechaRecepcion,
                   codigosQR: data.codigosQR,
+                  plannedPallets: data.plannedPallets,
+                  purchaseOrderId: data.purchaseOrderId,
+                  purchaseOrderNumber: data.purchaseOrderNumber,
+                  supplierCode: data.supplierCode,
+                  scheduledDate: data.scheduledDate,
                   conversionesTabla,
                 });
                 navigate("captura-evidencia");
@@ -1255,7 +1334,18 @@ function AppLayout() {
 
           {screen === "captura-tarima" && (
             <CapturaTarima
-              onBack={() => navigate("nueva-step2")}
+              onBack={() => {
+                if (
+                  isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") &&
+                  db &&
+                  canQuery &&
+                  currentReception?.receptionId
+                ) {
+                  navigate("recepciones", "recepciones");
+                } else {
+                  navigate("nueva-step2");
+                }
+              }}
               onFinish={() => {
                 if (receptionSession.session.data && receptionSession.session.phase === "PALLETS") {
                   receptionSession.transition("CONFIRMED");
@@ -1290,6 +1380,7 @@ function AppLayout() {
           )}
           {screen === "recepciones" && (
             <Recepciones
+              onResume={resumeReception}
               onSelectTarima={(id) => {
                 setSelectedReception(id);
                 navigate("tarima-detalle", "recepciones");
@@ -1398,7 +1489,7 @@ function AppLayout() {
       {/* ─── Bottom Navigation (mobile only) ─── */}
       {isMobile && (
         <nav
-          className="bottom-nav bg-white border-t border-[#dce4e7] flex items-center justify-between px-2 py-2 safe-bottom overflow-x-auto hide-scrollbar"
+          className="bottom-nav bg-white border-t border-[#dce4e7] flex items-center justify-between px-2 py-2 overflow-x-auto hide-scrollbar"
           role="navigation"
           aria-label="Navegación principal"
           style={{ gap: 4 }}

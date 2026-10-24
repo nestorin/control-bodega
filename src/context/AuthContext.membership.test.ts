@@ -33,17 +33,31 @@ describe("organization membership authorization", () => {
     expect(canAccessWarehouseForProfile("UNAUTHENTICATED", null, "wh_tehuacan_1")).toBe(false);
   });
 
-  it("accepts canonical roles and multiple warehouse scopes", () => {
+  it("rejects pending memberships because sign-up provisions active access directly", () => {
+    const pendingMember = {
+      userId: "pending-user",
+      organizationId: "org_exepa_001",
+      role: "AUXILIAR_ALMACENISTA",
+      warehouseId: null,
+      warehouseIds: [],
+      status: "PENDING",
+    };
+
+    expect(isValidMembership(pendingMember, "pending-user")).toBe(false);
+  });
+
+  it("accepts an active manager membership with both canonical warehouses", () => {
     const manager: UserProfile = {
       ...activeMember,
       role: "GERENTE_ALMACEN",
       warehouseId: null,
-      warehouseIds: ["wh_tehuacan_1", "warehouse-2"],
+      warehouseIds: ["wh_tehuacan_1", "wh_tehuacan_2"],
     };
 
     expect(isValidMembership(manager, "user-1")).toBe(true);
     expect(canAccessWarehouseForProfile("ACTIVE", manager, "wh_tehuacan_1")).toBe(true);
     expect(canAccessWarehouseForProfile("ACTIVE", manager, "wh_tehuacan_2")).toBe(true);
+    expect(canAccessWarehouseForProfile("ACTIVE", manager, "warehouse-1")).toBe(true);
   });
 
   it("keeps legacy role aliases compatible", () => {

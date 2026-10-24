@@ -14,7 +14,9 @@ import { validateReceptionLine } from "@/services/domain/validation";
 import type { ReceptionLineState } from "@/types/domain";
 import { useAuthorization } from "@/hooks/useAuthorization";
 import { WAREHOUSE_IDS } from "@/config/warehouses";
-import { mergeSupplierCatalog } from "@/config/supplierCatalog";
+import { CANONICAL_SUPPLIER_SEED, mergeSupplierCatalog } from "@/config/supplierCatalog";
+import { buildTarimaQR } from "@/types/qrcode";
+import type { PlannedReceptionPallet, PlannedReceptionPalletDraft } from "@/services/firestore/types";
 
 // PDF.js para preview de PDF
 import * as pdfjsLib from "pdfjs-dist";
@@ -347,6 +349,11 @@ interface Props {
       tarimas: number;
     }>;
     codigosQR: string[];
+    plannedPallets: PlannedReceptionPallet[];
+    purchaseOrderId?: string;
+    purchaseOrderNumber?: string;
+    supplierCode: string;
+    scheduledDate: string;
   }) => void;
   catalogos: {
     proveedores: Proveedor[];
@@ -443,6 +450,10 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
 
   // Códigos QR generados
   const [codigosQR, setCodigosQR] = useState<string[]>([]);
+  const [plannedPallets, setPlannedPallets] = useState<PlannedReceptionPallet[]>([]);
+  const [canonicalStickerHeader, setCanonicalStickerHeader] = useState<{
+    receptionId: string; folio: string; purchaseOrderId?: string; purchaseOrderNumber?: string; supplierCode: string; scheduledDate: string;
+  } | null>(null);
 
   useEffect(() => {
     if (useFirestore && db) {
@@ -577,13 +588,81 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
     setTimeout(() => setNotices([]), 2500);
   }
 
-  function generarCodigosQR(): string[] {
-    const totalTarimas = productos.reduce((sum, p) => sum + p.tarimas, 0);
-    const codigos: string[] = [];
-    for (let i = 1; i <= totalTarimas; i++) {
-      codigos.push(`${folio}-T${i.toString().padStart(3, "0")}`);
-    }
-    return codigos;
+  function buildPalletPlan(): PlannedReceptionPalletDraft[] {
+    let palletNumber = 1;
+    return productos.flatMap((product, lineIndex) =>
+      Array.from({ length: product.tarimas }, (_, index) => ({
+        palletNumber: palletNumber++, lineIndex, productId: product.productId || "",
+        productName: product.nombre,
+        quantity: Math.min(product.cajasPorTarima, product.cantidad - index * product.cajasPorTarima),
+        unit: product.unidad || "cajas",
+      })),
+    );
+  }
+
+  function getSupplierKey(): string {
+    const supplier = supplierCatalog.find((item) => item.nombre === proveedor);
+    return CANONICAL_SUPPLIER_SEED.find(([id]) => id === supplier?.id)?.[1] ?? supplier?.id ?? "—";
+  }
+
+  function appendStickerPages(pdf: import("jspdf").jsPDF, qrDataUrls: string[]) {
+    const total = plannedPallets.length;
+    const supplierKey = canonicalStickerHeader?.supplierCode || getSupplierKey();
+    const receptionId = canonicalStickerHeader?.purchaseOrderNumber || canonicalStickerHeader?.folio || savedReceptionId || folio;
+
+    const pageWidth = 297;
+    const pageHeight = 210;
+    const margin = 9;
+    const stickerWidth = (pageWidth - margin * 2) / 2;
+    const stickerHeight = (pageHeight - margin * 2) / 2;
+    const stickersPerPage = 4;
+
+    codigosQR.forEach((code, palletIndex) => {
+      // Two identical labels per pallet; the QR remains the pallet's unique ID.
+      for (let copy = 0; copy < 2; copy++) {
+        const stickerIndex = palletIndex * 2 + copy;
+        const slot = stickerIndex % stickersPerPage;
+        if (slot === 0) pdf.addPage("a4", "landscape");
+
+        const x = margin + (slot % 2) * stickerWidth;
+        const y = margin + Math.floor(slot / 2) * stickerHeight;
+        const centerX = x + (stickerWidth - 2) / 2;
+        const qrSize = 48;
+        const qrX = centerX - qrSize / 2;
+        const qrY = y + 2;
+
+        pdf.setDrawColor(200, 212, 216);
+        pdf.setLineWidth(0.35);
+        pdf.rect(x, y, stickerWidth - 2, stickerHeight - 2);
+        pdf.addImage(qrDataUrls[palletIndex], "PNG", qrX, qrY, qrSize, qrSize);
+
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(22, 52, 63);
+        pdf.setFontSize(11);
+        pdf.text(`ID tarima: ${code}`, centerX, y + 55, { align: "center" });
+        pdf.setFontSize(18);
+        pdf.text(`${palletIndex + 1}/${total}`, centerX, y + 64, { align: "center" });
+
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(72, 86, 92);
+        pdf.setFontSize(8);
+        pdf.text(`ID recepción/pedido: ${receptionId}`, centerX, y + 70, { align: "center" });
+        pdf.text(`Clave proveedor: ${supplierKey}`, centerX, y + 75, { align: "center" });
+
+        const product = plannedPallets[palletIndex];
+        if (product) {
+          const productLines = pdf
+            .splitTextToSize(`Producto: ${product.productName}`, stickerWidth - 12)
+            .slice(0, 2);
+          pdf.setFontSize(7.5);
+          pdf.text(productLines, centerX, y + 81, { align: "center" });
+          pdf.setFontSize(7);
+          pdf.text(`${product.quantity} ${product.unit}  ·  ${canonicalStickerHeader?.scheduledDate || fechaRecepcion}`, centerX, y + 89, {
+            align: "center",
+          });
+        }
+      }
+    });
   }
 
   function totalTarimas(): number {
@@ -639,7 +718,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
       return;
     }
 
-    const nextQrCodes = generarCodigosQR();
+    let nextQrCodes: string[] = [];
     let receptionId: string | null = null;
 
     // Guardar en Firestore si está habilitado
@@ -680,8 +759,15 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
         })),
         warehouseId: profile?.warehouseId || WAREHOUSE_IDS.NORTH,
         supplierId: catalogos.proveedores.find((item) => item.nombre === proveedor)?.id,
+        supplierName: proveedor,
+        logisticsProvider: proveedorLogistico,
         actorUserId: user.uid,
         operationId,
+        folio,
+        scheduledDate: fechaRecepcion,
+        purchaseOrderNumber: ocrResult?.tipo === "oc" ? ocrResult.parsed.folio ?? undefined : undefined,
+        supplierCode: getSupplierKey(),
+        plannedPallets: buildPalletPlan(),
       });
 
       if (persistence.lines.length === 0) {
@@ -697,6 +783,15 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
           operationId,
         );
         receptionId = reception.id;
+        if (!reception.plannedPallets?.length) throw new Error("El servidor no devolvió el plan canónico de tarimas");
+        setPlannedPallets(reception.plannedPallets);
+        nextQrCodes = reception.plannedPallets.map((pallet) => pallet.qrIdentifier);
+        setCanonicalStickerHeader({
+          receptionId: reception.id, folio: reception.folio || folio,
+          purchaseOrderId: reception.purchaseOrderId, purchaseOrderNumber: reception.purchaseOrderNumber,
+          supplierCode: reception.supplierCode || getSupplierKey(),
+          scheduledDate: reception.scheduledDate || fechaRecepcion,
+        });
       } catch (e) {
         console.error("Error guardando programación:", e);
         const error = e as {
@@ -713,6 +808,15 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
         setNotices([`No se pudo guardar la recepción: ${detail}`]);
         return;
       }
+    }
+
+    if (!useFirestore) {
+      const plan = buildPalletPlan().map((pallet, index) => ({
+        ...pallet, qrIdentifier: buildTarimaQR(folio, index + 1), status: "PLANNED" as const,
+      }));
+      setPlannedPallets(plan);
+      nextQrCodes = plan.map((pallet) => pallet.qrIdentifier);
+      setCanonicalStickerHeader({ receptionId: folio, folio, supplierCode: getSupplierKey(), scheduledDate: fechaRecepcion });
     }
 
     setSavedReceptionId(receptionId);
@@ -732,14 +836,14 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
       const qrDataUrls: string[] = [];
       for (const codigo of codigosQR) {
         const dataUrl = await QRCode.toDataURL(codigo, {
-          width: 120,
+          width: 512,
           margin: 2,
           errorCorrectionLevel: "H",
         });
         qrDataUrls.push(dataUrl);
       }
 
-      const pdf = new jsPDF({ unit: "mm", format: "a4" });
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 15;
@@ -769,7 +873,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
       });
       y += 5;
       pdf.text(
-        `Proveedor: ${proveedor || "—"}    |    Logística: ${proveedorLogistico || "—"}`,
+        `Clave proveedor: ${getSupplierKey()}    |    Logística: ${proveedorLogistico || "—"}`,
         pageWidth / 2,
         y,
         { align: "center" },
@@ -786,7 +890,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
       pdf.setFontSize(9);
       pdf.setTextColor(22, 52, 63);
 
-      const colWidths = [65, 25, 25, 25, 25];
+      const colWidths = [105, 35, 35, 35, 35];
       const colStarts = [margin];
       for (let i = 1; i < colWidths.length; i++) {
         colStarts.push(colStarts[i - 1] + colWidths[i - 1]);
@@ -840,73 +944,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
       });
       y += 10;
 
-      // ===== CÓDIGOS QR =====
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(12);
-      pdf.setTextColor(22, 52, 63);
-      pdf.text("CÓDIGOS QR PARA ETIQUETAS (4 stickers por tarima)", pageWidth / 2, y, {
-        align: "center",
-      });
-      y += 8;
-
-      const stickersPerPage = 4;
-      const stickerWidth = (pageWidth - 2 * margin) / 2;
-      const stickerHeight = 70;
-
-      for (let i = 0; i < codigosQR.length; i++) {
-        const stickerIndex = i % stickersPerPage;
-        const row = Math.floor(stickerIndex / 2);
-        const col = stickerIndex % 2;
-
-        if (stickerIndex === 0 && i > 0) {
-          pdf.addPage();
-          y = margin;
-        }
-
-        const x = margin + col * stickerWidth;
-        const stickerY = y + row * stickerHeight;
-
-        checkSpace(stickerHeight);
-
-        pdf.setDrawColor(200, 212, 216);
-        pdf.setLineWidth(0.3);
-        pdf.rect(x, stickerY, stickerWidth - 2, stickerHeight - 2);
-
-        const qrDataUrl = qrDataUrls[i];
-        const qrSize = 35;
-        const qrX = x + (stickerWidth - qrSize) / 2;
-        const qrY = stickerY + 3;
-        pdf.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
-
-        const textY = qrY + qrSize + 3;
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(8);
-        pdf.setTextColor(22, 52, 63);
-        pdf.text(codigosQR[i], x + stickerWidth / 2, textY, { align: "center" });
-
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(7);
-        pdf.setTextColor(96, 112, 120);
-        const tarimaNum = Math.floor(i / 4) + 1;
-        const stickerFace = i % 4 < 2 ? "Cara A" : "Cara B";
-        const stickerCopy = i % 2 === 0 ? "Copia 1" : "Copia 2";
-        pdf.text(
-          `${stickerFace} · ${stickerCopy} · Tarima ${tarimaNum}`,
-          x + stickerWidth / 2,
-          textY + 4,
-          { align: "center" },
-        );
-
-        const prodIdx = Math.floor(i / 4);
-        if (productos[prodIdx]) {
-          const p = productos[prodIdx];
-          pdf.setFontSize(6);
-          pdf.text(`Producto: ${p.nombre}`, x + 3, textY + 8);
-          pdf.text(`Cajas: ${p.cantidad} | Tarimas: ${p.tarimas}`, x + 3, textY + 12);
-          pdf.text(`Proveedor: ${proveedor}`, x + 3, textY + 16);
-          pdf.text(`Fecha: ${fechaRecepcion}`, x + 3, textY + 20);
-        }
-      }
+      appendStickerPages(pdf, qrDataUrls);
 
       // Obtener PDF como blob
       const pdfBlob = pdf.output("blob");
@@ -977,7 +1015,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
     const qrDataUrls: string[] = [];
     for (const codigo of codigosQR) {
       const dataUrl = await QRCode.toDataURL(codigo, {
-        width: 120,
+        width: 512,
         margin: 2,
         errorCorrectionLevel: "H",
       });
@@ -985,7 +1023,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
     }
 
     // Crear PDF
-    const pdf = new jsPDF({ unit: "mm", format: "a4" });
+    const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 15;
@@ -1016,7 +1054,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
     });
     y += 5;
     pdf.text(
-      `Proveedor: ${proveedor || "—"}    |    Logística: ${proveedorLogistico || "—"}`,
+      `Clave proveedor: ${getSupplierKey()}    |    Logística: ${proveedorLogistico || "—"}`,
       pageWidth / 2,
       y,
       { align: "center" },
@@ -1034,7 +1072,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
     pdf.setFontSize(9);
     pdf.setTextColor(22, 52, 63);
 
-    const colWidths = [65, 25, 25, 25, 25]; // Producto, Cajas, C/T, Tarimas, Match
+    const colWidths = [105, 35, 35, 35, 35]; // Producto, Cajas, C/T, Tarimas, Match
     const colStarts = [margin];
     for (let i = 1; i < colWidths.length; i++) {
       colStarts.push(colStarts[i - 1] + colWidths[i - 1]);
@@ -1090,79 +1128,11 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
     });
     y += 10;
 
-    // ===== CÓDIGOS QR (4 stickers por tarima) =====
+    // ===== CÓDIGOS QR =====
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(12);
     pdf.setTextColor(22, 52, 63);
-    pdf.text("CÓDIGOS QR PARA ETIQUETAS (4 stickers por tarima)", pageWidth / 2, y, {
-      align: "center",
-    });
-    y += 8;
-
-    // 4 stickers por tarima: 2 filas x 2 columnas por página
-    const stickersPerPage = 4;
-    const stickerWidth = (pageWidth - 2 * margin) / 2;
-    const stickerHeight = 70;
-
-    for (let i = 0; i < codigosQR.length; i++) {
-      const stickerIndex = i % stickersPerPage;
-      const row = Math.floor(stickerIndex / 2);
-      const col = stickerIndex % 2;
-
-      if (stickerIndex === 0 && i > 0) {
-        pdf.addPage();
-        y = margin;
-      }
-
-      const x = margin + col * stickerWidth;
-      const stickerY = y + row * stickerHeight;
-
-      checkSpace(stickerHeight);
-
-      // Borde del sticker
-      pdf.setDrawColor(200, 212, 216); // #c8d4d8
-      pdf.setLineWidth(0.3);
-      pdf.rect(x, stickerY, stickerWidth - 2, stickerHeight - 2);
-
-      // QR code usando data URL generado con qrcode library
-      const qrDataUrl = qrDataUrls[i];
-      const qrSize = 35;
-      const qrX = x + (stickerWidth - qrSize) / 2;
-      const qrY = stickerY + 3;
-      pdf.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
-
-      // Texto debajo del QR
-      const textY = qrY + qrSize + 3;
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(8);
-      pdf.setTextColor(22, 52, 63);
-      pdf.text(codigosQR[i], x + stickerWidth / 2, textY, { align: "center" });
-
-      // Info de sticker
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(7);
-      pdf.setTextColor(96, 112, 120);
-      const tarimaNum = Math.floor(i / 4) + 1;
-      const stickerFace = i % 4 < 2 ? "Cara A" : "Cara B";
-      const stickerCopy = i % 2 === 0 ? "Copia 1" : "Copia 2";
-      pdf.text(
-        `${stickerFace} · ${stickerCopy} · Tarima ${tarimaNum}`,
-        x + stickerWidth / 2,
-        textY + 4,
-        { align: "center" },
-      );
-
-      // Datos del producto
-      const prodIdx = Math.floor(i / 4);
-      if (productos[prodIdx]) {
-        const p = productos[prodIdx];
-        pdf.setFontSize(6);
-        pdf.text(`Producto: ${p.nombre}`, x + 3, textY + 8);
-        pdf.text(`Cajas: ${p.cantidad} | Tarimas: ${p.tarimas}`, x + 3, textY + 12);
-        pdf.text(`Proveedor: ${proveedor}`, x + 3, textY + 16);
-        pdf.text(`Fecha: ${fechaRecepcion}`, x + 3, textY + 20);
-      }
-    }
+    appendStickerPages(pdf, qrDataUrls);
 
     // Guardar
     pdf.save(`Programacion_${folio}.pdf`);
@@ -1179,14 +1149,14 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
       const qrDataUrls: string[] = [];
       for (const codigo of codigosQR) {
         const dataUrl = await QRCode.toDataURL(codigo, {
-          width: 120,
+          width: 512,
           margin: 2,
           errorCorrectionLevel: "H",
         });
         qrDataUrls.push(dataUrl);
       }
 
-      const pdf = new jsPDF({ unit: "mm", format: "a4" });
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 15;
@@ -1216,7 +1186,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
       });
       y += 5;
       pdf.text(
-        `Proveedor: ${proveedor || "—"}    |    Logística: ${proveedorLogistico || "—"}`,
+        `Clave proveedor: ${getSupplierKey()}    |    Logística: ${proveedorLogistico || "—"}`,
         pageWidth / 2,
         y,
         { align: "center" },
@@ -1233,7 +1203,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
       pdf.setFontSize(9);
       pdf.setTextColor(22, 52, 63);
 
-      const colWidths = [65, 25, 25, 25, 25];
+      const colWidths = [105, 35, 35, 35, 35];
       const colStarts = [margin];
       for (let i = 1; i < colWidths.length; i++) {
         colStarts.push(colStarts[i - 1] + colWidths[i - 1]);
@@ -1287,73 +1257,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
       });
       y += 10;
 
-      // ===== CÓDIGOS QR =====
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(12);
-      pdf.setTextColor(22, 52, 63);
-      pdf.text("CÓDIGOS QR PARA ETIQUETAS (4 stickers por tarima)", pageWidth / 2, y, {
-        align: "center",
-      });
-      y += 8;
-
-      const stickersPerPage = 4;
-      const stickerWidth = (pageWidth - 2 * margin) / 2;
-      const stickerHeight = 70;
-
-      for (let i = 0; i < codigosQR.length; i++) {
-        const stickerIndex = i % stickersPerPage;
-        const row = Math.floor(stickerIndex / 2);
-        const col = stickerIndex % 2;
-
-        if (stickerIndex === 0 && i > 0) {
-          pdf.addPage();
-          y = margin;
-        }
-
-        const x = margin + col * stickerWidth;
-        const stickerY = y + row * stickerHeight;
-
-        checkSpace(stickerHeight);
-
-        pdf.setDrawColor(200, 212, 216);
-        pdf.setLineWidth(0.3);
-        pdf.rect(x, stickerY, stickerWidth - 2, stickerHeight - 2);
-
-        const qrDataUrl = qrDataUrls[i];
-        const qrSize = 35;
-        const qrX = x + (stickerWidth - qrSize) / 2;
-        const qrY = stickerY + 3;
-        pdf.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
-
-        const textY = qrY + qrSize + 3;
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(8);
-        pdf.setTextColor(22, 52, 63);
-        pdf.text(codigosQR[i], x + stickerWidth / 2, textY, { align: "center" });
-
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(7);
-        pdf.setTextColor(96, 112, 120);
-        const tarimaNum = Math.floor(i / 4) + 1;
-        const stickerFace = i % 4 < 2 ? "Cara A" : "Cara B";
-        const stickerCopy = i % 2 === 0 ? "Copia 1" : "Copia 2";
-        pdf.text(
-          `${stickerFace} · ${stickerCopy} · Tarima ${tarimaNum}`,
-          x + stickerWidth / 2,
-          textY + 4,
-          { align: "center" },
-        );
-
-        const prodIdx = Math.floor(i / 4);
-        if (productos[prodIdx]) {
-          const p = productos[prodIdx];
-          pdf.setFontSize(6);
-          pdf.text(`Producto: ${p.nombre}`, x + 3, textY + 8);
-          pdf.text(`Cajas: ${p.cantidad} | Tarimas: ${p.tarimas}`, x + 3, textY + 12);
-          pdf.text(`Proveedor: ${proveedor}`, x + 3, textY + 16);
-          pdf.text(`Fecha: ${fechaRecepcion}`, x + 3, textY + 20);
-        }
-      }
+      appendStickerPages(pdf, qrDataUrls);
 
       // Abrir PDF en nueva ventana para imprimir
       const pdfBlob = pdf.output("blob");
@@ -1393,11 +1297,16 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
         tarimas: p.tarimas,
       })),
       codigosQR,
+      plannedPallets,
+      purchaseOrderId: canonicalStickerHeader?.purchaseOrderId,
+      purchaseOrderNumber: canonicalStickerHeader?.purchaseOrderNumber,
+      supplierCode: canonicalStickerHeader?.supplierCode || getSupplierKey(),
+      scheduledDate: canonicalStickerHeader?.scheduledDate || fechaRecepcion,
     });
   }
 
   return (
-    <div className="flex flex-col gap-[18px] items-start p-7 size-full overflow-y-auto">
+    <div className="flex flex-col gap-4 sm:gap-[18px] items-start min-h-full w-full min-w-0 px-3 py-4 sm:p-6 lg:p-7 overflow-x-hidden">
       {/* Progress bar */}
       <div className="bg-[#dce4e7] flex flex-col h-2 items-start overflow-hidden rounded-full w-full shrink-0">
         <div
@@ -1408,11 +1317,10 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
 
       {/* Step 1: Cargar OC */}
       {step === 1 && (
-        <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col gap-[14px] items-start p-5 rounded-[20px] w-full">
+        <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col gap-4 sm:gap-[14px] items-start p-4 sm:p-5 rounded-2xl sm:rounded-[20px] w-full min-w-0">
           <div className="flex items-center gap-4 w-full">
             <div
-              className="bg-[#e7f0f2] flex items-center justify-center rounded-[18px] shrink-0"
-              style={{ width: 72, height: 72 }}
+              className="bg-[#e7f0f2] flex items-center justify-center rounded-[18px] shrink-0 size-14 sm:size-[72px]"
             >
               <svg
                 width="52"
@@ -1433,7 +1341,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
             </div>
             <div className="flex flex-col gap-1">
               <p
-                className="font-extrabold text-[#172126] text-[24px] leading-tight"
+                className="font-extrabold text-[#172126] text-[20px] sm:text-[24px] leading-tight"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
               >
                 Programación de
@@ -1603,7 +1511,8 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                     productos.map((p, i) => (
                       <div
                         key={p.lineId ?? `line-${i}`}
-                        className="bg-white border border-[#dce4e7] rounded-[12px] p-4"
+                        data-testid="reception-product-card"
+                        className="bg-[#fbfcfc] border border-[#dce4e7] rounded-2xl p-4 sm:p-5 shadow-sm"
                       >
                         <div className="flex items-start justify-between gap-2 mb-3">
                           <span
@@ -1614,7 +1523,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                           </span>
                           <button
                             onClick={() => eliminarProducto(i)}
-                            className="text-[#c0392b] p-2"
+                            className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-[#f3d4d1] bg-white text-[#c0392b] hover:bg-[#fff4f3] touch-target"
                             aria-label="Eliminar producto"
                           >
                             <svg
@@ -1726,8 +1635,8 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-3 gap-3">
-                            <div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="min-w-0">
                               <label
                                 className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
                                 style={{ fontFamily: "'Inter', sans-serif" }}
@@ -1742,19 +1651,8 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                                   {p.tarimas}
                                 </span>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => confirmarProducto(i)}
-                                className={`mt-2 rounded-lg px-2 py-1 text-[10px] font-bold ${
-                                  p.productConfirmed
-                                    ? "bg-[#e2f5ec] text-[#16845b]"
-                                    : "bg-[#16343f] text-white"
-                                }`}
-                              >
-                                {p.productConfirmed ? "Producto confirmado" : "Confirmar producto"}
-                              </button>
                             </div>
-                            <div>
+                            <div className="min-w-0">
                               <label
                                 className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
                                 style={{ fontFamily: "'Inter', sans-serif" }}
@@ -1762,7 +1660,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                                 Match
                               </label>
                               <span
-                                className={`px-2 py-1 rounded-full text-[10px] font-bold ${
+                                className={`mt-1 inline-flex min-h-11 items-center rounded-xl px-3 py-2 text-xs font-bold ${
                                   p.conversionMatch
                                     ? "bg-[#e2f5ec] text-[#16845b]"
                                     : "bg-[#fdecea] text-[#c0392b]"
@@ -1773,6 +1671,17 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                               </span>
                             </div>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => confirmarProducto(i)}
+                            className={`flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold touch-target ${
+                              p.productConfirmed
+                                ? "bg-[#e2f5ec] text-[#16845b]"
+                                : "bg-[#16343f] text-white hover:bg-[#1e4456]"
+                            }`}
+                          >
+                            {p.productConfirmed ? "✓ Producto confirmado" : "Confirmar producto"}
+                          </button>
                         </div>
                       </div>
                     ))
@@ -1984,7 +1893,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
             <div className="flex flex-col md:flex-row gap-3 w-full">
               <button
                 onClick={onBack}
-                className="flex gap-2 h-12 md:h-[52px] items-center justify-center px-4 md:px-5 rounded-[14px] cursor-pointer transition-colors border touch-target w-full md:w-auto"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 touch-target transition-colors w-full md:w-auto"
                 style={{ background: "white", borderColor: "#dce4e7" }}
               >
                 <svg
@@ -2000,7 +1909,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
                 <p
-                  className="font-bold text-sm md:text-[15px] whitespace-nowrap"
+                  className="text-center text-sm md:text-[15px] font-bold leading-tight"
                   style={{
                     fontFamily: "'Inter', sans-serif",
                     fontWeight: 700,
@@ -2012,11 +1921,11 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
               </button>
               <button
                 onClick={() => setStep(2)}
-                className="bg-[#16343f] border border-[#16343f] flex gap-2 h-12 md:h-[52px] items-center justify-center px-4 md:px-5 rounded-[14px] cursor-pointer hover:bg-[#1e4456] transition-colors touch-target w-full md:w-auto"
+                className="bg-[#16343f] border border-[#16343f] flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 hover:bg-[#1e4456] transition-colors touch-target w-full md:w-auto"
               >
                 <img alt="" className="size-5 md:size-[18px]" src={imgArrowRight} />
                 <p
-                  className="font-bold text-white text-sm md:text-[15px] whitespace-nowrap"
+                  className="text-center font-bold text-white text-sm md:text-[15px] leading-tight"
                   style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
                 >
                   Continuar
@@ -2029,11 +1938,10 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
 
       {/* Step 2: Revisar y Editar */}
       {step === 2 && (
-        <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col gap-[14px] items-start p-5 rounded-[20px] w-full">
+        <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col gap-4 sm:gap-[14px] items-start p-4 sm:p-5 rounded-2xl sm:rounded-[20px] w-full min-w-0">
           <div className="flex items-center gap-4 w-full">
             <div
-              className="bg-[#e7f0f2] flex items-center justify-center rounded-[18px] shrink-0"
-              style={{ width: 72, height: 72 }}
+              className="bg-[#e7f0f2] flex items-center justify-center rounded-[18px] shrink-0 size-14 sm:size-[72px]"
             >
               <svg
                 width="52"
@@ -2051,7 +1959,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
             </div>
             <div className="flex flex-col gap-1">
               <p
-                className="font-extrabold text-[#172126] text-[24px] leading-tight"
+                className="font-extrabold text-[#172126] text-[20px] sm:text-[24px] leading-tight"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
               >
                 Revisar Programación
@@ -2205,7 +2113,8 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
               productos.map((p, i) => (
                 <div
                   key={p.lineId ?? `line-${i}`}
-                  className="bg-white border border-[#dce4e7] rounded-[12px] p-4"
+                  data-testid="reception-product-card"
+                  className="bg-[#fbfcfc] border border-[#dce4e7] rounded-2xl p-4 sm:p-5 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <span
@@ -2216,7 +2125,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                     </span>
                     <button
                       onClick={() => eliminarProducto(i)}
-                      className="text-[#c0392b] p-2"
+                      className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-[#f3d4d1] bg-white text-[#c0392b] hover:bg-[#fff4f3] touch-target"
                       aria-label="Eliminar producto"
                     >
                       <svg
@@ -2318,8 +2227,8 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="min-w-0">
                         <label
                           className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
                           style={{ fontFamily: "'Inter', sans-serif" }}
@@ -2334,19 +2243,8 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                             {p.tarimas}
                           </span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => confirmarProducto(i)}
-                          className={`mt-2 rounded-lg px-2 py-1 text-[10px] font-bold ${
-                            p.productConfirmed
-                              ? "bg-[#e2f5ec] text-[#16845b]"
-                              : "bg-[#16343f] text-white"
-                          }`}
-                        >
-                          {p.productConfirmed ? "Producto confirmado" : "Confirmar producto"}
-                        </button>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <label
                           className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
                           style={{ fontFamily: "'Inter', sans-serif" }}
@@ -2354,7 +2252,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                           Match
                         </label>
                         <span
-                          className={`px-2 py-1 rounded-full text-[10px] font-bold ${
+                          className={`mt-1 inline-flex min-h-11 items-center rounded-xl px-3 py-2 text-xs font-bold ${
                             p.conversionMatch
                               ? "bg-[#e2f5ec] text-[#16845b]"
                               : "bg-[#fdecea] text-[#c0392b]"
@@ -2365,6 +2263,17 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                         </span>
                       </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => confirmarProducto(i)}
+                      className={`flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold touch-target ${
+                        p.productConfirmed
+                          ? "bg-[#e2f5ec] text-[#16845b]"
+                          : "bg-[#16343f] text-white hover:bg-[#1e4456]"
+                      }`}
+                    >
+                      {p.productConfirmed ? "✓ Producto confirmado" : "Confirmar producto"}
+                    </button>
                   </div>
                 </div>
               ))
@@ -2577,9 +2486,9 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
 
           {/* Footer */}
           <div className="flex flex-col gap-3 w-full md:flex-row md:items-end md:justify-between">
-            <button
-              onClick={() => setStep(1)}
-              className="flex gap-2 h-12 md:h-[52px] items-center justify-center px-4 md:px-5 rounded-[14px] cursor-pointer transition-colors border touch-target w-full md:w-auto"
+              <button
+                onClick={() => setStep(1)}
+                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 touch-target transition-colors w-full md:w-auto"
               style={{ background: "white", borderColor: "#dce4e7" }}
             >
               <svg
@@ -2595,7 +2504,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                 <polyline points="15 18 9 12 15 6" />
               </svg>
               <p
-                className="font-bold text-sm md:text-[15px] whitespace-nowrap"
+                className="text-center font-bold text-sm md:text-[15px] leading-tight"
                 style={{
                   fontFamily: "'Inter', sans-serif",
                   fontWeight: 700,
@@ -2607,11 +2516,11 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
             </button>
             <button
               onClick={handleGuardar}
-              className="bg-[#16343f] border border-[#16343f] flex gap-2 h-12 md:h-[52px] items-center justify-center px-4 md:px-5 rounded-[14px] cursor-pointer hover:bg-[#1e4456] transition-colors touch-target w-full md:w-auto"
+              className="bg-[#16343f] border border-[#16343f] flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 hover:bg-[#1e4456] transition-colors touch-target w-full md:w-auto"
             >
               <img alt="" className="size-5 md:size-[18px]" src={imgArrowRight} />
               <p
-                className="font-bold text-white text-sm md:text-[15px] whitespace-nowrap"
+                className="text-center font-bold text-white text-sm md:text-[15px] leading-tight"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
               >
                 Generar Códigos
@@ -2623,11 +2532,10 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
 
       {/* Step 3: Códigos listos para imprimir/enviar */}
       {step === 3 && (
-        <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col gap-[14px] items-start p-5 rounded-[20px] w-full">
+        <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col gap-4 sm:gap-[14px] items-start p-4 sm:p-5 rounded-2xl sm:rounded-[20px] w-full min-w-0">
           <div className="flex items-center gap-4 w-full">
             <div
-              className="bg-[#e2f5ec] flex items-center justify-center rounded-[18px] shrink-0"
-              style={{ width: 72, height: 72 }}
+              className="bg-[#e2f5ec] flex items-center justify-center rounded-[18px] shrink-0 size-14 sm:size-[72px]"
             >
               <svg
                 width="52"
@@ -2645,7 +2553,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
             </div>
             <div className="flex flex-col gap-1">
               <p
-                className="font-extrabold text-[#172126] text-[24px] leading-tight"
+                className="font-extrabold text-[#172126] text-[20px] sm:text-[24px] leading-tight"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
               >
                 Códigos Generados
@@ -2664,7 +2572,8 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
               className="font-bold text-[#16845b] text-[13px]"
               style={{ fontFamily: "'Inter', sans-serif" }}
             >
-              ✅ Programación guardada — {codigosQR.length} códigos QR listos
+              ✅ Programación guardada — {codigosQR.length} tarimas · {codigosQR.length * 2}{" "}
+              stickers listos
             </p>
           </div>
 
@@ -2706,7 +2615,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
               </div>
               <div>
                 <p className="text-[#607078]" style={{ fontFamily: "'Inter', sans-serif" }}>
-                  Códigos
+                  Códigos únicos
                 </p>
                 <p
                   className="font-bold text-[#16845b] text-[20px]"
@@ -2724,9 +2633,9 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
               className="font-bold text-[#172126] text-[15px] mb-3"
               style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
             >
-              Códigos QR generados (4 por tarima en hoja carta)
+              Códigos QR generados (2 stickers por tarima en hoja A4 horizontal)
             </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-64 overflow-y-auto">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {codigosQR.slice(0, 20).map((qr, i) => (
                 <div
                   key={qr}
@@ -2748,7 +2657,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                     className="text-[10px] text-[#607078]"
                     style={{ fontFamily: "'Inter', sans-serif" }}
                   >
-                    4 stickers
+                    2 stickers
                   </p>
                 </div>
               ))}
@@ -2766,29 +2675,29 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
           {/* Acciones */}
           <div className="flex flex-col gap-3 w-full">
             {/* Primera fila: 4 botones - mobile: stacked, desktop: row */}
-            <div className="flex flex-col md:flex-row gap-3 w-full">
+            <div className="grid grid-cols-2 sm:flex gap-2 sm:gap-3 w-full">
               <button
                 onClick={handleImprimir}
-                className="flex items-center gap-2 h-12 px-4 rounded-[14px] cursor-pointer transition-colors border touch-target flex-1 min-w-[140px]"
+                className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 sm:px-4 py-2 touch-target transition-colors flex-1"
                 style={{
                   background: "#16343f",
                   borderColor: "#16343f",
                   color: "white",
                 }}
               >
-                <img src={imgPrint} alt="" className="size-5" />
-                <span className="font-bold text-sm" style={{ fontFamily: "'Inter', sans-serif" }}>
+                <img src={imgPrint} alt="" className="size-4 sm:size-5 shrink-0" />
+                <span className="text-center font-bold text-xs sm:text-sm leading-tight" style={{ fontFamily: "'Inter', sans-serif" }}>
                   Imprimir
                 </span>
               </button>
               <button
                 onClick={handleDescargarPDF}
-                className="flex items-center gap-2 h-12 px-4 rounded-[14px] cursor-pointer transition-colors border touch-target flex-1 min-w-[140px]"
+                className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 sm:px-4 py-2 touch-target transition-colors flex-1"
                 style={{ background: "white", borderColor: "#dce4e7" }}
               >
-                <img src={imgDownload} alt="" className="size-5" />
+                <img src={imgDownload} alt="" className="size-4 sm:size-5 shrink-0" />
                 <span
-                  className="font-bold text-sm text-[#172126]"
+                  className="text-center font-bold text-xs sm:text-sm text-[#172126] leading-tight"
                   style={{ fontFamily: "'Inter', sans-serif" }}
                 >
                   Descargar PDF
@@ -2796,39 +2705,39 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
               </button>
               <button
                 onClick={handleEnviarWhatsApp}
-                className="flex items-center gap-2 h-12 px-4 rounded-[14px] cursor-pointer transition-colors border touch-target flex-1 min-w-[140px]"
+                className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 sm:px-4 py-2 touch-target transition-colors flex-1"
                 style={{
                   background: "#25D366",
                   borderColor: "#25D366",
                   color: "white",
                 }}
               >
-                <img src={imgWhatsApp} alt="" className="size-5" />
-                <span className="font-bold text-sm" style={{ fontFamily: "'Inter', sans-serif" }}>
+                <img src={imgWhatsApp} alt="" className="size-4 sm:size-5 shrink-0" />
+                <span className="text-center font-bold text-xs sm:text-sm leading-tight" style={{ fontFamily: "'Inter', sans-serif" }}>
                   WhatsApp
                 </span>
               </button>
               <button
                 onClick={handleEnviarEmail}
-                className="flex items-center gap-2 h-12 px-4 rounded-[14px] cursor-pointer transition-colors border touch-target flex-1 min-w-[140px]"
+                className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 sm:px-4 py-2 touch-target transition-colors flex-1"
                 style={{
                   background: "#3276a8",
                   borderColor: "#3276a8",
                   color: "white",
                 }}
               >
-                <img src={imgEmail} alt="" className="size-5" />
-                <span className="font-bold text-sm" style={{ fontFamily: "'Inter', sans-serif" }}>
+                <img src={imgEmail} alt="" className="size-4 sm:size-5 shrink-0" />
+                <span className="text-center font-bold text-xs sm:text-sm leading-tight" style={{ fontFamily: "'Inter', sans-serif" }}>
                   Email
                 </span>
               </button>
             </div>
 
             {/* Segunda fila: Editar + Continuar */}
-            <div className="flex flex-col gap-3 w-full md:flex-row md:items-end md:justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between w-full">
               <button
                 onClick={handleEditar}
-                className="flex gap-2 h-12 md:h-[52px] items-center justify-center px-4 md:px-5 rounded-[14px] cursor-pointer transition-colors border touch-target w-full md:w-auto"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 touch-target transition-colors w-full sm:w-auto"
                 style={{
                   background: "white",
                   borderColor: "#f2b84b",
@@ -2836,8 +2745,8 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                 }}
               >
                 <svg
-                  width="14"
-                  height="14"
+                  width="18"
+                  height="18"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="#f2b84b"
@@ -2849,7 +2758,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                 </svg>
                 <p
-                  className="font-bold text-sm md:text-[15px] whitespace-nowrap"
+                  className="text-center font-bold text-sm md:text-[15px] leading-tight"
                   style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
                 >
                   ↩️ Editar Programación
@@ -2857,11 +2766,11 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
               </button>
               <button
                 onClick={handleContinuarRecepcion}
-                className="bg-[#16343f] border border-[#16343f] flex gap-2 h-12 md:h-[52px] items-center justify-center px-4 md:px-5 rounded-[14px] cursor-pointer hover:bg-[#1e4456] transition-colors touch-target w-full md:w-auto"
+                className="bg-[#16343f] border border-[#16343f] flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 hover:bg-[#1e4456] transition-colors touch-target w-full sm:w-auto"
               >
-                <img alt="" className="size-5 md:size-[18px]" src={imgArrowRight} />
+                <img alt="" className="size-4 shrink-0" src={imgArrowRight} />
                 <p
-                  className="font-bold text-white text-sm md:text-[15px] whitespace-nowrap"
+                  className="text-center font-bold text-white text-sm md:text-[15px] leading-tight"
                   style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
                 >
                   Continuar a Recepción Física ▶

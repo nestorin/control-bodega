@@ -31,6 +31,7 @@ import type {
   PurchaseOrderDoc,
   PurchaseOrderLine,
   ReceptionDoc,
+  ReceptionCreateInput,
   ReceptionLineDoc,
   PalletDoc,
   InventoryMovementDoc,
@@ -201,7 +202,7 @@ export class ReceptionService extends BaseService<ReceptionDoc> {
 
   // Create reception with lines in a transaction
   async createReception(
-    data: Omit<ReceptionDoc, "id" | "createdAt" | "updatedAt" | "organizationId">,
+    data: ReceptionCreateInput,
     lines: Array<
       Omit<ReceptionLineDoc, "id" | "createdAt" | "updatedAt" | "organizationId" | "receptionId">
     >,
@@ -214,6 +215,13 @@ export class ReceptionService extends BaseService<ReceptionDoc> {
       warehouseId: data.warehouseId,
       supplierId: data.supplierId,
       purchaseOrderId: data.purchaseOrderId,
+      purchaseOrderNumber: data.purchaseOrderNumber,
+      folio: data.folio,
+      scheduledDate: data.scheduledDate,
+      supplierCode: data.supplierCode,
+      supplierName: data.supplierName,
+      logisticsProvider: data.logisticsProvider,
+      plannedPallets: data.plannedPallets,
       lines: lines.map((line) => ({
         productId: line.productId,
         quantity: line.quantity,
@@ -221,15 +229,43 @@ export class ReceptionService extends BaseService<ReceptionDoc> {
         lot: line.lot || null,
       })),
     });
-    const receptionId = (result.data as { receptionId?: string })?.receptionId;
+    const response = result.data as {
+      receptionId?: string;
+      evidenceId?: string;
+      folio?: string;
+      scheduledDate?: string;
+      purchaseOrderId?: string;
+      purchaseOrderNumber?: string;
+      supplierCode?: string;
+      supplierName?: string;
+      logisticsProvider?: string;
+      productName?: string;
+      palletCount?: number;
+      plannedPallets?: ReceptionDoc["plannedPallets"];
+    };
+    const receptionId = response?.receptionId;
     if (!receptionId) throw new Error("create_reception returned no receptionId");
+    if (data.plannedPallets && !Array.isArray(response.plannedPallets)) {
+      throw new Error("create_reception returned no canonical plannedPallets");
+    }
     // The callable is the source of truth. Do not add a second client read
     // here: it can fail under a stricter membership rule after the authorized
     // write already succeeded and would incorrectly surface a generic save error.
     return {
       ...data,
       id: receptionId,
+      evidenceId: response.evidenceId,
       organizationId: this.orgId,
+      folio: response.folio ?? data.folio,
+      scheduledDate: response.scheduledDate ?? data.scheduledDate,
+      purchaseOrderId: response.purchaseOrderId ?? data.purchaseOrderId,
+      purchaseOrderNumber: response.purchaseOrderNumber ?? data.purchaseOrderNumber,
+      supplierCode: response.supplierCode ?? data.supplierCode,
+      supplierName: response.supplierName ?? data.supplierName,
+      logisticsProvider: response.logisticsProvider ?? data.logisticsProvider,
+      productName: response.productName ?? data.productName,
+      palletCount: response.palletCount ?? data.palletCount,
+      ...(response.plannedPallets ? { plannedPallets: response.plannedPallets } : {}),
     } as ReceptionDoc;
   }
 
@@ -254,6 +290,43 @@ export class ReceptionService extends BaseService<ReceptionDoc> {
   ): Promise<void> {
     const save = httpsCallable(getFunctions(), "save_evidence");
     await save({ receptionId, evidencePhotos, operationId });
+  }
+
+  async validatePalletScan(
+    receptionId: string,
+    qrIdentifier: string,
+    warehouseId: string,
+  ): Promise<{
+    receptionId: string;
+    palletId?: string;
+    qrIdentifier: string;
+    status: "PLANNED" | "IN_CAPTURE";
+    lot?: string;
+    expiryDate?: string;
+    activated: false;
+  }> {
+    const validate = httpsCallable(getFunctions(), "validate_reception_pallet_scan");
+    const result = await validate({ receptionId, qrIdentifier, warehouseId });
+    return result.data as {
+      receptionId: string;
+      palletId?: string;
+      qrIdentifier: string;
+      status: "PLANNED" | "IN_CAPTURE";
+      lot?: string;
+      expiryDate?: string;
+      activated: false;
+    };
+  }
+
+  async savePalletCapture(
+    receptionId: string,
+    qrIdentifier: string,
+    lot: string,
+    expiryDate: string,
+    operationId: string,
+  ): Promise<void> {
+    const save = httpsCallable(getFunctions(), "save_reception_pallet_capture");
+    await save({ receptionId, qrIdentifier, lot: lot || null, expiryDate: expiryDate || null, operationId });
   }
 
   // Delete reception (and its lines/pallets)
@@ -398,7 +471,7 @@ export class PalletService extends BaseService<PalletDoc> {
         "id" | "createdAt" | "updatedAt" | "organizationId" | "receptionId" | "expiryDate"
       > & {
         lot?: string;
-        expiryDate?: Timestamp | null;
+        expiryDate?: Timestamp | Date | null;
       }
     >,
     actorUserId: string,
@@ -416,6 +489,11 @@ export class PalletService extends BaseService<PalletDoc> {
         quantity: pallet.quantity,
         unit: pallet.unit,
         lot: pallet.lot || null,
+        expiryDate: pallet.expiryDate instanceof Date
+          ? pallet.expiryDate.toISOString().slice(0, 10)
+          : pallet.expiryDate instanceof Timestamp
+            ? pallet.expiryDate.toDate().toISOString().slice(0, 10)
+            : null,
         operationId: operation,
       });
       const palletId = (result.data as { palletId?: string })?.palletId;

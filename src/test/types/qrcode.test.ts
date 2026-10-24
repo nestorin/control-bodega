@@ -19,6 +19,11 @@ describe("Tarima QR Code Types", () => {
       expect(result).toEqual({ ocNumber: "ABC123", tarimaIndex: 1 });
     });
 
+    it("parses a canonical QR code bound to a hyphenated reception ID", () => {
+      const result = parseTarimaQR("TQR-reception-op-reception-20261024-001");
+      expect(result).toEqual({ ocNumber: "reception-op-reception-20261024", tarimaIndex: 1 });
+    });
+
     it("returns null for non-3-digit index", () => {
       const result = parseTarimaQR("TQR-24891-3");
       expect(result).toBeNull();
@@ -46,6 +51,11 @@ describe("Tarima QR Code Types", () => {
       expect(result).toBe(true);
     });
 
+    it("accepts canonical reception IDs while retaining legacy OC identifiers", () => {
+      expect(isValidTarimaQR("TQR-reception-op-reception-20261024-001")).toBe(true);
+      expect(isValidTarimaQR("TQR-24891-003")).toBe(true);
+    });
+
     it("returns false for invalid QR code", () => {
       const result = isValidTarimaQR("invalid");
       expect(result).toBe(false);
@@ -71,6 +81,12 @@ describe("Tarima QR Code Types", () => {
     it("builds QR code with alphanumeric OC number and pads index", () => {
       const result = buildTarimaQR("ABC", 12);
       expect(result).toBe("TQR-ABC-012");
+    });
+
+    it("builds canonical QR IDs from stable reception document IDs", () => {
+      expect(buildTarimaQR("reception-op-reception-20261024", 1)).toBe(
+        "TQR-reception-op-reception-20261024-001",
+      );
     });
 
     it("pads single digit index to 3 digits", () => {

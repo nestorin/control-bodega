@@ -9,6 +9,7 @@ import type { ReceptionDoc } from "@/services/firestore/types";
 import { WAREHOUSE_IDS } from "@/config/warehouses";
 import { useAuthorization, isPermissionDenied } from "@/hooks/useAuthorization";
 import { Panel, StatusBadge, TouchTarget } from "@/components/ui";
+import { mapReceptionListItem } from "@/domains/reception/receptionLifecycle";
 
 const imgIndicador = "/assets/08d70.svg";
 const imgIndicadorRed = "/assets/9d6fd.svg";
@@ -18,6 +19,7 @@ const NORTH_RECEPTION_CONSTRAINTS = [where("warehouseId", "==", WAREHOUSE_IDS.NO
 
 interface ReceptionView {
   id: string;
+  displayId?: string;
   proveedor: string;
   producto: string;
   tarimas: number;
@@ -27,6 +29,7 @@ interface ReceptionView {
   color: string;
   bg: string;
   img: string;
+  canResume?: boolean;
 }
 
 // Fallback local data for when feature flag is OFF
@@ -358,9 +361,11 @@ function DeleteModal({
 export default function Recepciones({
   onSelectTarima,
   onEdit,
+  onResume,
 }: {
   onSelectTarima: (recId: string) => void;
   onEdit: (id: string) => void;
+  onResume?: (id: string) => void;
 }) {
   const { canQuery, canAccessWarehouse } = useAuthorization();
   const useFirestore = isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery;
@@ -375,7 +380,7 @@ export default function Recepciones({
   const { enqueue, isOnline } = useOfflineQueue(db, ORG_ID);
 
   // Local state (fallback)
-  const [listaLocal, setListaLocal] = useState(recepcionesLocal);
+  const [listaLocal, setListaLocal] = useState<ReceptionView[]>(recepcionesLocal);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [loadingFs, setLoadingFs] = useState(false);
   const [errorFs, setErrorFs] = useState<string | null>(null);
@@ -399,15 +404,15 @@ export default function Recepciones({
     enabled: canQueryNorthWarehouse,
     mapFn: (doc) => {
       const d = doc.data();
+      const mapped = mapReceptionListItem({ id: doc.id, ...d } as any);
       return {
-        id: d.operationId || doc.id,
-        proveedor: d.supplierName || "Sin proveedor",
-        producto: d.productName || "Sin producto",
-        tarimas: d.palletCount || 0,
-        fecha:
-          d.receivedAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
-          d.createdAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
-          "",
+        id: mapped.id,
+        displayId: mapped.displayId,
+        proveedor: mapped.supplier,
+        producto: mapped.product,
+        tarimas: mapped.palletCount,
+        fecha: mapped.date,
+        canResume: mapped.canResume,
         estado:
           d.status === "CONFIRMED"
             ? "Completada"
@@ -442,14 +447,18 @@ export default function Recepciones({
       .getByWarehouse(WAREHOUSE_IDS.NORTH)
       .then((receptions: any[]) => {
         const converted = receptions.map((r: any) => ({
-          id: r.operationId || r.id,
-          proveedor: r.supplierName || "Sin proveedor",
-          producto: r.productName || "Sin producto",
-          tarimas: r.palletCount || 0,
-          fecha:
-            r.receivedAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
-            r.createdAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
-            "",
+          ...(() => {
+            const mapped = mapReceptionListItem(r);
+            return {
+              id: mapped.id,
+              displayId: mapped.displayId,
+              proveedor: mapped.supplier,
+              producto: mapped.product,
+              tarimas: mapped.palletCount,
+              fecha: mapped.date,
+              canResume: mapped.canResume,
+            };
+          })(),
           estado:
             r.status === "CONFIRMED"
               ? "Completada"
@@ -499,7 +508,7 @@ export default function Recepciones({
   const listaFiltrada = lista.filter((rec) => {
     const matchesSearch =
       searchText === "" ||
-      rec.id.toLowerCase().includes(searchText.toLowerCase()) ||
+      (rec.displayId || rec.id).toLowerCase().includes(searchText.toLowerCase()) ||
       rec.proveedor.toLowerCase().includes(searchText.toLowerCase()) ||
       rec.producto.toLowerCase().includes(searchText.toLowerCase());
     const matchesEstado = filterEstado === "todos" || rec.estado === filterEstado;
@@ -647,14 +656,18 @@ export default function Recepciones({
                   .getByWarehouse(WAREHOUSE_IDS.NORTH)
                   .then((r: any[]) => {
                     const converted = r.map((rec: any) => ({
-                      id: rec.operationId || rec.id,
-                      proveedor: rec.supplierName || "Sin proveedor",
-                      producto: rec.productName || "Sin producto",
-                      tarimas: rec.palletCount || 0,
-                      fecha:
-                        rec.receivedAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
-                        rec.createdAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
-                        "",
+                      ...(() => {
+                        const mapped = mapReceptionListItem(rec);
+                        return {
+                          id: mapped.id,
+                          displayId: mapped.displayId,
+                          proveedor: mapped.supplier,
+                          producto: mapped.product,
+                          tarimas: mapped.palletCount,
+                          fecha: mapped.date,
+                          canResume: mapped.canResume,
+                        };
+                      })(),
                       estado:
                         rec.status === "CONFIRMED"
                           ? "Completada"
@@ -704,13 +717,13 @@ export default function Recepciones({
               key={rec.id}
               role="button"
               tabIndex={0}
-              aria-label={`Abrir recepción ${rec.id}`}
+              aria-label={`Abrir recepción ${rec.displayId || rec.id}`}
               className="flex items-center justify-between px-4 md:px-5 py-3 md:py-4 w-full hover:shadow-[0px_12px_20px_rgba(22,52,63,0.12)] transition-shadow touch-target cursor-pointer"
-              onClick={() => onSelectTarima(rec.id)}
+              onClick={() => onSelectTarima(rec.displayId || rec.id)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  onSelectTarima(rec.id);
+                  onSelectTarima(rec.displayId || rec.id);
                 }
               }}
             >
@@ -723,7 +736,7 @@ export default function Recepciones({
                       fontWeight: 700,
                     }}
                   >
-                    {rec.id}
+                    {rec.displayId || rec.id}
                   </p>
                   <p
                     className="text-[#607078] text-base md:text-[13px]"
@@ -785,6 +798,19 @@ export default function Recepciones({
                   backgroundColor={rec.bg}
                   labelColor={rec.color}
                 />
+                {rec.canResume && onResume && (
+                  <button
+                    type="button"
+                    aria-label={`Reanudar recepción ${rec.displayId || rec.id}`}
+                    className="text-xs font-bold text-[#3276a8] underline"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onResume(rec.id);
+                    }}
+                  >
+                    Reanudar
+                  </button>
+                )}
                 <RowMenu
                   recId={rec.id}
                   onEdit={() => onEdit(rec.id)}

@@ -125,8 +125,18 @@ export interface PurchaseOrderLine {
 export interface ReceptionDoc extends BaseDoc {
   organizationId: string;
   warehouseId: string;
+  evidenceId?: string;
+  folio?: string;
+  scheduledDate?: string;
   purchaseOrderId?: string;
+  purchaseOrderNumber?: string;
   supplierId?: string;
+  supplierCode?: string;
+  supplierName?: string;
+  logisticsProvider?: string;
+  productName?: string;
+  palletCount?: number;
+  plannedPallets?: PlannedReceptionPallet[];
   status: "DRAFT" | "IN_PROGRESS" | "CONFIRMED" | "CANCELLED";
   operationId: string;
   receivedAt?: Timestamp;
@@ -140,6 +150,34 @@ export interface ReceptionDoc extends BaseDoc {
   invoicePreviewPath?: string;
   invoicePreviewUrl?: string;
 }
+
+export interface PlannedReceptionPalletDraft {
+  palletNumber: number;
+  lineIndex: number;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unit: string;
+}
+
+export interface PlannedReceptionPallet extends PlannedReceptionPalletDraft {
+  palletId?: string;
+  receptionId?: string;
+  qrIdentifier: string;
+  status: "PLANNED" | "IN_CAPTURE" | "ACTIVE" | "RECEIVED";
+  activated?: boolean;
+  lot?: string;
+  expiryDate?: string;
+  captureUpdatedAt?: Timestamp;
+  activatedAt?: Timestamp;
+}
+
+export type ReceptionCreateInput = Omit<
+  ReceptionDoc,
+  "id" | "createdAt" | "updatedAt" | "organizationId" | "plannedPallets"
+> & {
+  plannedPallets?: PlannedReceptionPalletDraft[];
+};
 
 export interface ReceptionLineDoc extends BaseDoc {
   receptionId: string;
@@ -155,6 +193,7 @@ export interface PalletDoc extends BaseDoc {
   organizationId: string;
   warehouseId: string;
   receptionId: string;
+  palletNumber?: number;
   qrIdentifier: string;
   status: "CREATED" | "RECEIVED" | "STORED" | "BLOCKED";
   productId: string;

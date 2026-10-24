@@ -9,32 +9,59 @@ interface Props {
 export default function EscanearQR({ onFound, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const controlsRef = useRef<{ stop: () => void } | null>(null);
+  const onFoundRef = useRef(onFound);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(true);
   const [manualId, setManualId] = useState("");
 
+  useEffect(() => { onFoundRef.current = onFound; }, [onFound]);
+
   useEffect(() => {
     const reader = new BrowserMultiFormatReader();
     readerRef.current = reader;
-
-    reader
-      .decodeFromVideoDevice(undefined, videoRef.current!, (result, err) => {
+    let active = true;
+    if (!window.isSecureContext && window.location.hostname !== "localhost") {
+      setError("La cámara requiere una conexión segura (HTTPS). Abre la aplicación con HTTPS.");
+      return () => { active = false; (reader as any).reset?.(); };
+    }
+    if (!navigator.mediaDevices?.getUserMedia || !videoRef.current) {
+      setError("Este navegador no permite acceder a la cámara. Prueba con Chrome o Safari actualizado.");
+      return () => { active = false; (reader as any).reset?.(); };
+    }
+    reader.decodeFromVideoDevice(undefined, videoRef.current, (result) => {
         if (result) {
           setScanning(false);
-          onFound(result.getText());
-        }
-        if (err && !err.message?.includes("No MultiFormat")) {
-          // suppress continuous not-found errors
+          onFoundRef.current(result.getText());
         }
       })
-      .catch(() => {
-        setError("No se pudo acceder a la cámara. Verifica los permisos del navegador.");
+      .then((controls) => {
+        if (!active) { controls.stop(); return; }
+        controlsRef.current = controls;
+        if (videoRef.current) {
+          videoRef.current.muted = true;
+          videoRef.current.playsInline = true;
+          void videoRef.current.play().catch(() => undefined);
+        }
+      })
+      .catch((cause: unknown) => {
+        const cameraError = cause as { name?: string };
+        setError(cameraError.name === "NotAllowedError" || cameraError.name === "PermissionDeniedError"
+          ? "El permiso de cámara está bloqueado. Habilítalo en los ajustes del sitio y vuelve a intentar."
+          : cameraError.name === "NotFoundError" || cameraError.name === "DevicesNotFoundError"
+            ? "No se encontró una cámara disponible en este dispositivo."
+            : cameraError.name === "NotReadableError" || cameraError.name === "TrackStartError"
+              ? "La cámara está siendo usada por otra aplicación. Ciérrala e inténtalo de nuevo."
+              : "No se pudo iniciar la cámara. Revisa los permisos del navegador e inténtalo de nuevo.");
       });
 
     return () => {
-      BrowserMultiFormatReader.releaseAllStreams();
+      active = false;
+      controlsRef.current?.stop();
+      controlsRef.current = null;
+      (reader as any).reset?.();
     };
-  }, [onFound]);
+  }, []);
 
   function handleManual(e: React.FormEvent) {
     e.preventDefault();
@@ -89,8 +116,8 @@ export default function EscanearQR({ onFound, onClose }: Props) {
       <div
         style={{
           position: "relative",
-          width: "320px",
-          height: "320px",
+          width: "min(320px, calc(100vw - 40px))",
+          aspectRatio: "1 / 1",
           borderRadius: "20px",
           overflow: "hidden",
           background: "#172126",
@@ -106,6 +133,7 @@ export default function EscanearQR({ onFound, onClose }: Props) {
           }}
           muted
           playsInline
+          autoPlay
         />
 
         {/* Corner guides */}

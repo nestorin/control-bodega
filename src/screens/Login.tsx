@@ -6,6 +6,42 @@ import { isFeatureEnabled } from "@/config/featureFlags";
 const assetPathPrefix = "/assets";
 const imgLogo = `${assetPathPrefix}/4cca0.svg`;
 
+function authenticationErrorMessage(error: unknown): string {
+  const code =
+    typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
+      ? error.code
+      : undefined;
+
+  switch (code) {
+    case "auth/user-not-found":
+    case "auth/invalid-credential":
+      return "El email o la contraseña son incorrectos";
+    case "auth/wrong-password":
+      return "Contraseña incorrecta";
+    case "auth/email-already-in-use":
+      return "El email ya está registrado";
+    case "auth/weak-password":
+      return "La contraseña debe tener al menos 6 caracteres";
+    case "auth/invalid-email":
+      return "Email inválido";
+    case "auth/operation-not-allowed":
+      return "Este método de acceso no está habilitado. Contacta a tu administrador.";
+    case "auth/unauthorized-domain":
+      return "Este dominio no está autorizado para iniciar sesión. Contacta a tu administrador.";
+    case "auth/popup-blocked":
+      return "El navegador bloqueó la ventana de Google. Permite las ventanas emergentes e inténtalo otra vez.";
+    case "auth/popup-closed-by-user":
+      return "Se canceló el inicio de sesión con Google.";
+    case "auth/network-request-failed":
+    case "unavailable":
+      return "No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.";
+    case "permission-denied":
+      return "No se pudo registrar tu solicitud de acceso. Inténtalo de nuevo o contacta a tu administrador.";
+    default:
+      return "No fue posible completar la autenticación. Inténtalo de nuevo.";
+  }
+}
+
 export default function Login() {
   const { login, register, loginWithGoogle, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -38,21 +74,10 @@ export default function Login() {
           return;
         }
         await register(email, password, displayName);
+        navigate("/", { replace: true });
       }
-    } catch (err: any) {
-      const message =
-        err.code === "auth/user-not-found"
-          ? "Usuario no encontrado"
-          : err.code === "auth/wrong-password"
-            ? "Contraseña incorrecta"
-            : err.code === "auth/email-already-in-use"
-              ? "El email ya está registrado"
-              : err.code === "auth/weak-password"
-                ? "La contraseña debe tener al menos 6 caracteres"
-                : err.code === "auth/invalid-email"
-                  ? "Email inválido"
-                  : "Error al autenticar";
-      setError(message);
+    } catch (err: unknown) {
+      setError(authenticationErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -64,8 +89,8 @@ export default function Login() {
     try {
       await loginWithGoogle();
       navigate("/", { replace: true });
-    } catch (err: any) {
-      setError("Error al iniciar sesión con Google");
+    } catch (err: unknown) {
+      setError(authenticationErrorMessage(err));
     } finally {
       setSubmitting(false);
     }

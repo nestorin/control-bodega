@@ -146,7 +146,12 @@ export function useDocument<T>(
   const isMountedRef = useRef(true);
 
   const subscribe = useCallback(() => {
-    if (!enabled || !db) return;
+    if (!enabled || !db || !docPath) {
+      setLoading(false);
+      setData(null);
+      setError(null);
+      return;
+    }
     setLoading(true);
     setError(null);
 

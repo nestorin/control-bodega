@@ -41,12 +41,14 @@ export function ScannerTarimas({
 
   useEffect(() => {
     cargarTarimas();
-    iniciarCamara();
-
     return () => {
       detenerCamara();
     };
   }, [embarqueId]);
+
+  useEffect(() => {
+    if (!loading) void iniciarCamara();
+  }, [loading]);
 
   const cargarTarimas = async () => {
     setLoading(true);
@@ -69,15 +71,31 @@ export function ScannerTarimas({
     if (!videoRef.current) return;
 
     try {
+      if (!window.isSecureContext && window.location.hostname !== "localhost") {
+        throw new Error("La cámara requiere una conexión segura (HTTPS).");
+      }
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("Este navegador no permite acceder a la cámara. Usa Chrome o Safari actualizado.");
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
       });
       streamRef.current = stream;
+      if (!videoRef.current) { stream.getTracks().forEach((track) => track.stop()); return; }
       videoRef.current.srcObject = stream;
+      videoRef.current.muted = true;
+      videoRef.current.playsInline = true;
       await videoRef.current.play();
     } catch (err) {
       console.warn("No se pudo acceder a la cámara:", err);
-      // Fallback a input manual
+      const cameraError = err as { name?: string };
+      setError(cameraError.name === "NotAllowedError" || cameraError.name === "PermissionDeniedError"
+        ? "Permiso de cámara bloqueado. Habilítalo en los ajustes del sitio; también puedes ingresar el QR manualmente."
+        : cameraError.name === "NotFoundError" || cameraError.name === "DevicesNotFoundError"
+          ? "No se encontró una cámara. Puedes ingresar el QR manualmente."
+          : cameraError.name === "NotReadableError" || cameraError.name === "TrackStartError"
+            ? "La cámara está ocupada por otra aplicación. Ciérrala o ingresa el QR manualmente."
+            : "No se pudo iniciar la cámara. Puedes ingresar el QR manualmente.");
     }
   };
 
@@ -282,9 +300,7 @@ export function ScannerTarimas({
         {/* Scanner area */}
         <div className="mb-6">
           <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-            {videoRef.current && (
-              <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
-            )}
+            <video ref={videoRef} autoPlay className="w-full h-full object-cover" playsInline muted />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="w-3/4 h-3/4 border-2 border-blue-500 rounded-lg relative">
                 <div className="absolute -top-3 -left-3 w-6 h-6 border-t-2 border-l-2 border-blue-500 rounded-tl-lg" />
@@ -293,7 +309,7 @@ export function ScannerTarimas({
                 <div className="absolute -bottom-3 -right-3 w-6 h-6 border-b-2 border-r-2 border-blue-500 rounded-br-lg" />
               </div>
             </div>
-            {!videoRef.current && (
+            {!streamRef.current && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-4">
                 <svg
                   className="w-16 h-16 mb-4 opacity-50"

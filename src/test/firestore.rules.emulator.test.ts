@@ -21,6 +21,7 @@ import {
   limit,
   documentId,
   collection,
+  serverTimestamp,
 } from "firebase/firestore";
 import { afterAll, afterEach, beforeAll, describe, it } from "vitest";
 
@@ -141,6 +142,57 @@ afterEach(async () => {
 });
 
 describe("Firestore security rules (emulator)", () => {
+  rulesTest("denies client creation of membership records", async () => {
+    const db = testEnv!.authenticatedContext("pending-user").firestore();
+    const membershipRef = doc(db, `organizations/${orgId}/users/pending-user`);
+
+    await assertFails(
+      setDoc(membershipRef, {
+        userId: "pending-user",
+        organizationId: orgId,
+        role: "AUXILIAR_ALMACENISTA",
+        status: "PENDING",
+        warehouseId: null,
+        warehouseIds: [],
+        createdAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  rulesTest("denies same-user attempts to self-grant membership access or add fields", async () => {
+    const exactPendingMembership = (uid: string) => ({
+      userId: uid,
+      organizationId: orgId,
+      role: "AUXILIAR_ALMACENISTA",
+      status: "PENDING",
+      warehouseId: null,
+      warehouseIds: [],
+      createdAt: serverTimestamp(),
+    });
+    const attempts: Array<{ uid: string; override: Record<string, unknown> }> = [
+      { uid: "self-active", override: { status: "ACTIVE" } },
+      { uid: "self-admin", override: { role: "ADMIN" } },
+      { uid: "self-warehouse", override: { warehouseId: wh1, warehouseIds: [wh1] } },
+      { uid: "self-extra-field", override: { untrusted: true } },
+    ];
+
+    for (const { uid, override } of attempts) {
+      const db = testEnv!.authenticatedContext(uid).firestore();
+      await assertFails(
+        setDoc(doc(db, `organizations/${orgId}/users/${uid}`), {
+          ...exactPendingMembership(uid),
+          ...override,
+        }),
+      );
+    }
+  });
+
+  rulesTest("retains revoked memberships by denying deletion even to admins", async () => {
+    const adminDb = testEnv!.authenticatedContext("admin-1").firestore();
+    await assertFails(deleteDoc(doc(adminDb, `organizations/${orgId}/users/operator-1`)));
+    await assertFails(deleteDoc(doc(adminDb, `organizations/${orgId}/users/admin-1`)));
+  });
+
   rulesTest(
     "requires authenticated active organization and authorized warehouse plus a bounded query",
     async () => {

@@ -10,7 +10,11 @@ const warehouseId = "wh_tehuacan_1";
 const receptionId = "rec_test_001";
 const productId = "prod_test_001";
 const supplierId = "prov_test_001";
-const projectId = "demo-exepa-rules";
+// This suite runs beside the broader rules suite, which clears its own
+// Firestore data after each case. A separate emulator project prevents one
+// suite from turning this suite's authorized lookup into a transient empty
+// collection-group query.
+const projectId = "demo-exepa-pallet-lookup";
 
 const rules = readFileSync(resolve(process.cwd(), "firestore.rules"), "utf8");
 

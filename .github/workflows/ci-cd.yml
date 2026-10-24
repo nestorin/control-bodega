@@ -213,6 +213,7 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIRESTORE_RECEPCIONES: "true"
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
         run: pnpm build
 
@@ -239,16 +240,6 @@ jobs:
           npm install --global firebase-tools@15.30.2
           firebase deploy --only firestore:rules,firestore:indexes,storage --project exepa-almacen-safe
 
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: "${{ secrets.GITHUB_TOKEN }}"
-          firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
-          projectId: exepa-almacen-safe
-          channelId: live
-          # firebase.json lives at the repo root; hosting.public points at dist.
-          entryPoint: .
-
       # The firebase CLI requires the Python functions source to ship a venv
       # containing the Functions SDK (same requirement the E2E job satisfies
       # for the functions emulator).
@@ -267,3 +258,14 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa/sa.json
         run: |
           firebase deploy --only functions --project exepa-almacen-safe
+
+      # Publish the frontend only after the rules and callable backend it uses.
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: "${{ secrets.GITHUB_TOKEN }}"
+          firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
+          projectId: exepa-almacen-safe
+          channelId: live
+          # firebase.json lives at the repo root; hosting.public points at dist.
+          entryPoint: .

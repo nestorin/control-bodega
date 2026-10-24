@@ -4,6 +4,7 @@
 **/*.pyo
 **/*.pyd
 **/venv/**
+venv/
 **/.venv/**
 **/env/**
 **/.env/**

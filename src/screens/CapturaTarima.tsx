@@ -7,17 +7,26 @@ import { useAuthorization } from "@/hooks/useAuthorization";
 import { Timestamp } from "firebase/firestore";
 import { resolveCatalogProduct } from "@/services/domain/productMatching";
 import { Panel } from "@/components/ui";
+import { parseTarimaQR, buildTarimaQR } from "@/types/qrcode";
+import type { PlannedReceptionPallet } from "@/services/firestore/types";
+import {
+  getFirstIncompletePalletIndex,
+  shouldReadLocalPalletCache,
+} from "@/domains/reception/receptionLifecycle";
 
 const assetPathPrefix = "/assets";
 const imgIndicador = `${assetPathPrefix}/08d70.svg`;
 const imgIndicador1 = `${assetPathPrefix}/9d6fd.svg`;
 const imgArrowRight = `${assetPathPrefix}/55de6.svg`;
-const imgScanner = `${assetPathPrefix}/scanner.svg`;
 const imgCheck = `${assetPathPrefix}/3eae4.svg`;
 const imgWarehouse = `${assetPathPrefix}/ccb3f.svg`;
 const imgKey = `${assetPathPrefix}/key.svg`;
 
 const ORG_ID = "org_exepa_001";
+
+function checkpointOperationId(receptionId: string, palletNumber: number): string {
+  return `checkpoint-${receptionId.slice(-32)}-${palletNumber}-${Date.now()}`;
+}
 
 export function canCreateExtraPallet(accessStatus: string, role: string | undefined): boolean {
   return accessStatus === "ACTIVE" && (role === "ADMIN" || role === "SUPERVISOR");
@@ -48,6 +57,7 @@ interface TarimaData {
   caducidad: string;
   cajas: number;
   unidadesPorCaja: number;
+  unidad: string;
   lote: string;
   observaciones: string;
   proveedor: string;
@@ -85,6 +95,7 @@ interface Props {
     lote?: string;
     caducidad?: string;
     receptionId?: string;
+    fechaRecepcion?: string;
     productos?: Array<{
       productId: string | null;
       codigo: string | null;
@@ -96,6 +107,7 @@ interface Props {
       estadoMatch: "confirmado" | "sugerido" | "manual";
     }>;
     conversionesTabla?: ConversionesTablaItem[];
+    plannedPallets?: PlannedReceptionPallet[];
   } | null;
   conversionesTabla?: ConversionesTablaItem[];
 }
@@ -132,6 +144,27 @@ export default function CapturaTarima({
 
   // Generar lista de tarimas basada en conversiones
   const [tarimasList, setTarimasList] = useState<TarimaData[]>(() => {
+    if (currentReception?.plannedPallets?.length) {
+      return currentReception.plannedPallets.map((pallet) => ({
+        id: pallet.qrIdentifier,
+        numero: pallet.palletNumber,
+        total: currentReception.plannedPallets!.length,
+        ocFolio: currentReception.ocFolio,
+        fechaRecepcion: currentReception.fechaRecepcion || "",
+        producto: pallet.productName,
+        productId: pallet.productId,
+        codigo: "",
+        caducidad: pallet.expiryDate || currentReception.caducidad || "",
+        cajas: pallet.quantity,
+        unidadesPorCaja: 1,
+        unidad: pallet.unit,
+        lote: pallet.lot || currentReception.lote || "",
+        observaciones: "",
+        proveedor: currentReception.proveedor,
+        proveedorLogistico: currentReception.proveedorLogistico,
+        completed: pallet.status === "ACTIVE" || pallet.status === "RECEIVED",
+      }));
+    }
     if (!currentReception || conversionesTabla.length === 0) return [];
 
     const ocNumber = currentReception.ocFolio.replace("OC-", "");
@@ -147,7 +180,7 @@ export default function CapturaTarima({
     let numero = 1;
     return conversionesTabla.flatMap((conv) =>
       Array.from({ length: conv.tarimas }, () => ({
-        id: `TQR-${ocNumber}-${String(numero++).padStart(3, "0")}`,
+        id: buildTarimaQR(ocNumber, numero++),
         numero: numero - 1,
         total: conversionesTabla.reduce((a, b) => a + b.tarimas, 0),
         ocFolio: currentReception.ocFolio,
@@ -158,6 +191,7 @@ export default function CapturaTarima({
         caducidad: currentReception.caducidad || "",
         cajas: Math.ceil(conv.cajas / conv.tarimas),
         unidadesPorCaja: conv.piezasPorCaja,
+        unidad: conv.unidad,
         lote: currentReception.lote || "",
         observaciones: "",
         proveedor: currentReception.proveedor,
@@ -170,11 +204,17 @@ export default function CapturaTarima({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [scannerError, setScannerError] = useState<string | null>(null);
   const [scannedCode, setScannedCode] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  const handlingScanRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const qrReaderRef = useRef<any>(null);
+  const scannerControlsRef = useRef<{ stop: () => void } | null>(null);
+  const scannerStartingRef = useRef(false);
 
   const { accessStatus, profile, canQuery } = useAuthorization();
 
@@ -202,11 +242,8 @@ export default function CapturaTarima({
     }
   }, [useFirestore]);
 
-  // Auto-focus scanner on mount
+  // Keep camera permission prompts behind a direct user gesture (required on iOS Safari).
   useEffect(() => {
-    if (currentTarima && !currentTarima.completed) {
-      startScanner();
-    }
     return () => stopScanner();
   }, [currentIndex]);
 
@@ -221,6 +258,11 @@ export default function CapturaTarima({
   // Load from localStorage on init
   useEffect(() => {
     if (currentReception?.ocFolio) {
+      const canonicalPlan = currentReception.plannedPallets;
+      if (!shouldReadLocalPalletCache(Boolean(canonicalPlan?.length), useFirestore)) {
+        setCurrentIndex(getFirstIncompletePalletIndex(canonicalPlan || []));
+        return;
+      }
       const saved = localStorage.getItem(`recepcion_${currentReception.ocFolio}_tarimas`);
       if (saved) {
         try {
@@ -236,10 +278,42 @@ export default function CapturaTarima({
         }
       }
     }
-  }, [currentReception?.ocFolio]);
+  }, [currentReception?.ocFolio, currentReception?.plannedPallets, useFirestore]);
+
+  async function retryReceptionConfirmation() {
+    if (!currentReception?.receptionId || !fsServices) return;
+    setIsSaving(true);
+    setConfirmationError(null);
+    try {
+      await fsServices.receptions.confirmReception(
+        currentReception.receptionId,
+        "user",
+        `op-${Date.now()}-confirm`,
+      );
+      onFinish();
+    } catch (error) {
+      console.error("Reception confirmation retry failed:", error);
+      setConfirmationError(
+        "No se pudo confirmar; el progreso de tarimas quedó guardado. Reintentá.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   async function startScanner() {
+    if (scannerStartingRef.current || scanning) return;
+    scannerStartingRef.current = true;
+    setScannerError(null);
+    setScanning(true);
     try {
+      if (!window.isSecureContext && window.location.hostname !== "localhost") {
+        throw new Error("La cámara requiere una conexión segura (HTTPS). Abre la aplicación con HTTPS.");
+      }
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("Este navegador no permite usar la cámara. Prueba con Safari o Chrome actualizado.");
+      }
+      if (!videoRef.current) throw new Error("No se pudo preparar la vista de cámara. Vuelve a intentarlo.");
       // @ts-ignore - BrowserQRCodeReader from @zxing/browser
       const { BrowserQRCodeReader } = await import("@zxing/browser");
       const reader = new BrowserQRCodeReader();
@@ -247,29 +321,45 @@ export default function CapturaTarima({
 
       const devices = await BrowserQRCodeReader.listVideoInputDevices();
       if (devices.length === 0) {
-        alert("No se encontró cámara. Verifica permisos.");
-        setScanning(false);
-        return;
+        throw new Error("No se encontró una cámara disponible en este dispositivo.");
       }
 
       // Prefer back camera
       const backCamera = devices.find((d) => /back|rear|environment/i.test(d.label)) || devices[0];
 
-      await reader.decodeFromVideoDevice(backCamera.deviceId, videoRef.current!, (result, err) => {
+      const controls = await reader.decodeFromVideoDevice(backCamera.deviceId, videoRef.current, (result) => {
         if (result) {
           const code = result.getText();
+          stopScanner();
           handleScannedCode(code);
         }
-        // Ignore NotFoundException errors
       });
+      scannerControlsRef.current = controls;
+      if (videoRef.current) {
+        videoRef.current.muted = true;
+        videoRef.current.playsInline = true;
+        await videoRef.current.play();
+      }
     } catch (e) {
       console.error("Scanner error:", e);
-      setScanning(false);
-      alert("Error iniciando escáner. Verifica permisos de cámara.");
+      const error = e as { name?: string; message?: string };
+      const message = error.name === "NotAllowedError" || error.name === "PermissionDeniedError"
+        ? "El navegador bloqueó el permiso de cámara. Habilítalo en los ajustes del sitio y vuelve a intentar."
+        : error.name === "NotFoundError" || error.name === "DevicesNotFoundError"
+          ? "No se encontró una cámara disponible en este dispositivo."
+          : error.name === "NotReadableError" || error.name === "TrackStartError"
+            ? "La cámara está siendo usada por otra aplicación. Ciérrala e inténtalo de nuevo."
+            : error.message || "No se pudo iniciar la cámara. Revisa los permisos del navegador e inténtalo de nuevo.";
+      setScannerError(message);
+      stopScanner();
+    } finally {
+      scannerStartingRef.current = false;
     }
   }
 
   function stopScanner() {
+    scannerControlsRef.current?.stop();
+    scannerControlsRef.current = null;
     if (typeof qrReaderRef.current?.reset === "function") {
       qrReaderRef.current.reset();
     }
@@ -277,51 +367,114 @@ export default function CapturaTarima({
     setScanning(false);
   }
 
-  function handleScannedCode(code: string) {
-    // Validar formato TQR-OC-NNN
-    const match = code.match(/^TQR-(\d+)-(\d{3})$/);
-    if (!match) {
+  async function handleScannedCode(code: string) {
+    if (handlingScanRef.current) return;
+    handlingScanRef.current = true;
+    const parsed = parseTarimaQR(code);
+    if (!parsed) {
       alert(`Código QR inválido: ${code}\nFormato esperado: TQR-24891-001`);
+      handlingScanRef.current = false;
       return;
     }
 
-    const [, ocNum, tarimaNum] = match;
-    const tarimaIndex = parseInt(tarimaNum, 10) - 1;
+    const tarimaIndex = tarimasList.findIndex((pallet) => pallet.id === code);
+    const tarimaNum = String(parsed.tarimaIndex).padStart(3, "0");
 
-    if (tarimaIndex < 0 || tarimaIndex >= tarimasList.length) {
+    if (tarimaIndex < 0) {
       alert(`Tarima ${tarimaNum} no existe en esta recepción (total: ${tarimasList.length})`);
+      handlingScanRef.current = false;
       return;
     }
 
-    // Si ya está completada, preguntar si quiere editar
     if (tarimasList[tarimaIndex].completed) {
-      if (!confirm(`La tarima ${tarimaNum} ya fue completada. ¿Desea editarla?`)) {
-        return;
-      }
+      alert(`El código ${tarimaNum} ya está activo y asociado a una tarima.`);
+      handlingScanRef.current = false;
+      return;
     }
+    try {
+      if (useFirestore) {
+        if (!fsServices || !currentReception?.receptionId) {
+          throw new Error("Reception backend is not ready");
+        }
+        const validated = await fsServices.receptions.validatePalletScan(
+          currentReception.receptionId,
+          code,
+          almacenActivo?.id || WAREHOUSE_IDS.NORTH,
+        );
+        setTarimasList((prev) => prev.map((pallet, index) => index === tarimaIndex ? {
+          ...pallet,
+          lote: validated.lot ?? pallet.lote,
+          caducidad: validated.expiryDate ?? pallet.caducidad,
+        } : pallet));
+      }
+      setScannedCode(code);
+      setCurrentIndex(tarimaIndex);
+      stopScanner();
+      setCaptureError(null);
+    } catch (error) {
+      console.error("Reception QR validation failed:", error);
+      alert("Este QR no está disponible para esta recepción o ya fue activado.");
+    } finally {
+      handlingScanRef.current = false;
+    }
+  }
 
-    setScannedCode(code);
-    setCurrentIndex(tarimaIndex);
-    stopScanner();
+  async function persistCaptureCheckpoint(pallet: TarimaData) {
+    if (!useFirestore) return;
+    if (!fsServices || !currentReception?.receptionId) {
+      setCaptureError("La conexión de recepción todavía no está lista; el avance no se guardó.");
+      return;
+    }
+    try {
+      await fsServices.receptions.savePalletCapture(
+        currentReception.receptionId,
+        pallet.id,
+        pallet.lote.trim(),
+        pallet.caducidad,
+        checkpointOperationId(currentReception.receptionId, pallet.numero),
+      );
+      setCaptureError(null);
+    } catch (error) {
+      console.error("Pallet capture checkpoint failed:", error);
+      setCaptureError("No se pudo guardar el avance de esta tarima. Revisá la conexión y reintentá.");
+    }
   }
 
   async function handleSaveTarima() {
     if (!currentTarima) return;
+    if (useFirestore && scannedCode !== currentTarima.id) {
+      alert("Escaneá el QR de esta tarima antes de activar su registro.");
+      return;
+    }
 
     // Validar campos requeridos
-    if (!currentTarima.lote.trim()) {
+    const lotToSave = currentTarima.lote.trim() || autoLote.trim();
+    const expiryToSave = currentTarima.caducidad || autoCaducidad;
+    if (!lotToSave) {
       alert("El lote es obligatorio");
       return;
     }
-    if (!currentTarima.caducidad.trim()) {
+    if (!expiryToSave.trim()) {
       alert("La fecha de caducidad es obligatoria");
+      return;
+    }
+
+    if (useFirestore && (!firestoreReady || !fsServices || !currentReception?.receptionId)) {
+      alert("La conexión de recepción todavía no está lista. Esperá un momento y reintentá.");
       return;
     }
 
     setIsSaving(true);
 
     // Guardar en Firestore si está habilitado
-    if (useFirestore && firestoreReady && fsServices && currentReception?.receptionId) {
+    if (useFirestore) {
+      if (!firestoreReady || !fsServices || !currentReception?.receptionId) {
+        setIsSaving(false);
+        alert("La conexión de recepción todavía no está lista. Esperá un momento y reintentá.");
+        return;
+      }
+      const receptionId = currentReception.receptionId;
+      const services = fsServices;
       const tarimaId = currentTarima.id;
       const canonicalProduct = resolveCatalogProduct(catalogos.productos, {
         productId: currentTarima.productId,
@@ -336,25 +489,29 @@ export default function CapturaTarima({
         return;
       }
       const palletData = {
-        receptionId: currentReception.receptionId,
+        receptionId,
         palletNumber: currentTarima.numero,
         qrCode: tarimaId,
         productId: canonicalProduct.id,
-        lot: currentTarima.lote,
-        expiryDate: currentTarima.caducidad ? new Date(currentTarima.caducidad) : undefined,
+        lot: lotToSave,
+        expiryDate: expiryToSave ? new Date(expiryToSave) : undefined,
         quantity: currentTarima.cajas,
-        unit: "cajas",
+        unit: currentTarima.unidad,
         status: "RECEIVED",
         observations: currentTarima.observaciones,
         warehouseId: almacenActivo?.id || WAREHOUSE_IDS.NORTH,
       };
 
-      if (!currentReception.receptionId) {
-        throw new Error("Reception ID is required to save a pallet");
-      }
       try {
-        await fsServices.pallets.createPalletsForReception(
-          currentReception.receptionId,
+        await services.receptions.savePalletCapture(
+          receptionId,
+          tarimaId,
+          lotToSave,
+          expiryToSave,
+          checkpointOperationId(receptionId, currentTarima.numero),
+        );
+        await services.pallets.createPalletsForReception(
+          receptionId,
           [
             {
               warehouseId: palletData.warehouseId,
@@ -387,7 +544,7 @@ export default function CapturaTarima({
     setTarimasList(updated);
 
     // Actualizar inventario
-    if (almacenActivo) {
+    if (almacenActivo && !useFirestore) {
       const producto = resolveCatalogProduct(catalogos.productos, {
         productId: currentTarima.productId,
         name: currentTarima.producto,
@@ -419,6 +576,9 @@ export default function CapturaTarima({
             );
           } catch (e) {
             console.error("Authorized reception confirmation failed:", e);
+            setConfirmationError(
+              "Las tarimas se guardaron, pero no se confirmó la recepción. Reintentá.",
+            );
             alert(
               "Las tarimas se guardaron, pero no se pudo confirmar la recepción. Reintentá desde el historial.",
             );
@@ -442,7 +602,7 @@ export default function CapturaTarima({
         const ocNumber = currentReception.ocFolio.replace("OC-", "");
         const nextNum = tarimasList.length + 1;
         const newTarima: TarimaData = {
-          id: `TQR-${ocNumber}-${String(nextNum).padStart(3, "0")}`,
+          id: buildTarimaQR(ocNumber, nextNum),
           numero: nextNum,
           total: tarimasList.length + 1,
           ocFolio: currentReception.ocFolio,
@@ -460,6 +620,7 @@ export default function CapturaTarima({
           caducidad: currentReception.caducidad || "",
           cajas: Math.ceil(lastConv.cajas / lastConv.tarimas),
           unidadesPorCaja: lastConv.piezasPorCaja,
+          unidad: lastConv.unidad,
           lote: currentReception.lote || "",
           observaciones: "",
           proveedor: currentReception.proveedor,
@@ -509,7 +670,7 @@ export default function CapturaTarima({
   }
 
   return (
-    <div className="flex flex-col gap-4 md:gap-[18px] p-4 md:p-7 size-full overflow-auto">
+    <div className="flex min-h-full w-full min-w-0 flex-col gap-4 overflow-x-hidden px-3 py-4 pb-[calc(80px+env(safe-area-inset-bottom))] md:gap-[18px] md:p-7 md:pb-7">
       {/* Progress Bar */}
       <div className="bg-[#dce4e7] flex flex-col h-2 items-start overflow-hidden rounded-full w-full">
         <div
@@ -565,6 +726,7 @@ export default function CapturaTarima({
             ref={videoRef}
             className="w-full h-full object-cover"
             playsInline
+            autoPlay
             muted
             style={{ opacity: scanning ? 1 : 0.3 }}
           />
@@ -573,7 +735,10 @@ export default function CapturaTarima({
               className="absolute inset-0 bg-[#172126] flex flex-col items-center justify-center gap-3 p-4"
               style={{ opacity: 0.9 }}
             >
-              <img alt="" className="size-16 md:size-20" src={imgScanner} />
+              <svg aria-hidden="true" className="size-16 md:size-20 text-[#f2b84b]" viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 24V12a4 4 0 0 1 4-4h12M40 8h12a4 4 0 0 1 4 4v12M56 40v12a4 4 0 0 1-4 4H40M24 56H12a4 4 0 0 1-4-4V40" />
+                <path d="M20 20h10v10H20zM34 20h10v10H34zM20 34h10v10H20zM36 36h3v3h-3zM43 43h3v3h-3zM34 43h3v3h-3z" />
+              </svg>
               <p
                 className="font-bold text-white text-base md:text-lg text-center"
                 style={{ fontFamily: "'Inter', sans-serif" }}
@@ -588,6 +753,12 @@ export default function CapturaTarima({
               >
                 {currentTarima?.completed ? "Ver detalles" : "Activar cámara"}
               </button>
+            </div>
+          )}
+          {scannerError && (
+            <div className="absolute inset-x-3 bottom-3 rounded-lg bg-white p-3 text-sm text-red-700 shadow-lg" role="alert">
+              <p>{scannerError}</p>
+              <button onClick={startScanner} className="mt-2 min-h-11 rounded-lg bg-[#f2b84b] px-4 font-semibold text-[#16343f]">Reintentar cámara</button>
             </div>
           )}
 
@@ -677,6 +848,11 @@ export default function CapturaTarima({
               <input
                 type="text"
                 value={currentTarima?.lote || autoLote}
+                onBlur={() => currentTarima && void persistCaptureCheckpoint({
+                  ...currentTarima,
+                  lote: currentTarima.lote || autoLote,
+                  caducidad: currentTarima.caducidad || autoCaducidad,
+                })}
                 onChange={(e) => {
                   if (currentTarima) {
                     setTarimasList((prev) => {
@@ -704,6 +880,11 @@ export default function CapturaTarima({
               <input
                 type="date"
                 value={currentTarima?.caducidad || autoCaducidad}
+                onBlur={() => currentTarima && void persistCaptureCheckpoint({
+                  ...currentTarima,
+                  lote: currentTarima.lote || autoLote,
+                  caducidad: currentTarima.caducidad || autoCaducidad,
+                })}
                 onChange={(e) => {
                   if (currentTarima) {
                     setTarimasList((prev) => {
@@ -721,6 +902,9 @@ export default function CapturaTarima({
               />
             </div>
           </div>
+          {captureError && (
+            <p className="mt-2 text-sm text-red-700" role="alert">{captureError}</p>
+          )}
 
           <div className="flex flex-col gap-1 mt-2">
             <label
@@ -811,41 +995,60 @@ export default function CapturaTarima({
             </span>
           </button>
 
-          <button
-            onClick={handleSaveTarima}
-            disabled={isSaving || !currentTarima || currentTarima.completed}
-            className={`bg-[#16343f] border border-[#16343f] flex flex-1 h-11 md:h-[52px] items-center justify-center gap-2 px-3 md:px-5 rounded-[14px] cursor-pointer hover:bg-[#1e4456] transition-colors touch-target ${
-              isSaving ? "opacity-75" : ""
-            }`}
-          >
-            {isSaving ? (
-              <svg
-                className="animate-spin"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="2.5"
-              >
-                <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
-                <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
-              </svg>
-            ) : (
-              <img alt="" className="size-5 md:size-[18px]" src={imgCheck} />
-            )}
-            <span
-              className="font-bold text-white text-sm md:text-[15px] whitespace-nowrap"
-              style={{ fontFamily: "'Inter', sans-serif" }}
+          {completedCount === tarimasList.length &&
+          tarimasList.length > 0 &&
+          useFirestore &&
+          currentReception?.receptionId ? (
+            <button
+              type="button"
+              onClick={retryReceptionConfirmation}
+              disabled={isSaving || showSuccess}
+              className="bg-[#16343f] text-white font-bold flex flex-1 h-11 items-center justify-center rounded-[14px] disabled:opacity-60"
             >
-              {isSaving
-                ? "Guardando..."
-                : currentTarima?.completed
-                  ? "Re-guardar"
-                  : "Guardar y siguiente →"}
-            </span>
-          </button>
+              {isSaving ? "Confirmando..." : "Reintentar confirmación"}
+            </button>
+          ) : (
+            <button
+              onClick={handleSaveTarima}
+              disabled={isSaving || !currentTarima || currentTarima.completed}
+              className={`bg-[#16343f] border border-[#16343f] flex flex-1 h-11 md:h-[52px] items-center justify-center gap-2 px-3 md:px-5 rounded-[14px] cursor-pointer hover:bg-[#1e4456] transition-colors touch-target ${
+                isSaving ? "opacity-75" : ""
+              }`}
+            >
+              {isSaving ? (
+                <svg
+                  className="animate-spin"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="2.5"
+                >
+                  <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                  <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <img alt="" className="size-5 md:size-[18px]" src={imgCheck} />
+              )}
+              <span
+                className="font-bold text-white text-sm md:text-[15px] whitespace-nowrap"
+                style={{ fontFamily: "'Inter', sans-serif" }}
+              >
+                {isSaving
+                  ? "Guardando..."
+                  : currentTarima?.completed
+                    ? "Re-guardar"
+                    : "Guardar y siguiente →"}
+              </span>
+            </button>
+          )}
         </div>
+        {confirmationError && (
+          <p role="alert" className="text-sm text-red-700">
+            {confirmationError}
+          </p>
+        )}
 
         {/* Navegación rápida entre tarimas */}
         <div className="flex flex-wrap gap-1 justify-center w-full">

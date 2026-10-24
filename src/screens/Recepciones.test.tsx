@@ -1,8 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+const firestoreScenario = vi.hoisted(() => ({ enabled: false, receptions: [] as any[] }));
+
 vi.mock("@/config/featureFlags", () => ({
-  isFeatureEnabled: () => false,
+  isFeatureEnabled: () => firestoreScenario.enabled,
 }));
 
 vi.mock("@/hooks/useFirestore", () => ({
@@ -15,12 +17,17 @@ vi.mock("@/hooks/useFirestore", () => ({
   useOfflineQueue: () => ({ enqueue: vi.fn(), isOnline: true }),
 }));
 
-vi.mock("@/lib/firebase", () => ({ db: null }));
+vi.mock("@/lib/firebase", () => ({ db: {} }));
+vi.mock("@/services/firestore", () => ({
+  createFirestoreServices: () => ({
+    receptions: { getByWarehouse: vi.fn(async () => firestoreScenario.receptions) },
+  }),
+}));
 
 vi.mock("@/hooks/useAuthorization", () => ({
   useAuthorization: () => ({
-    canQuery: false,
-    canAccessWarehouse: () => false,
+    canQuery: firestoreScenario.enabled,
+    canAccessWarehouse: () => firestoreScenario.enabled,
   }),
   isPermissionDenied: () => false,
 }));
@@ -56,5 +63,31 @@ describe("Recepciones presentation", () => {
     });
 
     expect(onSelectTarima).toHaveBeenCalledWith("OC-24850");
+  });
+
+  it("offers resume using the Firestore document ID, not operationId", async () => {
+    firestoreScenario.enabled = true;
+    firestoreScenario.receptions = [
+      {
+        id: "reception-doc-1",
+        operationId: "operation-1",
+        folio: "REC-2026-1",
+        supplierName: "El Florido",
+        status: "DRAFT",
+        plannedPallets: [{ productName: "Agua", status: "PLANNED" }],
+      },
+    ];
+    const onResume = vi.fn();
+
+    render(<Recepciones onSelectTarima={vi.fn()} onEdit={vi.fn()} onResume={onResume} />);
+
+    const resume = await screen.findByRole("button", { name: "Reanudar recepción REC-2026-1" });
+    expect(screen.getByText("El Florido")).toBeInTheDocument();
+    expect(screen.getByText("Agua")).toBeInTheDocument();
+    expect(screen.getByText("1 tarimas ·")).toBeInTheDocument();
+    fireEvent.click(resume);
+    expect(onResume).toHaveBeenCalledWith("reception-doc-1");
+    firestoreScenario.enabled = false;
+    firestoreScenario.receptions = [];
   });
 });

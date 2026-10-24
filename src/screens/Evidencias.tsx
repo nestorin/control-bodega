@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { isFeatureEnabled } from "@/config/featureFlags";
-import { useCollection } from "@/hooks/useFirestore";
 import { db } from "@/lib/firebase";
 import { createFirestoreServices } from "@/services/firestore";
 import { WAREHOUSE_IDS } from "@/config/warehouses";
 import { useAuthorization } from "@/hooks/useAuthorization";
+import { generateEvidencePdf, type EvidencePalletRow } from "@/services/evidencePdf";
+import { downloadBlob } from "@/services/pdfGenerator";
 
 const imgIndicador = "/assets/08d70.svg";
 const imgIndicadorRed = "/assets/9d6fd.svg";
@@ -71,15 +72,63 @@ export const evidenciasDataLocal = [
 ];
 
 // Export for use in EvidenciaDetalle
-export type EvidenciaData = (typeof evidenciasDataLocal)[0];
+export type EvidenciaData = (typeof evidenciasDataLocal)[0] & {
+  receptionId?: string;
+  evidenceId?: string;
+  purchaseOrderNumber?: string;
+  pallets?: EvidencePalletRow[];
+};
+
+export function mapReceptionEvidence(reception: any): EvidenciaData {
+  const planned = Array.isArray(reception.plannedPallets) ? reception.plannedPallets : [];
+  const receivedPallets = planned.filter((pallet: any) =>
+    ["ACTIVE", "RECEIVED"].includes(pallet.status),
+  );
+  const dateValue = reception.receivedAt?.toDate?.() || reception.createdAt?.toDate?.();
+  const dateKey = (reception.scheduledDate || dateValue?.toISOString?.() || "")
+    .replace(/\D/g, "")
+    .slice(0, 8);
+  const evidenceId =
+    reception.evidenceId ||
+    "EV-" + (dateKey || "SINFECHA") + "-" + String(reception.id || "").slice(-6).toUpperCase();
+  return {
+    id: evidenceId,
+    evidenceId,
+    receptionId: reception.id,
+    fotoTrailer: reception.evidencePhotos?.trailer || null,
+    fotoProducto: reception.evidencePhotos?.product || null,
+    proveedor: reception.supplierName || reception.supplierCode || "Sin proveedor",
+    proveedorLogistico: reception.logisticsProvider || "Sin dato",
+    item: reception.productName || "Sin producto",
+    tarimas: planned.length ? receivedPallets.length : reception.palletCount || 0,
+    caducidad: receivedPallets.map((pallet: any) => pallet.expiryDate).filter(Boolean).join(", "),
+    lote: receivedPallets.map((pallet: any) => pallet.lot).filter(Boolean).join(", "),
+    ocFolio: reception.purchaseOrderNumber || reception.folio || reception.purchaseOrderId || reception.id,
+    purchaseOrderNumber: reception.purchaseOrderNumber || reception.folio || reception.purchaseOrderId || "Sin dato",
+    fecha: dateValue?.toLocaleDateString?.("es-ES") || reception.scheduledDate || "",
+    hora: dateValue?.toLocaleTimeString?.("es-ES") || "",
+    estado: reception.evidencePhotos?.trailer && reception.evidencePhotos?.product ? "Completa" : "Incompleta",
+    color: reception.evidencePhotos?.trailer && reception.evidencePhotos?.product ? "#16845b" : "#c54b45",
+    bg: reception.evidencePhotos?.trailer && reception.evidencePhotos?.product ? "#e2f5ec" : "#fce9e7",
+    img: reception.evidencePhotos?.trailer && reception.evidencePhotos?.product ? imgIndicador : imgIndicadorRed,
+    pallets: receivedPallets.map((pallet: any) => ({
+      palletNumber: pallet.palletNumber,
+      qrIdentifier: pallet.qrIdentifier,
+      lot: pallet.lot,
+      expiryDate: pallet.expiryDate,
+    })),
+  };
+}
 
 function RowMenu({
   evId,
   onEdit,
+  onDownload,
   onDelete,
 }: {
   evId: string;
   onEdit: () => void;
+  onDownload: () => void;
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -139,6 +188,21 @@ function RowMenu({
               }}
             >
               Editar
+            </span>
+          </button>
+          <button
+            onClick={() => {
+              setOpen(false);
+              onDownload();
+            }}
+            className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-[#f4f7f8] transition-colors border-b border-[#edf1f3]"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#172126" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <path d="m7 10 5 5 5-5M12 15V3" />
+            </svg>
+            <span className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, color: "#172126" }}>
+              Descargar evidencia PDF
             </span>
           </button>
           <button
@@ -219,13 +283,13 @@ export default function Evidencias({ onSelect }: Props) {
   const { canQuery } = useAuthorization();
   const useFirestore = isFeatureEnabled("USE_FIRESTORE_EVIDENCIAS") && !!db && canQuery;
 
-  const [listaLocal, setListaLocal] = useState(evidenciasDataLocal);
+  const [listaLocal, setListaLocal] = useState<EvidenciaData[]>(evidenciasDataLocal);
   const [fsServices, setFsServices] = useState<ReturnType<typeof createFirestoreServices> | null>(
     null,
   );
-  const [firestoreReady, setFirestoreReady] = useState(false);
   const [loadingFs, setLoadingFs] = useState(false);
   const [errorFs, setErrorFs] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   // Estados de filtro
   const [searchText, setSearchText] = useState("");
@@ -236,7 +300,6 @@ export default function Evidencias({ onSelect }: Props) {
     if (useFirestore && db) {
       const services = createFirestoreServices(db, ORG_ID);
       setFsServices(services);
-      setFirestoreReady(true);
     }
   }, [useFirestore]);
 
@@ -252,31 +315,7 @@ export default function Evidencias({ onSelect }: Props) {
       .then((receptions: any[]) => {
         const converted = receptions
           .filter((r: any) => r.evidencePhotos?.trailer || r.evidencePhotos?.product)
-          .map((r: any) => ({
-            id: r.operationId || r.id,
-            fotoTrailer: r.evidencePhotos?.trailer,
-            fotoProducto: r.evidencePhotos?.product,
-            proveedor: r.supplierName || "Sin proveedor",
-            proveedorLogistico: "",
-            item: r.productName || "Sin producto",
-            tarimas: r.palletCount || 0,
-            caducidad: "",
-            lote: "",
-            ocFolio: r.operationId || r.id,
-            fecha:
-              r.receivedAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
-              r.createdAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
-              "",
-            hora: r.receivedAt?.toDate?.()?.toLocaleTimeString?.("es-ES") || "",
-            estado:
-              r.evidencePhotos?.trailer && r.evidencePhotos?.product ? "Completa" : "Incompleta",
-            color: r.evidencePhotos?.trailer && r.evidencePhotos?.product ? "#16845b" : "#c54b45",
-            bg: r.evidencePhotos?.trailer && r.evidencePhotos?.product ? "#e2f5ec" : "#fce9e7",
-            img:
-              r.evidencePhotos?.trailer && r.evidencePhotos?.product
-                ? imgIndicador
-                : imgIndicadorRed,
-          }));
+        .map(mapReceptionEvidence);
         setListaLocal(converted);
         setLoadingFs(false);
       })
@@ -287,43 +326,47 @@ export default function Evidencias({ onSelect }: Props) {
       });
   }, [useFirestore, fsServices]);
 
-  // Firestore hook - read from a collection (could be receptions with evidence or separate evidences collection)
-  const { data: evidenciasFirestore, loading } = useCollection<EvidenciaData | null>(
-    db,
-    `organizations/${ORG_ID}/receptions`, // Using receptions with evidence data embedded
-    {
-      enabled: useFirestore,
-      mapFn: (doc) => {
-        const d = doc.data();
-        if (!d.evidencePhotos) return null;
-        return {
-          id: d.operationId || doc.id,
-          fotoTrailer: d.evidencePhotos.trailer,
-          fotoProducto: d.evidencePhotos.product,
-          proveedor: d.supplierName || "Sin proveedor",
-          proveedorLogistico: "",
-          item: d.productName || "Sin producto",
-          tarimas: d.palletCount || 0,
-          caducidad: "",
-          lote: "",
-          ocFolio: d.operationId || doc.id,
-          fecha:
-            d.receivedAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
-            d.createdAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
-            "",
-          hora: d.receivedAt?.toDate?.()?.toLocaleTimeString?.("es-ES") || "",
-          estado:
-            d.evidencePhotos?.trailer && d.evidencePhotos?.product ? "Completa" : "Incompleta",
-          color: d.evidencePhotos?.trailer && d.evidencePhotos?.product ? "#16845b" : "#c54b45",
-          bg: d.evidencePhotos?.trailer && d.evidencePhotos?.product ? "#e2f5ec" : "#fce9e7",
-          img:
-            d.evidencePhotos?.trailer && d.evidencePhotos?.product ? imgIndicador : imgIndicadorRed,
-        };
-      },
-    },
-  );
+  const lista: EvidenciaData[] = listaLocal;
 
-  const lista: EvidenciaData[] = useFirestore && !loadingFs ? listaLocal : listaLocal;
+  async function downloadEvidence(evidence: EvidenciaData) {
+    setDownloadError(null);
+    try {
+      let pallets = evidence.pallets || [];
+      if (fsServices && evidence.receptionId) {
+        const docs = await fsServices.pallets.getByReception(evidence.receptionId, [WAREHOUSE_IDS.NORTH]);
+        const received = docs.filter((pallet) => ["RECEIVED", "STORED"].includes(pallet.status));
+        pallets = received.map((pallet, index) => ({
+          palletNumber: pallet.palletNumber
+            ?? evidence.pallets?.find((planned) => planned.qrIdentifier === pallet.qrIdentifier)?.palletNumber
+            ?? index + 1,
+          qrIdentifier: pallet.qrIdentifier,
+          lot: pallet.lot,
+          expiryDate: pallet.expiryDate,
+        }));
+      }
+      const blob = await generateEvidencePdf({
+        evidenceId: evidence.evidenceId || evidence.id,
+        receptionId: evidence.receptionId || evidence.ocFolio,
+        date: [evidence.fecha, evidence.hora].filter(Boolean).join(" "),
+        item: evidence.item,
+        supplier: evidence.proveedor,
+        logisticsProvider: evidence.proveedorLogistico,
+        purchaseOrderNumber: evidence.purchaseOrderNumber || evidence.ocFolio,
+        lot: evidence.lote,
+        expiryDate: evidence.caducidad,
+        receivedPalletCount: evidence.receptionId ? pallets.length : evidence.tarimas,
+        trailerPhoto: evidence.fotoTrailer,
+        productPhoto: evidence.fotoProducto,
+        pallets,
+      });
+      const filename = "Evidencia-" + (evidence.evidenceId || evidence.id).replace(/[^a-zA-Z0-9-]/g, "-") + ".pdf";
+      downloadBlob(blob, filename);
+    } catch (error) {
+      console.error("Evidence PDF generation failed:", error);
+      setDownloadError("No se pudo descargar la evidencia. Verificá las fotos y la conexión.");
+    } finally {
+    }
+  }
 
   // Lista filtrada
   const listaFiltrada = lista.filter((ev) => {
@@ -435,39 +478,7 @@ export default function Evidencias({ onSelect }: Props) {
                     .filter(
                       (rec: any) => rec.evidencePhotos?.trailer || rec.evidencePhotos?.product,
                     )
-                    .map((rec: any) => ({
-                      id: rec.operationId || rec.id,
-                      fotoTrailer: rec.evidencePhotos?.trailer,
-                      fotoProducto: rec.evidencePhotos?.product,
-                      proveedor: rec.supplierName || "Sin proveedor",
-                      proveedorLogistico: "",
-                      item: rec.productName || "Sin producto",
-                      tarimas: rec.palletCount || 0,
-                      caducidad: "",
-                      lote: "",
-                      ocFolio: rec.operationId || rec.id,
-                      fecha:
-                        rec.receivedAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
-                        rec.createdAt?.toDate?.()?.toLocaleDateString?.("es-ES") ||
-                        "",
-                      hora: rec.receivedAt?.toDate?.()?.toLocaleTimeString?.("es-ES") || "",
-                      estado:
-                        rec.evidencePhotos?.trailer && rec.evidencePhotos?.product
-                          ? "Completa"
-                          : "Incompleta",
-                      color:
-                        rec.evidencePhotos?.trailer && rec.evidencePhotos?.product
-                          ? "#16845b"
-                          : "#c54b45",
-                      bg:
-                        rec.evidencePhotos?.trailer && rec.evidencePhotos?.product
-                          ? "#e2f5ec"
-                          : "#fce9e7",
-                      img:
-                        rec.evidencePhotos?.trailer && rec.evidencePhotos?.product
-                          ? imgIndicador
-                          : imgIndicadorRed,
-                    }));
+                    .map(mapReceptionEvidence);
                   setListaLocal(converted);
                   setLoadingFs(false);
                 })
@@ -481,6 +492,9 @@ export default function Evidencias({ onSelect }: Props) {
             Reintentar
           </button>
         </div>
+      )}
+      {downloadError && (
+        <p className="text-sm text-red-700" role="alert">{downloadError}</p>
       )}
 
       <div className="flex flex-col gap-3 w-full">
@@ -570,6 +584,7 @@ export default function Evidencias({ onSelect }: Props) {
               <RowMenu
                 evId={ev.id}
                 onEdit={() => alert(`Editando evidencia ${ev.id}`)}
+                onDownload={() => void downloadEvidence(ev)}
                 onDelete={() => setListaLocal((prev) => prev.filter((e) => e.id !== ev.id))}
               />
             </div>
