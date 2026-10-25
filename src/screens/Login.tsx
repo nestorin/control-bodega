@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { isFeatureEnabled } from "@/config/featureFlags";
@@ -43,7 +43,16 @@ function authenticationErrorMessage(error: unknown): string {
 }
 
 export default function Login() {
-  const { login, register, loginWithGoogle, loading: authLoading } = useAuth();
+  const {
+    login,
+    register,
+    loginWithGoogle,
+    user,
+    profile,
+    loading: authLoading,
+    accessStatus,
+    authError,
+  } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
@@ -52,6 +61,26 @@ export default function Login() {
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [awaitingMembership, setAwaitingMembership] = useState(false);
+
+  useEffect(() => {
+    if (!awaitingMembership || authLoading || !user) return;
+
+    if (accessStatus === "ACTIVE" && profile) {
+      navigate("/", { replace: true });
+      return;
+    }
+
+    if (accessStatus === "ERROR") {
+      setError(authError?.message ?? "No se pudo verificar tu acceso al almacén.");
+      setAwaitingMembership(false);
+      return;
+    }
+
+    if (accessStatus === "INACTIVE") {
+      navigate("/unauthorized", { replace: true, state: { reason: accessStatus } });
+    }
+  }, [accessStatus, authError, authLoading, awaitingMembership, navigate, profile, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +90,7 @@ export default function Login() {
     try {
       if (mode === "login") {
         await login(email, password);
-        navigate("/", { replace: true });
+        setAwaitingMembership(true);
       } else {
         if (password !== confirmPassword) {
           setError("Las contraseñas no coinciden");
@@ -74,7 +103,7 @@ export default function Login() {
           return;
         }
         await register(email, password, displayName);
-        navigate("/", { replace: true });
+        setAwaitingMembership(true);
       }
     } catch (err: unknown) {
       setError(authenticationErrorMessage(err));
@@ -88,7 +117,7 @@ export default function Login() {
     setSubmitting(true);
     try {
       await loginWithGoogle();
-      navigate("/", { replace: true });
+      setAwaitingMembership(true);
     } catch (err: unknown) {
       setError(authenticationErrorMessage(err));
     } finally {
@@ -232,11 +261,11 @@ export default function Login() {
           {/* Submit */}
           <button
             type="submit"
-            disabled={submitting || authLoading}
+            disabled={submitting || authLoading || awaitingMembership}
             className="w-full h-12 md:h-[52px] bg-[#16343f] hover:bg-[#1e4456] disabled:bg-[#b9c9cf] text-white font-bold text-[14px] md:text-[15px] rounded-[14px] transition-colors touch-target"
             style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
           >
-            {submitting || authLoading
+            {submitting || authLoading || awaitingMembership
               ? "Procesando..."
               : mode === "login"
                 ? "Entrar"
@@ -263,7 +292,7 @@ export default function Login() {
         <button
           type="button"
           onClick={handleGoogleLogin}
-          disabled={submitting || authLoading}
+          disabled={submitting || authLoading || awaitingMembership}
           className="w-full h-12 md:h-[52px] bg-white border border-[#dce4e7] hover:bg-[#f4f7f8] flex items-center justify-center gap-3 text-[14px] font-bold rounded-[14px] transition-colors touch-target"
           style={{
             fontFamily: "'Inter', sans-serif",
