@@ -23,14 +23,18 @@ export interface RawOcrProductDto {
   confianza?: number;
 }
 
-export interface RawOcrParsedDto {
+export interface RawOcrOrderDto {
   folio?: string | null;
   fecha?: string | null;
   proveedor?: string | null;
-  proveedor_posible?: string | null; // compatibilidad
   total?: string | null;
   productos?: RawOcrProductDto[];
   lineas_detectadas?: string[]; // compatibilidad
+}
+
+export interface RawOcrParsedDto extends RawOcrOrderDto {
+  proveedor_posible?: string | null; // compatibilidad
+  ordenes?: RawOcrOrderDto[];
 }
 
 export interface RawOcrResponseDto {
@@ -64,13 +68,17 @@ export interface OcrProduct {
   confianza: number;
 }
 
-export interface OcrParsed {
+export interface OcrOrder {
   folio: string | null;
   fecha: string | null;
   proveedor: string | null;
   total: string | null;
   productos: OcrProduct[];
   lineas_detectadas: string[]; // raw text lines para debug
+}
+
+export interface OcrParsed extends OcrOrder {
+  ordenes?: OcrOrder[];
 }
 
 export interface OcrResponse {
@@ -129,6 +137,32 @@ function asNumber(value: unknown, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function normalizeOcrOrder(raw: RawOcrOrderDto): OcrOrder {
+  const rawProducts = Array.isArray(raw.productos) ? raw.productos : [];
+  return {
+    folio: asString(raw.folio),
+    fecha: asString(raw.fecha),
+    proveedor: asString(raw.proveedor),
+    total: asString(raw.total),
+    productos: rawProducts.map(normalizeOcrProduct),
+    lineas_detectadas: Array.isArray(raw.lineas_detectadas)
+      ? raw.lineas_detectadas.filter((value): value is string => typeof value === "string")
+      : [],
+  };
+}
+
+/** Keep the existing single-order response shape while requiring a choice for multiple orders. */
+export function getSelectedOcrOrder(
+  parsed: OcrParsed,
+  selectedIndex: number | null,
+): OcrOrder | null {
+  const orders = parsed.ordenes;
+  if (!orders?.length) return parsed;
+  if (orders.length === 1) return orders[0];
+  if (selectedIndex === null || selectedIndex < 0) return null;
+  return orders[selectedIndex] ?? null;
+}
+
 /**
  * Normaliza un producto RAW del backend al DTO canónico
  */
@@ -176,6 +210,9 @@ export function normalizeOcrResponse(raw: RawOcrResponseDto, requestedType: DocT
       lineas_detectadas: Array.isArray(parsed.lineas_detectadas)
         ? parsed.lineas_detectadas.filter((v): v is string => typeof v === "string")
         : [],
+      ...(Array.isArray(parsed.ordenes) && parsed.ordenes.length > 0
+        ? { ordenes: parsed.ordenes.map(normalizeOcrOrder) }
+        : {}),
     },
     tipo: requestedType,
     ...(preview?.mimeType === "image/jpeg" && typeof preview.dataUrl === "string"

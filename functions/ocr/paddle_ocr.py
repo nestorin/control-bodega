@@ -2,6 +2,7 @@
 import re
 import io
 import base64
+import unicodedata
 from typing import Dict, List, Optional, Any
 from PIL import Image
 import numpy as np
@@ -63,26 +64,42 @@ def ocr_image(image_bytes: bytes) -> Dict[str, Any]:
     }
 
 
+def _pdf_page_blocks(page: Any, page_index: int) -> List[Dict[str, Any]]:
+    """Extract text spans with per-span coordinates from one PDF page."""
+    blocks: List[Dict] = []
+    for raw in page.get_text("dict").get("blocks", []):
+        for line in raw.get("lines", []):
+            for span in line.get("spans", []):
+                value = str(span.get("text", "")).strip()
+                if not value:
+                    continue
+                x0, y0, x1, y1 = span["bbox"]
+                blocks.append({
+                    "text": value,
+                    "confidence": 1.0,
+                    "bbox": [[x0, y0], [x1, y0], [x1, y1], [x0, y1]],
+                    "page": page_index + 1,
+                })
+    return blocks
+
+
+def _has_usable_native_text_layer(blocks: List[Dict[str, Any]]) -> bool:
+    """Treat short scanner watermarks and page labels as non-content text."""
+    text = " ".join(block.get("text", "") for block in blocks)
+    text = re.sub(r"(?i)escaneado\s+con\s+camscanner|scanned\s+with\s+camscanner", " ", text)
+    tokens = re.findall(r"[A-Za-zÀ-ÿ0-9]+", text)
+    return len(tokens) >= 3 and sum(len(token) for token in tokens) >= 12
+
+
 def _pdf_blocks(pdf_bytes: bytes) -> tuple[List[Dict], Optional[bytes]]:
-    """Extract text/coordinates from a digital PDF and create a small preview."""
+    """Extract text/coordinates from all PDF pages and create a small preview."""
     import fitz
 
     document = fitz.open(stream=pdf_bytes, filetype="pdf")
     blocks: List[Dict] = []
     preview: Optional[bytes] = None
     for page_index, page in enumerate(document):
-        raw_blocks = page.get_text("blocks")
-        for raw in raw_blocks:
-            x0, y0, x1, y1, text, *_ = raw
-            for line in str(text).splitlines():
-                value = line.strip()
-                if value:
-                    blocks.append({
-                        "text": value,
-                        "confidence": 1.0,
-                        "bbox": [[x0, y0], [x1, y0], [x1, y1], [x0, y1]],
-                        "page": page_index + 1,
-                    })
+        blocks.extend(_pdf_page_blocks(page, page_index))
         if page_index == 0:
             # 200 DPI keeps small text printable without retaining the source PDF.
             pix = page.get_pixmap(matrix=fitz.Matrix(200 / 72, 200 / 72), alpha=False)
@@ -92,26 +109,33 @@ def _pdf_blocks(pdf_bytes: bytes) -> tuple[List[Dict], Optional[bytes]]:
 
 
 def extract_document(file_bytes: bytes, content_type: str) -> Dict[str, Any]:
-    """Use PDF text extraction when possible; otherwise fall back to PaddleOCR."""
+    """Use native PDF text per page and run PaddleOCR only on pages without it."""
     if content_type == "application/pdf" or file_bytes[:4] == b"%PDF":
-        blocks, preview = _pdf_blocks(file_bytes)
-        if blocks:
-            return {"blocks": blocks, "full_text": "\n".join(b["text"] for b in blocks), "preview": preview}
-        # Image-only PDF: render and OCR every page, not only the first page.
         import fitz
+
         document = fitz.open(stream=file_bytes, filetype="pdf")
         page_count = len(document)
         combined_blocks: List[Dict[str, Any]] = []
         preview: Optional[bytes] = None
-        for page_index, page in enumerate(document):
-            pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0), alpha=False)
-            image_bytes = pix.tobytes("jpeg", jpg_quality=90)
-            if preview is None:
-                preview = image_bytes
-            page_result = ocr_image(image_bytes)
-            for block in page_result["blocks"]:
-                combined_blocks.append({**block, "page": page_index + 1})
-        document.close()
+        try:
+            for page_index, page in enumerate(document):
+                page_blocks = _pdf_page_blocks(page, page_index)
+                if _has_usable_native_text_layer(page_blocks):
+                    combined_blocks.extend(page_blocks)
+                else:
+                    # Image-only or effectively empty page: OCR only this page.
+                    pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0), alpha=False)
+                    image_bytes = pix.tobytes("jpeg", jpg_quality=90)
+                    page_result = ocr_image(image_bytes)
+                    for block in page_result["blocks"]:
+                        combined_blocks.append({**block, "page": page_index + 1})
+
+                if page_index == 0:
+                    # Preview represents the original first page, independent of OCR route.
+                    pix = page.get_pixmap(matrix=fitz.Matrix(200 / 72, 200 / 72), alpha=False)
+                    preview = pix.tobytes("jpeg", jpg_quality=82)
+        finally:
+            document.close()
         return {
             "pages": page_count,
             "blocks": combined_blocks,
@@ -130,6 +154,14 @@ def extract_document(file_bytes: bytes, content_type: str) -> Dict[str, Any]:
 # ─────────────────────────────────────────────────────────────────────────────
 # PARSING CFDI / FACTURAS MEXICANAS (CFDI 4.0)
 # ─────────────────────────────────────────────────────────────────────────────
+
+# Mexican RFC: 3-character legal entity or 4-character individual prefix,
+# followed by YYMMDD and the 3-character homoclave.
+RFC_PATTERN = re.compile(r"\b[A-Z&Ñ]{3,4}\d{6}[A-Z0-9]{3}\b", re.I)
+UUID_PATTERN = re.compile(
+    r"\b[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\b",
+    re.I,
+)
 
 # Folio: puede tener prefijo + número, ej: "FAC-2024-001", "A-123", "12345", "OC-24891"
 # Acepta "Folio", "Folia" (OCR typo), "Factura", "No.", "Número", "OC", "Orden"
@@ -262,8 +294,42 @@ def parse_cfdi(blocks: List[Dict]) -> Dict[str, Optional[str]]:
 
 
 def parse_orden_compra(blocks: List[Dict]) -> Dict[str, Any]:
-    """Parsing estructurado para órdenes de compra - usa la misma lógica que CFDI."""
+    """Parse a purchase order, using the fixed Smart & Final table when present."""
     full_text = " ".join([b["text"] for b in blocks])
+
+    fixed_order = _parse_smart_final_order(blocks)
+    if fixed_order is not None:
+        orders = []
+        for raw_order in fixed_order["ordenes"]:
+            orders.append({
+                **raw_order,
+                "productos": [
+                    {
+                        "linea": product.get("linea"),
+                        "codigo": product.get("codigo"),
+                        "nombre": product.get("nombre", ""),
+                        "unidad": product.get("u_med"),
+                        "cantidad": product.get("unidades"),
+                        "precio": product.get("precio", 0.0),
+                        "importe": product.get("importe", 0.0),
+                        "confianza": product.get("confianza", 1.0),
+                    }
+                    for product in raw_order["productos"]
+                ],
+            })
+        first_order = orders[0]
+        parsed = {
+            "folio": first_order["folio"],
+            "fecha": first_order["fecha"],
+            "total": first_order["total"],
+            "proveedor": first_order["proveedor"] or _extract_proveedor(full_text, is_oc=True),
+            "proveedor_posible": first_order["proveedor"] or _extract_proveedor(full_text, is_oc=True),
+            "productos": first_order["productos"],
+            "lineas_detectadas": first_order["lineas_detectadas"],
+        }
+        if len(orders) > 1:
+            parsed["ordenes"] = orders
+        return parsed
     
     # Extraer productos estructurados (misma lógica que CFDI)
     lines = _extract_product_lines(blocks)
@@ -357,6 +423,245 @@ def _group_rows(blocks: List[Dict], tolerance: float = 14.0) -> List[List[Dict]]
         else:
             row.append(block)
     return [sorted(row, key=lambda item: item.get("bbox", [[0]])[0][0]) for row in rows]
+
+
+def _normalized_layout_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9]+", "", normalized.lower())
+
+
+def _block_center_x(block: Dict[str, Any]) -> float:
+    bbox = block.get("bbox") or []
+    if bbox:
+        return sum(point[0] for point in bbox) / len(bbox)
+    return float(block.get("x", 0.0))
+
+
+def _row_text(row: List[Dict[str, Any]]) -> str:
+    return " ".join(block.get("text", "").strip() for block in row if block.get("text", "").strip())
+
+
+def _candidate_folio(value: str) -> Optional[str]:
+    """Select an order identifier, excluding dates and unrelated stamp text."""
+    for token in re.findall(r"[A-Z0-9][A-Z0-9/-]{2,}", value, flags=re.I):
+        compact = token.upper().replace("-", "").replace("/", "")
+        if re.fullmatch(r"\d{4}", compact):
+            continue
+        if re.search(r"[A-Z]", compact) and re.search(r"\d", compact):
+            return token.upper()
+        if compact.isdigit() and len(compact) >= 5:
+            return token
+    return None
+
+
+def _fixed_order_folio(rows: List[List[Dict[str, Any]]]) -> Optional[str]:
+    for index, row in enumerate(rows):
+        for block in row:
+            text = block.get("text", "").strip()
+            match = re.search(r"\bFolio\b\s*[:#-]?\s*(.+)$", text, flags=re.I)
+            if match and (candidate := _candidate_folio(match.group(1))):
+                return candidate
+
+        label_blocks = [
+            block for block in row
+            if "folio" in _normalized_layout_text(block.get("text", ""))
+        ]
+        if not label_blocks:
+            continue
+        label_x = sum(_block_center_x(block) for block in label_blocks) / len(label_blocks)
+        for next_row in rows[index + 1:index + 3]:
+            candidates = sorted(
+                next_row,
+                key=lambda block: abs(_block_center_x(block) - label_x),
+            )
+            for block in candidates:
+                if abs(_block_center_x(block) - label_x) > 110:
+                    continue
+                if candidate := _candidate_folio(block.get("text", "")):
+                    return candidate
+    return None
+
+
+def _fixed_order_supplier(rows: List[List[Dict[str, Any]]]) -> Optional[str]:
+    for index, row in enumerate(rows):
+        for block in row:
+            text = block.get("text", "").strip()
+            match = re.search(r"\bProveedor\b\s*[:#-]?\s*(.+)$", text, flags=re.I)
+            if match and match.group(1).strip():
+                return match.group(1).strip()[:100]
+
+        if not any("proveedor" in _normalized_layout_text(block.get("text", "")) for block in row):
+            continue
+        if index + 1 >= len(rows):
+            continue
+        value = _row_text(rows[index + 1])
+        if value and _normalized_layout_text(value) not in {"proveedor", "factura", "condiciones"}:
+            # In this layout the supplier is a dedicated cell. The address appears
+            # on the following row and is deliberately not treated as the supplier.
+            return value[:100]
+    return None
+
+
+def _fixed_header_columns(row: List[Dict[str, Any]]) -> Optional[Dict[str, float]]:
+    columns: Dict[str, float] = {}
+    for block in row:
+        text = block.get("text", "")
+        normalized = _normalized_layout_text(text)
+        if normalized.startswith("articulo"):
+            columns.setdefault("code", _block_center_x(block))
+        elif normalized.startswith("nombre"):
+            columns.setdefault("name", _block_center_x(block))
+        elif normalized in {"umed", "umedida", "unidadmedida"}:
+            columns.setdefault("unit", _block_center_x(block))
+        elif normalized in {"unidades", "unidad"}:
+            columns.setdefault("quantity", _block_center_x(block))
+        elif normalized.startswith("precio"):
+            columns.setdefault("price", _block_center_x(block))
+        elif normalized.startswith("importe"):
+            columns.setdefault("amount", _block_center_x(block))
+
+    if not all(name in columns for name in ("code", "name", "unit", "quantity")):
+        return None
+    ordered = [columns[name] for name in ("code", "name", "unit", "quantity")]
+    if ordered != sorted(ordered) or len(set(ordered)) != len(ordered):
+        return None
+    return columns
+
+
+def _interval_value(row: List[Dict[str, Any]], left: float, right: float) -> str:
+    values = [
+        block.get("text", "").strip()
+        for block in row
+        if left <= _block_center_x(block) < right and block.get("text", "").strip()
+    ]
+    return " ".join(values).strip()
+
+
+def _smart_final_products_for_page(
+    rows: List[List[Dict[str, Any]]],
+    start_index: int,
+    columns: Dict[str, float],
+    first_line: int,
+) -> List[Dict[str, Any]]:
+    price_x = columns.get("price", columns["quantity"] + 120)
+    amount_x = columns.get("amount", price_x + 120)
+    code_name = (columns["code"] + columns["name"]) / 2
+    name_unit = (columns["name"] + columns["unit"]) / 2
+    unit_quantity = (columns["unit"] + columns["quantity"]) / 2
+    quantity_price = (columns["quantity"] + price_x) / 2
+    price_amount = (price_x + amount_x) / 2
+
+    products: List[Dict[str, Any]] = []
+    for row in rows[start_index:]:
+        row_text = _row_text(row)
+        normalized = _normalized_layout_text(row_text)
+        if any(marker in normalized for marker in ("subtotal", "importe", "total", "iva")):
+            if "total" in normalized or "subtotal" in normalized:
+                break
+            continue
+        if _fixed_header_columns(row) is not None:
+            continue
+
+        code_text = _interval_value(row, float("-inf"), code_name)
+        code_candidates = re.findall(r"[A-Z0-9][A-Z0-9/-]{2,}", code_text, flags=re.I)
+        code = next(
+            (
+                candidate.upper() for candidate in code_candidates
+                if re.search(r"[A-Z]", candidate) and re.search(r"\d", candidate)
+            ),
+            None,
+        )
+        name = _interval_value(row, code_name, name_unit)
+        unit = _interval_value(row, name_unit, unit_quantity)
+        quantity_text = _interval_value(row, unit_quantity, quantity_price)
+        quantity_match = re.search(r"(?<![\w])\d+(?:[.,]\d+)?(?![\w])", quantity_text)
+        quantity = _number(quantity_match.group(0)) if quantity_match else None
+        if not (code and name and unit and quantity is not None and quantity > 0):
+            continue
+
+        price_text = _interval_value(row, quantity_price, price_amount)
+        amount_text = _interval_value(row, price_amount, float("inf"))
+        price = _number(price_text) or 0.0
+        amount = _number(amount_text) or 0.0
+        products.append({
+            "linea": first_line + len(products),
+            "codigo": code,
+            "nombre": name[:240],
+            "u_med": unit,
+            "unidades": quantity,
+            "precio": price,
+            "importe": amount,
+            "confianza": min(float(block.get("confidence", 1.0)) for block in row),
+        })
+    return products
+
+
+def _parse_smart_final_order(blocks: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Parse Smart & Final pages and keep different purchase-order folios separate."""
+    full_text = " ".join(block.get("text", "") for block in blocks)
+    normalized_text = _normalized_layout_text(full_text)
+    if "smart" not in normalized_text or "final" not in normalized_text:
+        return None
+
+    pages: Dict[int, List[Dict[str, Any]]] = {}
+    for block in blocks:
+        pages.setdefault(int(block.get("page", 1)), []).append(block)
+
+    orders_by_folio: Dict[str, Dict[str, Any]] = {}
+    fallback_columns: Optional[Dict[str, float]] = None
+    for page_number in sorted(pages):
+        # The fixed purchase-order form places table headers and values only
+        # about 12 points apart vertically; a larger tolerance merges them.
+        rows = _group_rows(pages[page_number], tolerance=6.0)
+        folio = _fixed_order_folio(rows)
+        supplier = _fixed_order_supplier(rows)
+        page_text = " ".join(_row_text(row) for row in rows)
+        page_products: List[Dict[str, Any]] = []
+        columns = None
+        header_index = None
+        for index, row in enumerate(rows):
+            columns = _fixed_header_columns(row)
+            if columns is not None:
+                header_index = index
+                fallback_columns = columns
+                break
+
+        if header_index is not None and columns is not None:
+            page_products = _smart_final_products_for_page(
+                rows, header_index + 1, columns, 1
+            )
+        elif fallback_columns is not None:
+            # Continuation pages can omit repeated table headings. Reuse only the
+            # previous page's column map; a different folio still creates a new order.
+            page_products = _smart_final_products_for_page(rows, 0, fallback_columns, 1)
+
+        if not page_products:
+            continue
+
+        key = folio.upper() if folio else f"__page_{page_number}"
+        if key not in orders_by_folio:
+            orders_by_folio[key] = {
+                "folio": folio,
+                "fecha": _search(FECHA_PATTERN, page_text),
+                "total": _search(TOTAL_PATTERN, page_text),
+                "proveedor": supplier,
+                "proveedor_posible": supplier,
+                "productos": [],
+                "lineas_detectadas": [],
+            }
+
+        order = orders_by_folio[key]
+        order["proveedor"] = order["proveedor"] or supplier
+        order["proveedor_posible"] = order["proveedor"]
+        for product in page_products:
+            product["linea"] = len(order["productos"]) + 1
+            order["productos"].append(product)
+            order["lineas_detectadas"].append(product["nombre"])
+
+    orders = list(orders_by_folio.values())
+    if not orders:
+        return None
+    return {"ordenes": orders}
 
 
 def _extract_cliente(blocks: List[Dict]) -> Optional[str]:

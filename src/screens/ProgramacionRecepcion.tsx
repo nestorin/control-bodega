@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Select, type Proveedor, type Producto } from "./Configuracion";
 import { useOcr } from "../hooks/useOcr";
+import { OcrOrderSelector } from "@/components/OcrOrderSelector";
 import { isFeatureEnabled } from "@/config/featureFlags";
 import { createFirestoreServices } from "@/services/firestore";
 import { db } from "@/lib/firebase";
@@ -16,6 +17,7 @@ import { useAuthorization } from "@/hooks/useAuthorization";
 import { WAREHOUSE_IDS } from "@/config/warehouses";
 import { CANONICAL_SUPPLIER_SEED, mergeSupplierCatalog } from "@/config/supplierCatalog";
 import { buildTarimaQR } from "@/types/qrcode";
+import { getSelectedOcrOrder, type OcrOrder } from "@/services/domain/ocrMapper";
 import type {
   PlannedReceptionPallet,
   PlannedReceptionPalletDraft,
@@ -423,6 +425,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
       productConfirmed: boolean;
     }>
   >([]);
+  const [selectedOcrOrderIndex, setSelectedOcrOrderIndex] = useState<number | null>(null);
 
   // OCR
   const {
@@ -436,6 +439,10 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
     isPdfPreview,
   } = useOcr();
   const fileRef = useRef<HTMLInputElement>(null);
+  const ocrOrders = ocrResult?.parsed.ordenes ?? [];
+  const selectedOcrOrder = ocrResult
+    ? getSelectedOcrOrder(ocrResult.parsed, selectedOcrOrderIndex)
+    : null;
 
   // Firestore
   const { user, profile, canQuery } = useAuthorization();
@@ -480,6 +487,8 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
     if (!file) return;
 
     clear();
+    setSelectedOcrOrderIndex(null);
+    setProductos([]);
 
     try {
       // Para órdenes de compra, usar tipo "oc" en lugar de "cfdi"
@@ -489,10 +498,14 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
     }
   }
 
-  function procesarOCR() {
-    if (!ocrResult?.parsed?.productos?.length) return;
+  function procesarOCR(order: OcrOrder) {
+    if (!ocrResult || !order.productos.length) return;
 
-    const receptionLines = ocrResponseToReceptionLines(ocrResult);
+    const responseForOrder = {
+      ...ocrResult,
+      parsed: { ...ocrResult.parsed, ...order },
+    };
+    const receptionLines = ocrResponseToReceptionLines(responseForOrder);
     const matchedLines = matchReceptionLinesToCatalog(receptionLines, catalogos.productos);
     const matchedProducts = matchedLines.map((line, index) => {
       const cajasPorTarima =
@@ -511,17 +524,17 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
     });
 
     setProductos(matchedProducts);
-    if (ocrResult.parsed.proveedor) {
-      setProveedor(ocrResult.parsed.proveedor);
+    if (order.proveedor) {
+      setProveedor(order.proveedor);
     }
     // Buscar proveedor logístico si viene en OCR
   }
 
   useEffect(() => {
-    if (ocrResult?.parsed?.productos?.length) {
-      procesarOCR();
+    if (selectedOcrOrder?.productos.length) {
+      procesarOCR(selectedOcrOrder);
     }
-  }, [ocrResult]);
+  }, [ocrResult, selectedOcrOrderIndex]);
 
   function agregarProductoManual() {
     setProductos((prev) => [
@@ -720,6 +733,9 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
   async function handleGuardar() {
     // Validar
     const missing: string[] = [];
+    if (ocrOrders.length > 1 && selectedOcrOrderIndex === null) {
+      missing.push("Selecciona una orden de compra");
+    }
     if (!proveedor.trim()) missing.push("Proveedor");
     if (!proveedorLogistico.trim()) missing.push("Proveedor Logístico");
     if (productos.length === 0) missing.push("Al menos un producto");
@@ -788,7 +804,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
         folio,
         scheduledDate: fechaRecepcion,
         purchaseOrderNumber:
-          ocrResult?.tipo === "oc" ? (ocrResult.parsed.folio ?? undefined) : undefined,
+          ocrResult?.tipo === "oc" ? (selectedOcrOrder?.folio ?? undefined) : undefined,
         supplierCode: getSupplierKey(),
         plannedPallets: buildPalletPlan(),
       });
@@ -1482,6 +1498,22 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
               onChange={handleFileUpload}
             />
           </div>
+
+          {ocrError && (
+            <div
+              role="alert"
+              className="w-full rounded-[10px] border border-[#f5c6c2] bg-[#fce9e7] px-3 py-2 text-[12px] text-[#c0392b]"
+              style={{ fontFamily: "'Inter', sans-serif" }}
+            >
+              {ocrError}
+            </div>
+          )}
+
+          <OcrOrderSelector
+            orders={ocrOrders}
+            selectedIndex={selectedOcrOrderIndex}
+            onSelect={setSelectedOcrOrderIndex}
+          />
 
           {/* Sin OC */}
           <button

@@ -15,14 +15,18 @@ export interface RawOcrProductDto {
   confianza?: number;
 }
 
-export interface RawOcrParsedDto {
+export interface RawOcrOrderDto {
   folio?: string | null;
   fecha?: string | null;
   proveedor?: string | null;
-  proveedor_posible?: string | null;
   total?: string | null;
   productos?: RawOcrProductDto[];
   lineas_detectadas?: string[];
+}
+
+export interface RawOcrParsedDto extends RawOcrOrderDto {
+  proveedor_posible?: string | null;
+  ordenes?: RawOcrOrderDto[];
 }
 
 export interface RawOcrResponseDto {

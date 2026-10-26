@@ -38,6 +38,30 @@ def _check_rate_limit(user_id: str) -> bool:
     _rate_limit_store[user_id].append(now)
     return True
 
+
+def _has_valid_purchase_order(parsed: dict) -> bool:
+    orders = parsed.get("ordenes") or [parsed]
+    for order in orders:
+        folio = order.get("folio")
+        products = order.get("productos") or []
+        if not isinstance(folio, str) or not folio.strip():
+            continue
+        if any(
+            isinstance(product.get("nombre"), str)
+            and product["nombre"].strip()
+            and _positive_quantity(product.get("cantidad"))
+            for product in products
+        ):
+            return True
+    return False
+
+
+def _positive_quantity(value) -> bool:
+    try:
+        return float(value) > 0
+    except (TypeError, ValueError):
+        return False
+
 # ===== DECORADOR DE AUTENTICACIÓN =====
 def require_auth(func):
     """Decorator que verifica autenticación y App Check."""
@@ -120,6 +144,11 @@ def extract_ocr_secure(req: https_fn.CallableRequest) -> dict:
             parsed = parse_cfdi(ocr_result["blocks"])
         else:
             parsed = parse_orden_compra(ocr_result["blocks"])
+            if not _has_valid_purchase_order(parsed):
+                raise https_fn.HttpsError(
+                    "invalid-argument",
+                    "No se encontró una orden de compra válida. Verifica que el archivo tenga folio y productos legibles, o carga una orden compatible.",
+                )
         
         response = {
             "success": True,

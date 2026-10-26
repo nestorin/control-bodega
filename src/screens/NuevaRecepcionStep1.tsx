@@ -17,6 +17,8 @@ import {
   type ReceptionSubmissionStatus,
 } from "@/domains/reception/receptionSubmission";
 import { Panel, TouchTarget } from "@/components/ui";
+import { OcrOrderSelector } from "@/components/OcrOrderSelector";
+import { getSelectedOcrOrder } from "@/services/domain/ocrMapper";
 
 const assetPathPrefix = "/assets";
 const imgFileUp = `${assetPathPrefix}/928ba.svg`;
@@ -160,6 +162,11 @@ function NuevaRecepcionStep1Form({
   );
 
   const { runOcr, loading, result, error, clear, previewDataUrl } = useOcr();
+  const [selectedOcrOrderIndex, setSelectedOcrOrderIndex] = useState<number | null>(null);
+  const ocrOrders = result?.parsed.ordenes ?? [];
+  const selectedOcrOrder = result
+    ? getSelectedOcrOrder(result.parsed, selectedOcrOrderIndex)
+    : null;
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { user, canQuery } = useAuthorization();
@@ -214,7 +221,8 @@ function NuevaRecepcionStep1Form({
   );
 
   function matchProducts() {
-    const ocrProducts = result?.parsed.productos;
+    const ocrProducts = selectedOcrOrder?.productos;
+    if (result && (!selectedOcrOrder || !ocrProducts?.length)) return [];
     if (!ocrProducts?.length && initialData?.productos) {
       return initialData.productos;
     }
@@ -260,6 +268,19 @@ function NuevaRecepcionStep1Form({
     return tabla;
   }
 
+  useEffect(() => {
+    if (result) calcularConversionesYStickers();
+    // Recalculate only when a document/order changes, not when the table itself changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, selectedOcrOrderIndex]);
+
+  function selectOcrOrder(index: number) {
+    setSelectedOcrOrderIndex(index);
+    const order = ocrOrders[index];
+    if (order?.folio) setOcFolio(order.folio);
+    if (order?.proveedor) setProveedor(order.proveedor);
+  }
+
   // Initialize Firestore services
   useEffect(() => {
     if (useFirestore && db) {
@@ -289,6 +310,9 @@ function NuevaRecepcionStep1Form({
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    clear();
+    setSelectedOcrOrderIndex(null);
+    setConversionesTabla([]);
     try {
       await runOcr(file, getReceptionOcrDocumentType(hasOC ?? true));
       // Calcular conversiones y stickers después del OCR
@@ -299,6 +323,11 @@ function NuevaRecepcionStep1Form({
   };
 
   async function handleContinue() {
+    if (ocrOrders.length > 1 && selectedOcrOrderIndex === null) {
+      setSubmissionError("Selecciona una orden de compra antes de continuar.");
+      return;
+    }
+    setSubmissionError(null);
     const matchedProducts = matchProducts();
     // Calcular conversiones y stickers antes de continuar
     const tablaConversiones = calcularConversionesYStickers();
@@ -661,17 +690,25 @@ function NuevaRecepcionStep1Form({
                 style={{ fontFamily: "'Inter', sans-serif" }}
               >
                 <strong>OCR detectado:</strong>
-                {result.parsed.folio && <span> Folio: {result.parsed.folio}</span>}
-                {result.parsed.fecha && <span> Fecha: {result.parsed.fecha}</span>}
-                {result.parsed.proveedor && <span> Proveedor: {result.parsed.proveedor}</span>}
-                {result.parsed.total && <span> Total: ${result.parsed.total}</span>}
-                {result.parsed.productos && (
-                  <span> Productos: {result.parsed.productos.length}</span>
+                {selectedOcrOrder?.folio && <span> Folio: {selectedOcrOrder.folio}</span>}
+                {selectedOcrOrder?.fecha && <span> Fecha: {selectedOcrOrder.fecha}</span>}
+                {selectedOcrOrder?.proveedor && (
+                  <span> Proveedor: {selectedOcrOrder.proveedor}</span>
                 )}
+                {selectedOcrOrder?.total && <span> Total: ${selectedOcrOrder.total}</span>}
+                {selectedOcrOrder && <span> Productos: {selectedOcrOrder.productos.length}</span>}
                 <button onClick={clear} className="ml-2 underline text-[11px]">
                   Limpiar
                 </button>
               </div>
+            )}
+
+            {result && (
+              <OcrOrderSelector
+                orders={ocrOrders}
+                selectedIndex={selectedOcrOrderIndex}
+                onSelect={selectOcrOrder}
+              />
             )}
 
             {result?.preview?.dataUrl && (
@@ -687,7 +724,7 @@ function NuevaRecepcionStep1Form({
               </div>
             )}
 
-            {!!result?.parsed?.productos?.length && (
+            {!!selectedOcrOrder?.productos?.length && (
               <div className="bg-white border border-[#dce4e7] rounded-[10px] overflow-auto w-full">
                 <table className="w-full text-[11px]">
                   <thead className="bg-[#f4f8fc] text-left text-[#607078]">
@@ -702,7 +739,7 @@ function NuevaRecepcionStep1Form({
                     </tr>
                   </thead>
                   <tbody>
-                    {result.parsed.productos.map((line) => {
+                    {selectedOcrOrder.productos.map((line) => {
                       const matched = matchProducts().find(
                         (item) =>
                           item.codigo === (line.codigo?.toUpperCase() || null) &&
@@ -729,16 +766,16 @@ function NuevaRecepcionStep1Form({
               </div>
             )}
 
-            {result?.parsed?.folio && (
+            {selectedOcrOrder?.folio && (
               <div className="bg-[#e2f5ec] border border-[#16845b] rounded-[10px] px-3 py-2 w-full">
                 <p
                   className="text-[#16845b] text-[12px] font-bold"
                   style={{ fontFamily: "'Inter', sans-serif" }}
                 >
-                  ✓ Folio detectado: {result.parsed.folio} — ¿Usar este folio?
+                  ✓ Folio detectado: {selectedOcrOrder.folio} — ¿Usar este folio?
                 </p>
                 <button
-                  onClick={() => setOcFolio(result.parsed.folio!)}
+                  onClick={() => setOcFolio(selectedOcrOrder.folio!)}
                   className="mt-1 bg-[#16845b] text-white text-[11px] font-bold px-3 py-1 rounded-[8px] touch-target"
                   style={{ fontFamily: "'Inter', sans-serif" }}
                 >

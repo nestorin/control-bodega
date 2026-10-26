@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { normalizeOcrResponse } from "@/services/domain/ocrMapper";
+import { getSelectedOcrOrder, normalizeOcrResponse } from "@/services/domain/ocrMapper";
 import { WAREHOUSE_IDS } from "@/config/warehouses";
 import {
   getReceptionOcrDocumentType,
@@ -50,6 +50,44 @@ describe("OCR application contract", () => {
     ]);
     expect(result.parsed.productos[0]).not.toHaveProperty("unidades");
     expect(result.parsed.productos[0]).not.toHaveProperty("u_med");
+  });
+
+  it("keeps distinct purchase orders separate and requires an explicit selection", () => {
+    const result = normalizeOcrResponse(
+      {
+        success: true,
+        ocr: { blocks: [], full_text: "OC1437 OC1436" },
+        parsed: {
+          folio: "OC1437",
+          proveedor: "SMART & FINAL DEL NOROESTE",
+          productos: [{ codigo: "CB0401", nombre: "Agua mineral", unidad: "Caja", cantidad: 100 }],
+          ordenes: [
+            {
+              folio: "OC1437",
+              proveedor: "SMART & FINAL DEL NOROESTE",
+              productos: [
+                { codigo: "CB0401", nombre: "Agua mineral", unidad: "Caja", cantidad: 100 },
+              ],
+            },
+            {
+              folio: "OC1436",
+              proveedor: "SMART & FINAL DEL NOROESTE",
+              productos: [
+                { codigo: "CB0301", nombre: "Bebida cola", unidad: "Caja", cantidad: 100 },
+              ],
+            },
+          ],
+        },
+      },
+      "oc",
+    );
+
+    expect(getSelectedOcrOrder(result.parsed, null)).toBeNull();
+    expect(getSelectedOcrOrder(result.parsed, 1)).toMatchObject({
+      folio: "OC1436",
+      productos: [{ codigo: "CB0301", cantidad: 100 }],
+    });
+    expect(result.parsed.productos[0].codigo).toBe("CB0401");
   });
 
   it("selects OC vs CFDI explicitly", () => {
