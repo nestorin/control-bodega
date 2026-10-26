@@ -39,4 +39,39 @@ describe("CapturaTarima empty state", () => {
     fireEvent.click(screen.getByRole("button", { name: "Volver al inicio" }));
     expect(onBack).toHaveBeenCalledTimes(1);
   });
+
+  it("returns from an active QR capture and keeps navigation under the parent callback", () => {
+    const onBack = vi.fn();
+
+    render(
+      <CapturaTarima
+        onBack={onBack}
+        onFinish={vi.fn()}
+        almacenActivo={null}
+        onAumentarInventario={vi.fn()}
+        catalogos={{ productos: [] }}
+        currentReception={{
+          ocFolio: "OC-2026-001",
+          tarimas: 1,
+          proveedor: "Proveedor",
+          proveedorLogistico: "Logística",
+          plannedPallets: [
+            {
+              palletNumber: 1,
+              lineIndex: 0,
+              productId: "product-1",
+              productName: "Producto",
+              quantity: 2,
+              unit: "cajas",
+              qrIdentifier: "TQR-OC-2026-001-001",
+              status: "PLANNED",
+            },
+          ],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Regresar" }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
 });

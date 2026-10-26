@@ -51,6 +51,15 @@ const catalogsWithoutLogistics = {
 };
 
 describe("ProgramacionRecepcion controlled inputs", () => {
+  it("uses the manually entered purchase order number as the reception folio", () => {
+    render(<ProgramacionRecepcion onBack={vi.fn()} onFinish={vi.fn()} catalogos={catalogs} />);
+
+    const folio = screen.getByLabelText("Número de orden de compra o folio de recepción");
+    fireEvent.change(folio, { target: { value: "OC-2026-001" } });
+
+    expect(folio).toHaveValue("OC-2026-001");
+  });
+
   it("persists logistics selection when entering no-OC mode and advancing", () => {
     render(<ProgramacionRecepcion onBack={vi.fn()} onFinish={vi.fn()} catalogos={catalogs} />);
 

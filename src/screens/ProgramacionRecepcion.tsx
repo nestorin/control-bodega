@@ -385,7 +385,7 @@ function formatFecha(fecha: Date): string {
 
 export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1); // 1=Cargar OC, 2=Revisar/Editar, 3=Códigos listos
-  const [folio] = useState(() => generateFolio());
+  const [folio, setFolio] = useState(() => generateFolio());
   const [fechaRecepcion] = useState(() => formatFecha(new Date()));
 
   // Datos del formulario
@@ -457,6 +457,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
   const [notices, setNotices] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
   const [savedReceptionId, setSavedReceptionId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Códigos QR generados
   const [codigosQR, setCodigosQR] = useState<string[]>([]);
@@ -480,6 +481,10 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
 
   function calcularTarimas(cajas: number, cajasPorTarima: number): number {
     return Math.ceil(cajas / cajasPorTarima);
+  }
+
+  function selectZeroInput(event: React.FocusEvent<HTMLInputElement>) {
+    if (event.currentTarget.value === "0") event.currentTarget.select();
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -526,6 +531,9 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
     setProductos(matchedProducts);
     if (order.proveedor) {
       setProveedor(order.proveedor);
+    }
+    if (order.folio) {
+      setFolio(order.folio);
     }
     // Buscar proveedor logístico si viene en OCR
   }
@@ -730,12 +738,20 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
     return `Programación de Recepción\n\nFolio: ${folio}\nFecha: ${fechaRecepcion}\nProveedor: ${proveedor}\nLogística: ${proveedorLogistico}\n\nProductos:\n${productos.map((p, i) => `${i + 1}. ${p.nombre} - ${p.cantidad} cajas - ${p.tarimas} tarimas`).join("\n")}\n\nTotal Tarimas: ${totalTarimas()}`;
   }
 
-  async function handleGuardar() {
+  async function handleGuardar({ showCodes = true }: { showCodes?: boolean } = {}) {
+    if (saved) {
+      if (showCodes) setStep(3);
+      else
+        setNotices(["La programación ya está guardada y disponible para reanudar en Recepciones."]);
+      return;
+    }
+
     // Validar
     const missing: string[] = [];
     if (ocrOrders.length > 1 && selectedOcrOrderIndex === null) {
       missing.push("Selecciona una orden de compra");
     }
+    if (!folio.trim()) missing.push("Número de orden de compra / folio de recepción");
     if (!proveedor.trim()) missing.push("Proveedor");
     if (!proveedorLogistico.trim()) missing.push("Proveedor Logístico");
     if (productos.length === 0) missing.push("Al menos un producto");
@@ -756,122 +772,136 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
       return;
     }
 
-    let nextQrCodes: string[] = [];
-    let receptionId: string | null = null;
+    if (isSaving) return;
+    // Remove an older validation banner before the authorized save starts so it
+    // cannot briefly masquerade as a new validation failure while the request runs.
+    setNotices([]);
+    setIsSaving(true);
+    try {
+      let nextQrCodes: string[] = [];
+      let receptionId: string | null = null;
 
-    // Guardar en Firestore si está habilitado
-    if (useFirestore) {
-      if (!firestoreReady || !fsServices || !user) {
-        setNotices(["No se pudo iniciar una sesión válida para guardar"]);
-        return;
-      }
+      // Guardar en Firestore si está habilitado
+      if (useFirestore) {
+        if (!firestoreReady || !fsServices || !user) {
+          setNotices(["No se pudo iniciar una sesión válida para guardar"]);
+          return;
+        }
 
-      const operationId = `op-reception-${Date.now()}`;
-      const canonicalLines: ReceptionLineState[] = productos.map((product) => ({
-        productId: product.productId,
-        codigo: product.codigo,
-        nombre: product.nombre,
-        unidad: product.unidad,
-        cantidad: product.cantidad,
-        precio: 0,
-        importe: 0,
-        estadoMatch: product.conversionMatch ? "confirmado" : "sugerido",
-      }));
-      const lineErrors = canonicalLines.flatMap((line, index) => {
-        const result = validateReceptionLine(line);
-        return result.valid ? [] : [`Producto ${index + 1}: ${result.errors.join(", ")}`];
-      });
-      if (lineErrors.length > 0) {
-        setNotices(lineErrors);
-        return;
-      }
-      const persistence = mapReceptionFormToPersistence({
-        products: canonicalLines.map((line) => ({
-          productId: line.productId,
-          codigo: line.codigo,
-          nombre: line.nombre,
-          unidad: line.unidad,
-          cantidad: line.cantidad,
-          importe: line.importe,
-          estadoMatch: line.estadoMatch,
-        })),
-        warehouseId: profile?.warehouseId || WAREHOUSE_IDS.NORTH,
-        supplierId: catalogos.proveedores.find((item) => item.nombre === proveedor)?.id,
-        supplierName: proveedor,
-        logisticsProvider: proveedorLogistico,
-        actorUserId: user.uid,
-        operationId,
-        folio,
-        scheduledDate: fechaRecepcion,
-        purchaseOrderNumber:
-          ocrResult?.tipo === "oc" ? (selectedOcrOrder?.folio ?? undefined) : undefined,
-        supplierCode: getSupplierKey(),
-        plannedPallets: buildPalletPlan(),
-      });
-
-      if (persistence.lines.length === 0) {
-        setNotices(["Relaciona al menos un producto antes de guardar"]);
-        return;
-      }
-
-      try {
-        const reception = await fsServices.receptions.createReception(
-          persistence.reception,
-          persistence.lines,
-          user.uid,
-          operationId,
-        );
-        receptionId = reception.id;
-        if (!reception.plannedPallets?.length)
-          throw new Error("El servidor no devolvió el plan canónico de tarimas");
-        setPlannedPallets(reception.plannedPallets);
-        nextQrCodes = reception.plannedPallets.map((pallet) => pallet.qrIdentifier);
-        setCanonicalStickerHeader({
-          receptionId: reception.id,
-          folio: reception.folio || folio,
-          purchaseOrderId: reception.purchaseOrderId,
-          purchaseOrderNumber: reception.purchaseOrderNumber,
-          supplierCode: reception.supplierCode || getSupplierKey(),
-          scheduledDate: reception.scheduledDate || fechaRecepcion,
+        const operationId = `op-reception-${Date.now()}`;
+        const canonicalLines: ReceptionLineState[] = productos.map((product) => ({
+          productId: product.productId,
+          codigo: product.codigo,
+          nombre: product.nombre,
+          unidad: product.unidad,
+          cantidad: product.cantidad,
+          precio: 0,
+          importe: 0,
+          estadoMatch: product.conversionMatch ? "confirmado" : "sugerido",
+        }));
+        const lineErrors = canonicalLines.flatMap((line, index) => {
+          const result = validateReceptionLine(line);
+          return result.valid ? [] : [`Producto ${index + 1}: ${result.errors.join(", ")}`];
         });
-      } catch (e) {
-        console.error("Error guardando programación:", e);
-        const error = e as {
-          code?: unknown;
-          message?: unknown;
-        };
-        const code = typeof error.code === "string" ? error.code : "";
-        const message = typeof error.message === "string" ? error.message : "";
-        const detail = code.includes("permission-denied")
-          ? "No tenés permisos para guardar en el almacén seleccionado."
-          : code.includes("invalid-argument")
-            ? "Los datos de la recepción no cumplen el formato requerido."
-            : message || "El servicio autorizado rechazó la operación.";
-        setNotices([`No se pudo guardar la recepción: ${detail}`]);
-        return;
+        if (lineErrors.length > 0) {
+          setNotices(lineErrors);
+          return;
+        }
+        const persistence = mapReceptionFormToPersistence({
+          products: canonicalLines.map((line) => ({
+            productId: line.productId,
+            codigo: line.codigo,
+            nombre: line.nombre,
+            unidad: line.unidad,
+            cantidad: line.cantidad,
+            importe: line.importe,
+            estadoMatch: line.estadoMatch,
+          })),
+          warehouseId: profile?.warehouseId || WAREHOUSE_IDS.NORTH,
+          supplierId: catalogos.proveedores.find((item) => item.nombre === proveedor)?.id,
+          supplierName: proveedor,
+          logisticsProvider: proveedorLogistico,
+          actorUserId: user.uid,
+          operationId,
+          folio,
+          scheduledDate: fechaRecepcion,
+          purchaseOrderNumber: selectedOcrOrder?.folio || folio.trim() || undefined,
+          supplierCode: getSupplierKey(),
+          plannedPallets: buildPalletPlan(),
+        });
+
+        if (persistence.lines.length === 0) {
+          setNotices(["Relaciona al menos un producto antes de guardar"]);
+          return;
+        }
+
+        try {
+          const reception = await fsServices.receptions.createReception(
+            persistence.reception,
+            persistence.lines,
+            user.uid,
+            operationId,
+          );
+          receptionId = reception.id;
+          if (!reception.plannedPallets?.length)
+            throw new Error("El servidor no devolvió el plan canónico de tarimas");
+          setPlannedPallets(reception.plannedPallets);
+          nextQrCodes = reception.plannedPallets.map((pallet) => pallet.qrIdentifier);
+          setCanonicalStickerHeader({
+            receptionId: reception.id,
+            folio: reception.folio || folio,
+            purchaseOrderId: reception.purchaseOrderId,
+            purchaseOrderNumber: reception.purchaseOrderNumber || folio,
+            supplierCode: reception.supplierCode || getSupplierKey(),
+            scheduledDate: reception.scheduledDate || fechaRecepcion,
+          });
+        } catch (e) {
+          console.error("Error guardando programación:", e);
+          const error = e as {
+            code?: unknown;
+            message?: unknown;
+          };
+          const code = typeof error.code === "string" ? error.code : "";
+          const message = typeof error.message === "string" ? error.message : "";
+          const detail = code.includes("permission-denied")
+            ? "No tenés permisos para guardar en el almacén seleccionado."
+            : code.includes("invalid-argument")
+              ? "Los datos de la recepción no cumplen el formato requerido."
+              : message || "El servicio autorizado rechazó la operación.";
+          setNotices([`No se pudo guardar la recepción: ${detail}`]);
+          return;
+        }
       }
-    }
 
-    if (!useFirestore) {
-      const plan = buildPalletPlan().map((pallet, index) => ({
-        ...pallet,
-        qrIdentifier: buildTarimaQR(folio, index + 1),
-        status: "PLANNED" as const,
-      }));
-      setPlannedPallets(plan);
-      nextQrCodes = plan.map((pallet) => pallet.qrIdentifier);
-      setCanonicalStickerHeader({
-        receptionId: folio,
-        folio,
-        supplierCode: getSupplierKey(),
-        scheduledDate: fechaRecepcion,
-      });
-    }
+      if (!useFirestore) {
+        const plan = buildPalletPlan().map((pallet, index) => ({
+          ...pallet,
+          qrIdentifier: buildTarimaQR(folio, index + 1),
+          status: "PLANNED" as const,
+        }));
+        setPlannedPallets(plan);
+        nextQrCodes = plan.map((pallet) => pallet.qrIdentifier);
+        setCanonicalStickerHeader({
+          receptionId: folio,
+          folio,
+          purchaseOrderNumber: folio,
+          supplierCode: getSupplierKey(),
+          scheduledDate: fechaRecepcion,
+        });
+      }
 
-    setSavedReceptionId(receptionId);
-    setCodigosQR(nextQrCodes);
-    setSaved(true);
-    setStep(3);
+      setSavedReceptionId(receptionId);
+      setCodigosQR(nextQrCodes);
+      setSaved(true);
+      if (showCodes) setStep(3);
+      else setNotices(["Programación guardada. Podés reanudarla desde Recepciones."]);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function handleGuardarProgramacion() {
+    void handleGuardar({ showCodes: false });
   }
 
   async function handleEnviarWhatsApp() {
@@ -1348,11 +1378,21 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
       codigosQR,
       plannedPallets,
       purchaseOrderId: canonicalStickerHeader?.purchaseOrderId,
-      purchaseOrderNumber: canonicalStickerHeader?.purchaseOrderNumber,
+      purchaseOrderNumber: canonicalStickerHeader?.purchaseOrderNumber || folio,
       supplierCode: canonicalStickerHeader?.supplierCode || getSupplierKey(),
       scheduledDate: canonicalStickerHeader?.scheduledDate || fechaRecepcion,
     });
   }
+
+  const noticeTitle = notices.some((notice) => notice.startsWith("No se pudo guardar"))
+    ? "No se pudo guardar la programación:"
+    : notices.some(
+          (notice) =>
+            notice.startsWith("Programación guardada") || notice.startsWith("La programación ya"),
+        )
+      ? "Programación guardada:"
+      : "Faltan datos requeridos:";
+  const noticeIsSuccess = noticeTitle === "Programación guardada:";
 
   return (
     <div className="flex flex-col gap-4 sm:gap-[18px] items-start min-h-full w-full min-w-0 px-3 py-4 sm:p-6 lg:p-7 overflow-x-hidden">
@@ -1515,6 +1555,29 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
             onSelect={setSelectedOcrOrderIndex}
           />
 
+          <div className="w-full rounded-xl border border-[#dce4e7] bg-[#f8fafb] p-3">
+            <label
+              htmlFor="programming-reception-folio"
+              className="mb-1 block text-[12px] font-bold text-[#172126]"
+              style={{ fontFamily: "'Inter', sans-serif" }}
+            >
+              Número de orden de compra / folio de recepción
+            </label>
+            <input
+              id="programming-reception-folio"
+              name="purchaseOrderNumber"
+              aria-label="Número de orden de compra o folio de recepción"
+              value={folio}
+              onChange={(event) => setFolio(event.target.value)}
+              placeholder="Ej. OC-24891"
+              className="h-11 w-full rounded-lg border border-[#dce4e7] bg-white px-3 text-[13px] text-[#172126] outline-none focus:border-[#3276a8]"
+              style={{ fontFamily: "'Inter', sans-serif" }}
+            />
+            <p className="mt-1 text-[11px] text-[#607078]">
+              Este valor identifica y permite reanudar la recepción programada.
+            </p>
+          </div>
+
           {/* Sin OC */}
           <button
             onClick={() => setShowNoOCNotice(true)}
@@ -1662,6 +1725,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                                 aria-label={`Valor numérico 1`}
                                 type="number"
                                 value={p.cantidad}
+                                onFocus={selectZeroInput}
                                 onChange={(e) =>
                                   actualizarProducto(i, "cantidad", parseInt(e.target.value) || 0)
                                 }
@@ -1684,6 +1748,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                                 aria-label={`Valor numérico 2`}
                                 type="number"
                                 value={p.cajasPorTarima}
+                                onFocus={selectZeroInput}
                                 onChange={(e) =>
                                   actualizarProducto(
                                     i,
@@ -1846,6 +1911,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                                 aria-label={`Valor numérico 3`}
                                 type="number"
                                 value={p.cantidad}
+                                onFocus={selectZeroInput}
                                 onChange={(e) =>
                                   actualizarProducto(i, "cantidad", parseInt(e.target.value) || 0)
                                 }
@@ -1860,6 +1926,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                                 aria-label={`Valor numérico 4`}
                                 type="number"
                                 value={p.cajasPorTarima}
+                                onFocus={selectZeroInput}
                                 onChange={(e) =>
                                   actualizarProducto(
                                     i,
@@ -2256,6 +2323,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                           aria-label={`Valor numérico 5`}
                           type="number"
                           value={p.cantidad}
+                          onFocus={selectZeroInput}
                           onChange={(e) =>
                             actualizarProducto(i, "cantidad", parseInt(e.target.value) || 0)
                           }
@@ -2278,6 +2346,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                           aria-label={`Valor numérico 6`}
                           type="number"
                           value={p.cajasPorTarima}
+                          onFocus={selectZeroInput}
                           onChange={(e) =>
                             actualizarProducto(i, "cajasPorTarima", parseInt(e.target.value) || 0)
                           }
@@ -2433,6 +2502,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                           aria-label={`Valor numérico 7`}
                           type="number"
                           value={p.cantidad}
+                          onFocus={selectZeroInput}
                           onChange={(e) =>
                             actualizarProducto(i, "cantidad", parseInt(e.target.value) || 0)
                           }
@@ -2447,6 +2517,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                           aria-label={`Valor numérico 8`}
                           type="number"
                           value={p.cajasPorTarima}
+                          onFocus={selectZeroInput}
                           onChange={(e) =>
                             actualizarProducto(i, "cajasPorTarima", parseInt(e.target.value) || 0)
                           }
@@ -2521,20 +2592,30 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
 
           {/* Notices */}
           {notices.length > 0 && (
-            <div className="bg-[#fff8e6] border border-[#f2b84b] flex gap-3 items-start p-[14px] rounded-[12px] w-full">
-              <span className="text-[#f2b84b] text-[16px] shrink-0 mt-[1px]">⚠</span>
+            <div
+              className={`flex gap-3 items-start p-[14px] rounded-[12px] w-full ${
+                noticeIsSuccess
+                  ? "bg-[#e2f5ec] border border-[#16845b]"
+                  : "bg-[#fff8e6] border border-[#f2b84b]"
+              }`}
+            >
+              <span
+                className={`text-[16px] shrink-0 mt-[1px] ${noticeIsSuccess ? "text-[#16845b]" : "text-[#f2b84b]"}`}
+              >
+                {noticeIsSuccess ? "✓" : "⚠"}
+              </span>
               <div className="flex flex-col gap-1">
                 <p
-                  className="font-bold text-[#7a5c00] text-[13px]"
+                  className={`font-bold text-[13px] ${noticeIsSuccess ? "text-[#16845b]" : "text-[#7a5c00]"}`}
                   style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
                 >
-                  Faltan datos requeridos:
+                  {noticeTitle}
                 </p>
                 <ul className="flex flex-col gap-[2px]">
                   {notices.map((n) => (
                     <li
                       key={n}
-                      className="text-[#7a5c00] text-[12px]"
+                      className={`text-[12px] ${noticeIsSuccess ? "text-[#16845b]" : "text-[#7a5c00]"}`}
                       style={{ fontFamily: "'Inter', sans-serif" }}
                     >
                       · {n}
@@ -2576,16 +2657,46 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
               </p>
             </button>
             <button
-              onClick={handleGuardar}
-              className="bg-[#16343f] border border-[#16343f] flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 hover:bg-[#1e4456] transition-colors touch-target w-full md:w-auto"
+              type="button"
+              onClick={handleGuardarProgramacion}
+              disabled={isSaving}
+              aria-busy={isSaving}
+              className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#16845b] bg-[#e2f5ec] px-4 py-2 text-sm font-bold text-[#16845b] transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] touch-target w-full md:w-auto disabled:cursor-wait disabled:opacity-70"
             >
-              <img alt="" className="size-5 md:size-[18px]" src={imgArrowRight} />
-              <p
+              {isSaving ? (
+                <span
+                  className="size-4 animate-spin rounded-full border-2 border-[#16845b]/35 border-t-[#16845b]"
+                  aria-hidden="true"
+                />
+              ) : (
+                <span aria-hidden="true">✓</span>
+              )}
+              Guardar programación
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleGuardar()}
+              disabled={isSaving}
+              aria-busy={isSaving}
+              className="bg-[#16343f] border border-[#16343f] flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 hover:bg-[#1e4456] active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f2b84b] transition-all touch-target w-full md:w-auto disabled:cursor-wait disabled:opacity-70"
+            >
+              {isSaving ? (
+                <span
+                  className="size-5 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                  aria-hidden="true"
+                />
+              ) : (
+                <img alt="" className="size-5 md:size-[18px]" src={imgArrowRight} />
+              )}
+              <span
                 className="text-center font-bold text-white text-sm md:text-[15px] leading-tight"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
               >
-                Generar Códigos
-              </p>
+                {isSaving ? "Generando códigos..." : "Generar Códigos"}
+              </span>
+              <span className="sr-only" role="status" aria-live="polite">
+                {isSaving ? "La programación se está guardando" : ""}
+              </span>
             </button>
           </div>
         </div>
@@ -2698,22 +2809,37 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
               {codigosQR.slice(0, 20).map((qr, i) => (
                 <div
                   key={qr}
-                  className="bg-white border border-[#dce4e7] rounded-[12px] p-3 text-center"
+                  className="relative overflow-hidden rounded-[12px] border border-[#dce4e7] bg-white p-3 text-center shadow-sm"
                 >
                   <div
-                    className="bg-[#e7f0f2] rounded-[8px] aspect-square flex items-center justify-center mb-2"
-                    style={{ fontSize: 10 }}
-                  >
-                    📱 {qr}
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 opacity-[0.12]"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 120'%3E%3Cg fill='none' stroke='%2316343f' stroke-width='5'%3E%3Cpath d='M28 82h104M38 54h84M44 54v28M116 54v28M32 40h96v14H32zM52 28h56v12H52z'/%3E%3Cpath d='M24 84l12 20m92-20l-12 20M48 84l8 20m56-20l-8 20'/%3E%3C/g%3E%3C/svg%3E")`,
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "center",
+                      backgroundSize: "135%",
+                    }}
+                  />
+                  <div className="relative rounded-[8px] border border-white/70 bg-white/85 p-2 text-[10px] font-bold text-[#16343f]">
+                    <span className="block font-mono text-[9px]">{qr}</span>
+                    <span className="mt-1 block text-[10px] text-[#172126]">
+                      {plannedPallets[i]?.productName || "Producto por confirmar"}
+                    </span>
+                    <span className="block text-[10px] text-[#607078]">
+                      {plannedPallets[i]
+                        ? `${plannedPallets[i].quantity} ${plannedPallets[i].unit}`
+                        : ""}
+                    </span>
                   </div>
                   <p
-                    className="text-[11px] font-bold text-[#172126]"
+                    className="relative mt-2 text-[11px] font-bold text-[#172126]"
                     style={{ fontFamily: "'Inter', sans-serif" }}
                   >
                     Tarima {i + 1}
                   </p>
                   <p
-                    className="text-[10px] text-[#607078]"
+                    className="relative text-[10px] text-[#607078]"
                     style={{ fontFamily: "'Inter', sans-serif" }}
                   >
                     2 stickers
@@ -2737,7 +2863,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
             <div className="grid grid-cols-2 sm:flex gap-2 sm:gap-3 w-full">
               <button
                 onClick={handleImprimir}
-                className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 sm:px-4 py-2 touch-target transition-colors flex-1"
+                className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 sm:px-4 py-2 touch-target transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3276a8] flex-1"
                 style={{
                   background: "#16343f",
                   borderColor: "#16343f",
@@ -2754,7 +2880,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
               </button>
               <button
                 onClick={handleDescargarPDF}
-                className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 sm:px-4 py-2 touch-target transition-colors flex-1"
+                className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 sm:px-4 py-2 touch-target transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3276a8] flex-1"
                 style={{ background: "white", borderColor: "#dce4e7" }}
               >
                 <img src={imgDownload} alt="" className="size-4 sm:size-5 shrink-0" />
@@ -2767,7 +2893,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
               </button>
               <button
                 onClick={handleEnviarWhatsApp}
-                className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 sm:px-4 py-2 touch-target transition-colors flex-1"
+                className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 sm:px-4 py-2 touch-target transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3276a8] flex-1"
                 style={{
                   background: "#25D366",
                   borderColor: "#25D366",
@@ -2784,7 +2910,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
               </button>
               <button
                 onClick={handleEnviarEmail}
-                className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 sm:px-4 py-2 touch-target transition-colors flex-1"
+                className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 sm:px-4 py-2 touch-target transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3276a8] flex-1"
                 style={{
                   background: "#3276a8",
                   borderColor: "#3276a8",
@@ -2804,8 +2930,21 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
             {/* Segunda fila: Editar + Continuar */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between w-full">
               <button
+                type="button"
+                onClick={handleGuardarProgramacion}
+                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#16845b] bg-[#e2f5ec] px-4 py-2 text-[#16845b] transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] touch-target w-full sm:w-auto"
+              >
+                <span aria-hidden="true">✓</span>
+                <span
+                  className="text-center text-sm font-bold leading-tight"
+                  style={{ fontFamily: "'Inter', sans-serif" }}
+                >
+                  Guardar programación
+                </span>
+              </button>
+              <button
                 onClick={handleEditar}
-                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 touch-target transition-colors w-full sm:w-auto"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 touch-target transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3276a8] w-full sm:w-auto"
                 style={{
                   background: "white",
                   borderColor: "#f2b84b",
