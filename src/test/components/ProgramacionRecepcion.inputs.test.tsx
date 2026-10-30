@@ -142,6 +142,98 @@ describe("ProgramacionRecepcion controlled inputs", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("renders scannable PNG QR images for the generated pallet identifiers", async () => {
+    render(<ProgramacionRecepcion onBack={vi.fn()} onFinish={vi.fn()} catalogos={catalogs} />);
+
+    fireEvent.change(screen.getByLabelText("Número de orden de compra o folio de recepción"), {
+      target: { value: "OC-QR-TEST" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /No tengo Orden de Compra/ }));
+    fireEvent.change(screen.getByLabelText("Proveedor de mercancía"), {
+      target: { value: "Proveedor Norte" },
+    });
+    fireEvent.change(screen.getByLabelText("Proveedor logístico"), {
+      target: { value: "Logística Remota" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agregar primer producto" }));
+
+    const productInput = screen.getAllByPlaceholderText("Escribe para buscar...")[0];
+    fireEvent.change(productInput, { target: { value: "Producto Seleccionable" } });
+    fireEvent.click(screen.getByRole("button", { name: /Producto Seleccionable/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Confirmar producto" })[0]);
+    fireEvent.change(screen.getAllByRole("spinbutton")[0], { target: { value: "1" } });
+    fireEvent.change(screen.getAllByRole("spinbutton")[1], { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generar Códigos" }));
+
+    const [qrImage] = await screen.findAllByTestId("reception-pallet-qr");
+    expect(qrImage.getAttribute("src")).toMatch(/^data:image\/png;base64,iVBORw0KGgo/);
+    expect(qrImage.getAttribute("alt")).toContain("TQR-OC-QR-TEST-001");
+  });
+
+  it("rebuilds the QR plan from edits after an initial local generation", async () => {
+    render(<ProgramacionRecepcion onBack={vi.fn()} onFinish={vi.fn()} catalogos={catalogs} />);
+    fireEvent.change(screen.getByLabelText("Número de orden de compra o folio de recepción"), {
+      target: { value: "OC-EDIT-TEST" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /No tengo Orden de Compra/ }));
+    fireEvent.change(screen.getByLabelText("Proveedor de mercancía"), {
+      target: { value: "Proveedor Norte" },
+    });
+    fireEvent.change(screen.getByLabelText("Proveedor logístico"), {
+      target: { value: "Logística Remota" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agregar primer producto" }));
+
+    const productInput = screen.getAllByPlaceholderText("Escribe para buscar...")[0];
+    fireEvent.change(productInput, { target: { value: "Producto Seleccionable" } });
+    fireEvent.click(screen.getByRole("button", { name: /Producto Seleccionable/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Confirmar producto" })[0]);
+    fireEvent.change(screen.getAllByRole("spinbutton")[0], { target: { value: "2" } });
+    fireEvent.change(screen.getAllByRole("spinbutton")[1], { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generar Códigos" }));
+
+    expect(await screen.findAllByTestId("reception-pallet-qr")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: /Editar Programación/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    fireEvent.change(screen.getAllByRole("spinbutton")[1], { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generar Códigos" }));
+
+    expect(await screen.findAllByTestId("reception-pallet-qr")).toHaveLength(1);
+  });
+
+  it("shows a visible error when PDF creation fails instead of failing silently", async () => {
+    const createObjectUrl = vi.spyOn(URL, "createObjectURL").mockImplementation(() => {
+      throw new Error("download unavailable");
+    });
+    try {
+      render(<ProgramacionRecepcion onBack={vi.fn()} onFinish={vi.fn()} catalogos={catalogs} />);
+      fireEvent.click(screen.getByRole("button", { name: /No tengo Orden de Compra/ }));
+      fireEvent.change(screen.getByLabelText("Proveedor de mercancía"), {
+        target: { value: "Proveedor Norte" },
+      });
+      fireEvent.change(screen.getByLabelText("Proveedor logístico"), {
+        target: { value: "Logística Remota" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+      fireEvent.click(screen.getByRole("button", { name: "Agregar primer producto" }));
+
+      const productInput = screen.getAllByPlaceholderText("Escribe para buscar...")[0];
+      fireEvent.change(productInput, { target: { value: "Producto Seleccionable" } });
+      fireEvent.click(screen.getByRole("button", { name: /Producto Seleccionable/ }));
+      fireEvent.click(screen.getAllByRole("button", { name: "Confirmar producto" })[0]);
+      fireEvent.change(screen.getAllByRole("spinbutton")[0], { target: { value: "1" } });
+      fireEvent.change(screen.getAllByRole("spinbutton")[1], { target: { value: "1" } });
+      fireEvent.click(screen.getByRole("button", { name: "Generar Códigos" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Descargar PDF" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo generar el PDF");
+    } finally {
+      createObjectUrl.mockRestore();
+    }
+  });
+
   it("keeps product cards spacious and product actions touch-friendly on mobile", () => {
     render(<ProgramacionRecepcion onBack={vi.fn()} onFinish={vi.fn()} catalogos={catalogs} />);
     fireEvent.click(screen.getByRole("button", { name: /No tengo Orden de Compra/ }));

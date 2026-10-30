@@ -22,6 +22,83 @@ from receptions import (
 
 
 class ReceptionCommandContractTests(unittest.TestCase):
+    def test_edit_reception_rejects_after_capture_has_started(self):
+        class Reference:
+            def __init__(self, path):
+                self.path = path
+
+            def collection(self, collection_id):
+                return Collection(f"{self.path}/{collection_id}")
+
+            def document(self, document_id=None):
+                return Reference(f"{self.path}/{document_id or 'generated'}")
+
+        class Collection:
+            def __init__(self, path):
+                self.path = path
+
+            def document(self, document_id=None):
+                return Reference(f"{self.path}/{document_id or 'generated'}")
+
+        class Snapshot:
+            def __init__(self, data=None):
+                self.exists = data is not None
+                self._data = data
+
+            def to_dict(self):
+                return self._data
+
+        class Transaction:
+            def __init__(self):
+                self.writes = []
+
+            def get(self, reference):
+                return Snapshot({
+                    "warehouseId": "wh_tehuacan_1",
+                    "status": "IN_PROGRESS",
+                    "version": 2,
+                    "plannedPallets": [{"status": "IN_CAPTURE", "activated": False}],
+                } if reference.path.endswith("/receptions/reception-1") else None)
+
+            def update(self, *args):
+                self.writes.append(args)
+
+            def set(self, *args):
+                self.writes.append(args)
+
+        class Database:
+            def __init__(self, transaction):
+                self._transaction = transaction
+
+            def collection(self, collection_id):
+                return Collection(collection_id)
+
+            def transaction(self):
+                return self._transaction
+
+        transaction = Transaction()
+        request = SimpleNamespace(data={
+            "operationId": "edit-draft-1",
+            "receptionId": "reception-1",
+            "warehouseId": "wh_tehuacan_1",
+            "folio": "REC-1",
+            "lines": [{"productId": "product-1", "quantity": 2, "unit": "cajas"}],
+            "plannedPallets": [{
+                "palletNumber": 1, "lineIndex": 0, "productId": "product-1",
+                "productName": "Producto", "quantity": 2, "unit": "cajas",
+            }],
+        })
+
+        with (
+            patch.object(receptions.firestore, "client", return_value=Database(transaction)),
+            patch.object(receptions.firestore, "transactional", side_effect=lambda callback: callback),
+            patch.object(receptions, "_check_actor", return_value={"userId": "operator-1"}),
+        ):
+            with self.assertRaises(https_fn.HttpsError):
+                inspect.unwrap(receptions.edit_reception)(request)
+
+        self.assertEqual(transaction.writes, [])
+
     def test_digest_is_stable_for_key_order(self):
         self.assertEqual(_digest({"b": 2, "a": 1}), _digest({"a": 1, "b": 2}))
 

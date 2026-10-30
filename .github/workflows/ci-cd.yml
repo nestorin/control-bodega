@@ -313,7 +313,7 @@ jobs:
           # existing Auth before-create trigger is unchanged and updating its
           # Identity Toolkit config requires a separate permission not granted
           # to this deployment identity.
-          firebase deploy --only functions:create_reception,functions:register_reception_pallet,functions:confirm_reception,functions:save_evidence,functions:save_reception_pallet_capture,functions:validate_reception_pallet_scan --project exepa-almacen-safe
+          firebase deploy --only functions:create_reception,functions:edit_reception,functions:register_reception_pallet,functions:confirm_reception,functions:save_evidence,functions:save_reception_pallet_capture,functions:validate_reception_pallet_scan --project exepa-almacen-safe
 
       # Publish the frontend only after the rules and callable backend it uses.
       - name: Deploy to Firebase Hosting

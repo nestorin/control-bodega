@@ -17,6 +17,7 @@ import { useAuthorization } from "@/hooks/useAuthorization";
 import { WAREHOUSE_IDS } from "@/config/warehouses";
 import { CANONICAL_SUPPLIER_SEED, mergeSupplierCatalog } from "@/config/supplierCatalog";
 import { buildTarimaQR } from "@/types/qrcode";
+import { generateReceptionQrPngs } from "@/services/receptionQr";
 import { getSelectedOcrOrder, type OcrOrder } from "@/services/domain/ocrMapper";
 import type {
   PlannedReceptionPallet,
@@ -456,11 +457,19 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
   const [showNoOCNotice, setShowNoOCNotice] = useState(false);
   const [notices, setNotices] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
+  const [isEditingSavedReception, setIsEditingSavedReception] = useState(false);
   const [savedReceptionId, setSavedReceptionId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   // Códigos QR generados
   const [codigosQR, setCodigosQR] = useState<string[]>([]);
+  const [qrPreviewImages, setQrPreviewImages] = useState<Record<string, string>>({});
+  const [qrPreviewState, setQrPreviewState] = useState<"idle" | "loading" | "ready" | "error">(
+    "idle",
+  );
+  const [pdfAction, setPdfAction] = useState<"download" | "print" | null>(null);
+  const [pdfActionMessage, setPdfActionMessage] = useState("");
+  const [readyPdf, setReadyPdf] = useState<{ url: string; filename: string } | null>(null);
   const [plannedPallets, setPlannedPallets] = useState<PlannedReceptionPallet[]>([]);
   const [canonicalStickerHeader, setCanonicalStickerHeader] = useState<{
     receptionId: string;
@@ -478,6 +487,42 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
       setFirestoreReady(true);
     }
   }, [useFirestore]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (codigosQR.length === 0) {
+      setQrPreviewImages({});
+      setQrPreviewState("idle");
+      return;
+    }
+
+    setQrPreviewImages({});
+    setQrPreviewState("loading");
+    void generateReceptionQrPngs(codigosQR)
+      .then((images) => {
+        if (!cancelled) {
+          setQrPreviewImages(
+            Object.fromEntries(codigosQR.map((code, index) => [code, images[index]])),
+          );
+          setQrPreviewState("ready");
+        }
+      })
+      .catch((error) => {
+        console.error("No se pudieron generar los QR de vista previa:", error);
+        if (!cancelled) setQrPreviewState("error");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [codigosQR]);
+
+  useEffect(
+    () => () => {
+      if (readyPdf) URL.revokeObjectURL(readyPdf.url);
+    },
+    [readyPdf],
+  );
 
   function calcularTarimas(cajas: number, cajasPorTarima: number): number {
     return Math.ceil(cajas / cajasPorTarima);
@@ -738,8 +783,24 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
     return `Programación de Recepción\n\nFolio: ${folio}\nFecha: ${fechaRecepcion}\nProveedor: ${proveedor}\nLogística: ${proveedorLogistico}\n\nProductos:\n${productos.map((p, i) => `${i + 1}. ${p.nombre} - ${p.cantidad} cajas - ${p.tarimas} tarimas`).join("\n")}\n\nTotal Tarimas: ${totalTarimas()}`;
   }
 
+  function keepPdfAvailable(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob);
+    setReadyPdf({ url, filename });
+    return url;
+  }
+
+  function triggerPdfDownload(url: string, filename: string) {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
   async function handleGuardar({ showCodes = true }: { showCodes?: boolean } = {}) {
-    if (saved) {
+    if (saved && !isEditingSavedReception) {
       if (showCodes) setStep(3);
       else
         setNotices(["La programación ya está guardada y disponible para reanudar en Recepciones."]);
@@ -836,12 +897,21 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
         }
 
         try {
-          const reception = await fsServices.receptions.createReception(
-            persistence.reception,
-            persistence.lines,
-            user.uid,
-            operationId,
-          );
+          const reception =
+            isEditingSavedReception && savedReceptionId
+              ? await fsServices.receptions.editReception(
+                  savedReceptionId,
+                  persistence.reception,
+                  persistence.lines,
+                  user.uid,
+                  `op-edit-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+                )
+              : await fsServices.receptions.createReception(
+                  persistence.reception,
+                  persistence.lines,
+                  user.uid,
+                  operationId,
+                );
           receptionId = reception.id;
           if (!reception.plannedPallets?.length)
             throw new Error("El servidor no devolvió el plan canónico de tarimas");
@@ -893,6 +963,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
       setSavedReceptionId(receptionId);
       setCodigosQR(nextQrCodes);
       setSaved(true);
+      setIsEditingSavedReception(false);
       if (showCodes) setStep(3);
       else setNotices(["Programación guardada. Podés reanudarla desde Recepciones."]);
     } finally {
@@ -910,17 +981,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
     try {
       // Generar el PDF como blob
       const { default: jsPDF } = await import("jspdf");
-      const QRCode = (await import("qrcode")).default;
-
-      const qrDataUrls: string[] = [];
-      for (const codigo of codigosQR) {
-        const dataUrl = await QRCode.toDataURL(codigo, {
-          width: 512,
-          margin: 2,
-          errorCorrectionLevel: "H",
-        });
-        qrDataUrls.push(dataUrl);
-      }
+      const qrDataUrls = await generateReceptionQrPngs(codigosQR);
 
       const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -1084,156 +1145,156 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
   }
 
   async function handleDescargarPDF() {
-    if (!saved) return;
+    if (!saved || pdfAction) return;
 
-    // Importar jsPDF y qrcode dinámicamente
-    const { default: jsPDF } = await import("jspdf");
-    const QRCode = (await import("qrcode")).default;
+    setPdfAction("download");
+    setPdfActionMessage("");
+    try {
+      // Importar jsPDF y qrcode dinámicamente
+      const { default: jsPDF } = await import("jspdf");
+      const qrDataUrls = await generateReceptionQrPngs(codigosQR);
 
-    // Generar QR codes como data URLs usando qrcode library
-    const qrDataUrls: string[] = [];
-    for (const codigo of codigosQR) {
-      const dataUrl = await QRCode.toDataURL(codigo, {
-        width: 512,
-        margin: 2,
-        errorCorrectionLevel: "H",
+      // Crear PDF
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 15;
+      let y = margin;
+
+      // Función para agregar nueva página si no hay espacio
+      const checkSpace = (needed: number) => {
+        if (y + needed > pageHeight - margin) {
+          pdf.addPage();
+          y = margin;
+        }
+      };
+
+      // ===== ENCABEZADO =====
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(18);
+      pdf.setTextColor(22, 52, 63); // #16343f
+      pdf.text("PROGRAMACIÓN DE RECEPCIÓN — BODEGA Exapa", pageWidth / 2, y, {
+        align: "center",
       });
-      qrDataUrls.push(dataUrl);
-    }
+      y += 8;
 
-    // Crear PDF
-    const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 15;
-    let y = margin;
-
-    // Función para agregar nueva página si no hay espacio
-    const checkSpace = (needed: number) => {
-      if (y + needed > pageHeight - margin) {
-        pdf.addPage();
-        y = margin;
-      }
-    };
-
-    // ===== ENCABEZADO =====
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(18);
-    pdf.setTextColor(22, 52, 63); // #16343f
-    pdf.text("PROGRAMACIÓN DE RECEPCIÓN — BODEGA Exapa", pageWidth / 2, y, {
-      align: "center",
-    });
-    y += 8;
-
-    pdf.setFontSize(10);
-    pdf.setTextColor(96, 112, 120); // #607078
-    pdf.setFont("helvetica", "normal");
-    pdf.text(`Folio: ${folio}    |    Fecha Recepción: ${fechaRecepcion}`, pageWidth / 2, y, {
-      align: "center",
-    });
-    y += 5;
-    pdf.text(
-      `Clave proveedor: ${getSupplierKey()}    |    Logística: ${proveedorLogistico || "—"}`,
-      pageWidth / 2,
-      y,
-      { align: "center" },
-    );
-    y += 8;
-
-    // Línea separadora
-    pdf.setDrawColor(220, 228, 231); // #dce4e7
-    pdf.setLineWidth(0.5);
-    pdf.line(margin, y, pageWidth - margin, y);
-    y += 6;
-
-    // ===== TABLA DE PRODUCTOS =====
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(9);
-    pdf.setTextColor(22, 52, 63);
-
-    const colWidths = [105, 35, 35, 35, 35]; // Producto, Cajas, C/T, Tarimas, Match
-    const colStarts = [margin];
-    for (let i = 1; i < colWidths.length; i++) {
-      colStarts.push(colStarts[i - 1] + colWidths[i - 1]);
-    }
-
-    const headers = ["Producto", "Cajas", "C/T", "Tarimas", "Match"];
-    headers.forEach((h, i) => {
-      pdf.text(h, colStarts[i] + 2, y);
-    });
-    y += 5;
-
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(8);
-    pdf.setTextColor(23, 33, 38); // #172126
-
-    productos.forEach((p, idx) => {
-      checkSpace(6);
-      const matchText = p.conversionMatch ? "✓ Match" : "✗ Manual";
-      const matchColor: [number, number, number] = p.conversionMatch
-        ? [22, 132, 91]
-        : [192, 57, 43]; // verde/rojo
-
-      // Truncar nombre si es muy largo
-      const nombre = p.nombre.length > 32 ? p.nombre.substring(0, 29) + "..." : p.nombre;
-
-      pdf.text(nombre, colStarts[0] + 2, y);
-      pdf.text(p.cantidad.toString(), colStarts[1] + colWidths[1] - 2, y, {
-        align: "right",
+      pdf.setFontSize(10);
+      pdf.setTextColor(96, 112, 120); // #607078
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`Folio: ${folio}    |    Fecha Recepción: ${fechaRecepcion}`, pageWidth / 2, y, {
+        align: "center",
       });
-      pdf.text(p.cajasPorTarima.toString(), colStarts[2] + colWidths[2] - 2, y, { align: "right" });
-      pdf.text(p.tarimas.toString(), colStarts[3] + colWidths[3] - 2, y, {
-        align: "right",
-      });
-
-      pdf.setTextColor(...matchColor);
-      pdf.text(matchText, colStarts[4] + colWidths[4] - 2, y, {
-        align: "right",
-      });
-      pdf.setTextColor(23, 33, 38);
       y += 5;
-    });
+      pdf.text(
+        `Clave proveedor: ${getSupplierKey()}    |    Logística: ${proveedorLogistico || "—"}`,
+        pageWidth / 2,
+        y,
+        { align: "center" },
+      );
+      y += 8;
 
-    // Total tarimas
-    y += 3;
-    pdf.setDrawColor(220, 228, 231);
-    pdf.line(margin, y, pageWidth - margin, y);
-    y += 4;
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(10);
-    pdf.setTextColor(22, 52, 63);
-    pdf.text(`Total Tarimas: ${totalTarimas()}`, pageWidth - margin, y, {
-      align: "right",
-    });
-    y += 10;
+      // Línea separadora
+      pdf.setDrawColor(220, 228, 231); // #dce4e7
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, y, pageWidth - margin, y);
+      y += 6;
 
-    // ===== CÓDIGOS QR =====
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(12);
-    pdf.setTextColor(22, 52, 63);
-    appendStickerPages(pdf, qrDataUrls);
+      // ===== TABLA DE PRODUCTOS =====
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(9);
+      pdf.setTextColor(22, 52, 63);
 
-    // Guardar
-    pdf.save(`Programacion_${folio}.pdf`);
+      const colWidths = [105, 35, 35, 35, 35]; // Producto, Cajas, C/T, Tarimas, Match
+      const colStarts = [margin];
+      for (let i = 1; i < colWidths.length; i++) {
+        colStarts.push(colStarts[i - 1] + colWidths[i - 1]);
+      }
+
+      const headers = ["Producto", "Cajas", "C/T", "Tarimas", "Match"];
+      headers.forEach((h, i) => {
+        pdf.text(h, colStarts[i] + 2, y);
+      });
+      y += 5;
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8);
+      pdf.setTextColor(23, 33, 38); // #172126
+
+      productos.forEach((p, idx) => {
+        checkSpace(6);
+        const matchText = p.conversionMatch ? "✓ Match" : "✗ Manual";
+        const matchColor: [number, number, number] = p.conversionMatch
+          ? [22, 132, 91]
+          : [192, 57, 43]; // verde/rojo
+
+        // Truncar nombre si es muy largo
+        const nombre = p.nombre.length > 32 ? p.nombre.substring(0, 29) + "..." : p.nombre;
+
+        pdf.text(nombre, colStarts[0] + 2, y);
+        pdf.text(p.cantidad.toString(), colStarts[1] + colWidths[1] - 2, y, {
+          align: "right",
+        });
+        pdf.text(p.cajasPorTarima.toString(), colStarts[2] + colWidths[2] - 2, y, {
+          align: "right",
+        });
+        pdf.text(p.tarimas.toString(), colStarts[3] + colWidths[3] - 2, y, {
+          align: "right",
+        });
+
+        pdf.setTextColor(...matchColor);
+        pdf.text(matchText, colStarts[4] + colWidths[4] - 2, y, {
+          align: "right",
+        });
+        pdf.setTextColor(23, 33, 38);
+        y += 5;
+      });
+
+      // Total tarimas
+      y += 3;
+      pdf.setDrawColor(220, 228, 231);
+      pdf.line(margin, y, pageWidth - margin, y);
+      y += 4;
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10);
+      pdf.setTextColor(22, 52, 63);
+      pdf.text(`Total Tarimas: ${totalTarimas()}`, pageWidth - margin, y, {
+        align: "right",
+      });
+      y += 10;
+
+      // ===== CÓDIGOS QR =====
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(12);
+      pdf.setTextColor(22, 52, 63);
+      appendStickerPages(pdf, qrDataUrls);
+
+      const filename = `Programacion_${folio}.pdf`;
+      const url = keepPdfAvailable(pdf.output("blob"), filename);
+      triggerPdfDownload(url, filename);
+      setPdfActionMessage(
+        "PDF generado. Si la descarga automática no comenzó, usa el enlace de descarga que aparece abajo.",
+      );
+    } catch (error) {
+      console.error("Error generando o descargando el PDF de tarimas:", error);
+      setPdfActionMessage(
+        "No se pudo generar el PDF. Revisá el espacio disponible e intentá nuevamente.",
+      );
+    } finally {
+      setPdfAction(null);
+    }
   }
 
   async function handleImprimir() {
-    if (!saved) return;
+    if (!saved || pdfAction) return;
+
+    setPdfAction("print");
+    setPdfActionMessage("");
+    const printWindow = window.open("about:blank", "_blank");
 
     try {
       // Generar el mismo PDF que para descargar, pero abrir diálogo de impresión
       const { default: jsPDF } = await import("jspdf");
-      const QRCode = (await import("qrcode")).default;
-
-      const qrDataUrls: string[] = [];
-      for (const codigo of codigosQR) {
-        const dataUrl = await QRCode.toDataURL(codigo, {
-          width: 512,
-          margin: 2,
-          errorCorrectionLevel: "H",
-        });
-        qrDataUrls.push(dataUrl);
-      }
+      const qrDataUrls = await generateReceptionQrPngs(codigosQR);
 
       const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -1340,21 +1401,32 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
 
       // Abrir PDF en nueva ventana para imprimir
       const pdfBlob = pdf.output("blob");
-      const url = URL.createObjectURL(pdfBlob);
-      const printWindow = window.open(url, "_blank");
+      const filename = `Programacion_${folio}.pdf`;
+      const url = keepPdfAvailable(pdfBlob, filename);
       if (printWindow) {
+        printWindow.location.href = url;
         printWindow.onload = () => {
           printWindow.print();
         };
+        setPdfActionMessage(
+          "PDF abierto para imprimir. Si no aparece el diálogo, usa el enlace al PDF.",
+        );
+      } else {
+        setPdfActionMessage(
+          "El navegador bloqueó la ventana de impresión. El PDF está listo para abrir o descargar abajo.",
+        );
       }
     } catch (error) {
       console.error("Error generando PDF para imprimir:", error);
-      // Fallback
-      window.print();
+      printWindow?.close();
+      setPdfActionMessage("No se pudo preparar el PDF para imprimir. Intentá nuevamente.");
+    } finally {
+      setPdfAction(null);
     }
   }
 
   function handleEditar() {
+    setIsEditingSavedReception(true);
     setStep(1);
   }
 
@@ -2797,7 +2869,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
             </div>
           </div>
 
-          {/* Vista previa códigos QR (simplificada) */}
+          {/* Vista previa con QR auténtico, codificado con el mismo identificador impreso */}
           <div className="w-full">
             <p
               className="font-bold text-[#172126] text-[15px] mb-3"
@@ -2805,6 +2877,17 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
             >
               Códigos QR generados (2 stickers por tarima en hoja A4 horizontal)
             </p>
+            {qrPreviewState === "loading" && (
+              <p role="status" className="mb-3 text-sm text-[#607078]">
+                Generando vista previa de los códigos QR…
+              </p>
+            )}
+            {qrPreviewState === "error" && (
+              <p role="alert" className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">
+                No se pudieron generar los QR de vista previa. No se mostrarán códigos simulados;
+                intenta descargar el PDF o vuelve a generar la programación.
+              </p>
+            )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {codigosQR.slice(0, 20).map((qr, i) => (
                 <div
@@ -2821,7 +2904,21 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                       backgroundSize: "135%",
                     }}
                   />
-                  <div className="relative rounded-[8px] border border-white/70 bg-white/85 p-2 text-[10px] font-bold text-[#16343f]">
+                  <div className="relative mx-auto mb-2 flex min-h-36 w-36 items-center justify-center rounded-[8px] border border-white/70 bg-white p-2">
+                    {qrPreviewImages[qr] ? (
+                      <img
+                        src={qrPreviewImages[qr]}
+                        alt={`Código QR escaneable de tarima ${i + 1}: ${qr}`}
+                        className="size-32 object-contain"
+                        data-testid="reception-pallet-qr"
+                      />
+                    ) : (
+                      <span className="text-center text-xs text-[#607078]">
+                        {qrPreviewState === "error" ? "QR no disponible" : "Preparando QR…"}
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative rounded-[8px] border border-white/70 bg-white/90 p-2 text-[10px] font-bold text-[#16343f]">
                     <span className="block font-mono text-[9px]">{qr}</span>
                     <span className="mt-1 block text-[10px] text-[#172126]">
                       {plannedPallets[i]?.productName || "Producto por confirmar"}
@@ -2863,6 +2960,8 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
             <div className="grid grid-cols-2 sm:flex gap-2 sm:gap-3 w-full">
               <button
                 onClick={handleImprimir}
+                disabled={pdfAction !== null}
+                aria-busy={pdfAction === "print"}
                 className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 sm:px-4 py-2 touch-target transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3276a8] flex-1"
                 style={{
                   background: "#16343f",
@@ -2875,11 +2974,13 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                   className="text-center font-bold text-xs sm:text-sm leading-tight"
                   style={{ fontFamily: "'Inter', sans-serif" }}
                 >
-                  Imprimir
+                  {pdfAction === "print" ? "Preparando impresión…" : "Imprimir"}
                 </span>
               </button>
               <button
                 onClick={handleDescargarPDF}
+                disabled={pdfAction !== null}
+                aria-busy={pdfAction === "download"}
                 className="flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 sm:px-4 py-2 touch-target transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3276a8] flex-1"
                 style={{ background: "white", borderColor: "#dce4e7" }}
               >
@@ -2888,7 +2989,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                   className="text-center font-bold text-xs sm:text-sm text-[#172126] leading-tight"
                   style={{ fontFamily: "'Inter', sans-serif" }}
                 >
-                  Descargar PDF
+                  {pdfAction === "download" ? "Generando PDF…" : "Descargar PDF"}
                 </span>
               </button>
               <button
@@ -2926,6 +3027,26 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                 </span>
               </button>
             </div>
+
+            {pdfActionMessage && (
+              <div
+                role={pdfActionMessage.startsWith("No se pudo") ? "alert" : "status"}
+                className={`rounded-lg p-3 text-sm ${pdfActionMessage.startsWith("No se pudo") ? "bg-red-50 text-red-800" : "bg-[#e2f5ec] text-[#16343f]"}`}
+              >
+                <p>{pdfActionMessage}</p>
+                {readyPdf && (
+                  <a
+                    href={readyPdf.url}
+                    download={readyPdf.filename}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 inline-flex min-h-11 items-center rounded-lg border border-[#3276a8] bg-white px-4 font-bold text-[#3276a8] underline"
+                  >
+                    Abrir o descargar {readyPdf.filename}
+                  </a>
+                )}
+              </div>
+            )}
 
             {/* Segunda fila: Editar + Continuar */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between w-full">

@@ -423,6 +423,137 @@ def create_reception(req: https_fn.CallableRequest):
 
 
 @https_fn.on_call(cors=CORS_OPTS)
+def edit_reception(req: https_fn.CallableRequest):
+    """Replace a reception draft and its planned pallet QR set atomically."""
+    data = _data(req)
+    operation_id = _validate_operation_id(data.get("operationId"))
+    reception_id = _string(data.get("receptionId"), "receptionId", 160)
+    warehouse_id = _canonical_warehouse_id(_string(data.get("warehouseId"), "warehouseId", 128))
+    raw_lines = data.get("lines")
+    if not isinstance(raw_lines, list) or not raw_lines or len(raw_lines) > MAX_LINES:
+        raise https_fn.HttpsError("invalid-argument", "lines is invalid")
+    normalized_lines = []
+    for index, line in enumerate(raw_lines):
+        if not isinstance(line, dict):
+            raise https_fn.HttpsError("invalid-argument", "Invalid reception line")
+        quantity = line.get("quantity")
+        if isinstance(quantity, bool) or not isinstance(quantity, int) or not 1 <= quantity <= 100000:
+            raise https_fn.HttpsError("invalid-argument", "Invalid reception quantity")
+        normalized_lines.append({
+            "index": index,
+            "productId": _string(line.get("productId"), "productId", 128),
+            "quantity": quantity,
+            "unit": _string(line.get("unit", "cajas"), "unit", 32),
+            "lot": _string(line.get("lot"), "lot", 128, False),
+        })
+    planned_pallets = _normalize_planned_pallets(
+        reception_id, normalized_lines, data.get("plannedPallets")
+    )
+    payload = {
+        "receptionId": reception_id,
+        "warehouseId": warehouse_id,
+        "lines": normalized_lines,
+        "plannedPallets": planned_pallets,
+        "supplierId": _string(data.get("supplierId"), "supplierId", 128, False),
+        "purchaseOrderId": _string(data.get("purchaseOrderId"), "purchaseOrderId", 128, False),
+        "purchaseOrderNumber": _string(data.get("purchaseOrderNumber"), "purchaseOrderNumber", 128, False),
+        "folio": _string(data.get("folio"), "folio", 128),
+        "scheduledDate": _string(data.get("scheduledDate"), "scheduledDate", 32, False),
+        "supplierCode": _string(data.get("supplierCode"), "supplierCode", 64, False),
+        "supplierName": _string(data.get("supplierName"), "supplierName", 256, False),
+        "logisticsProvider": _string(data.get("logisticsProvider"), "logisticsProvider", 256, False),
+    }
+    payload["productName"] = ", ".join(dict.fromkeys(pallet["productName"] for pallet in planned_pallets))
+    digest = _digest(payload)
+    db = firestore.client()
+    root = db.collection("organizations").document(ORG_ID)
+    reception_ref = root.collection("receptions").document(reception_id)
+    lines_ref = reception_ref.collection("lines")
+    operation_ref = root.collection("reception_operations").document(operation_id)
+
+    @firestore.transactional
+    def txn(transaction):
+        snapshot = _transaction_snapshot(transaction, reception_ref)
+        if snapshot is None or not snapshot.exists:
+            raise https_fn.HttpsError("not-found", "Reception not found")
+        reception = snapshot.to_dict() or {}
+        actor = _check_actor(req, db, warehouse_id)
+        previous = _transaction_snapshot(transaction, operation_ref)
+        if previous is not None and previous.exists:
+            return _operation_result(previous, "edit_reception", digest)
+        expected = _version(data.get("expectedVersion"))
+        current_version = reception.get("version", 0)
+        if reception.get("warehouseId") != warehouse_id:
+            raise https_fn.HttpsError("permission-denied", "Reception warehouse cannot change")
+        if expected is not None and expected != current_version:
+            raise _error("Reception version precondition failed")
+        if reception.get("status") != "DRAFT":
+            raise _error("Only DRAFT receptions can be edited")
+        existing_plan = reception.get("plannedPallets", [])
+        if not isinstance(existing_plan, list) or any(
+            pallet.get("status") != "PLANNED" or pallet.get("activated")
+            for pallet in existing_plan
+        ):
+            raise _error("Reception pallet capture has already started")
+        old_lines_snapshot = transaction.get(lines_ref)
+        old_lines = list(old_lines_snapshot) if old_lines_snapshot is not None else []
+        if len(old_lines) + len(normalized_lines) + 3 > 500:
+            raise https_fn.HttpsError(
+                "resource-exhausted", "Reception has too many lines to replace atomically"
+            )
+        now = firestore.SERVER_TIMESTAMP
+        transaction.update(reception_ref, {
+            "supplierId": payload["supplierId"],
+            "purchaseOrderId": payload["purchaseOrderId"],
+            "purchaseOrderNumber": payload["purchaseOrderNumber"],
+            "folio": payload["folio"],
+            "scheduledDate": payload["scheduledDate"],
+            "supplierCode": payload["supplierCode"],
+            "supplierName": payload["supplierName"],
+            "logisticsProvider": payload["logisticsProvider"],
+            "productName": payload["productName"],
+            "palletCount": len(planned_pallets),
+            "plannedPallets": planned_pallets,
+            "version": current_version + 1,
+            "updatedAt": now,
+        })
+        for old_line in old_lines:
+            transaction.delete(old_line.reference)
+        for line in normalized_lines:
+            line_id = f"line-{operation_id}-{line['index']}"
+            transaction.set(lines_ref.document(line_id), {
+                "id": line_id, "organizationId": ORG_ID, "receptionId": reception_id,
+                "productId": line["productId"], "quantity": line["quantity"],
+                "unit": line["unit"], "lot": line["lot"], "palletsCreated": 0,
+                "createdAt": now, "updatedAt": now,
+            })
+        audit_ref = root.collection("audit_events").document()
+        transaction.set(audit_ref, {
+            "organizationId": ORG_ID, "warehouseId": warehouse_id,
+            "entityType": "reception", "entityId": reception_id, "action": "EDIT_DRAFT",
+            "actorUserId": actor["userId"], "operationId": operation_id,
+            "occurredAt": now, "schemaVersion": 1,
+        })
+        result = {
+            "receptionId": reception_id, "folio": payload["folio"],
+            "scheduledDate": payload["scheduledDate"],
+            "purchaseOrderId": payload["purchaseOrderId"],
+            "purchaseOrderNumber": payload["purchaseOrderNumber"],
+            "supplierCode": payload["supplierCode"], "supplierName": payload["supplierName"],
+            "logisticsProvider": payload["logisticsProvider"], "productName": payload["productName"],
+            "palletCount": len(planned_pallets), "plannedPallets": planned_pallets,
+            "version": current_version + 1, "idempotent": False,
+        }
+        transaction.set(operation_ref, {
+            "kind": "edit_reception", "payloadDigest": digest, "result": result,
+            "actorUserId": actor["userId"], "createdAt": now,
+        })
+        return result
+
+    return txn(db.transaction())
+
+
+@https_fn.on_call(cors=CORS_OPTS)
 def register_reception_pallet(req: https_fn.CallableRequest):
     data = _data(req)
     operation_id = _validate_operation_id(data.get("operationId"))

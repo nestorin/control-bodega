@@ -9,6 +9,7 @@ from membership_provisioning import provision_membership_before_auth_user_create
 from receptions import (
     confirm_reception,
     create_reception,
+    edit_reception,
     register_reception_pallet,
     save_evidence,
     save_reception_pallet_capture,

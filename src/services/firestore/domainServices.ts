@@ -266,7 +266,72 @@ export class ReceptionService extends BaseService<ReceptionDoc> {
       productName: response.productName ?? data.productName,
       palletCount: response.palletCount ?? data.palletCount,
       ...(response.plannedPallets ? { plannedPallets: response.plannedPallets } : {}),
-    } as ReceptionDoc;
+    } as unknown as ReceptionDoc;
+  }
+
+  async editReception(
+    receptionId: string,
+    data: ReceptionCreateInput,
+    lines: Array<
+      Omit<ReceptionLineDoc, "id" | "createdAt" | "updatedAt" | "organizationId" | "receptionId">
+    >,
+    actorUserId: string,
+    operationId: string,
+  ): Promise<ReceptionDoc> {
+    const edit = httpsCallable(getFunctions(), "edit_reception");
+    const result = await edit({
+      operationId,
+      receptionId,
+      warehouseId: data.warehouseId,
+      supplierId: data.supplierId,
+      purchaseOrderId: data.purchaseOrderId,
+      purchaseOrderNumber: data.purchaseOrderNumber,
+      folio: data.folio,
+      scheduledDate: data.scheduledDate,
+      supplierCode: data.supplierCode,
+      supplierName: data.supplierName,
+      logisticsProvider: data.logisticsProvider,
+      plannedPallets: data.plannedPallets,
+      lines: lines.map((line) => ({
+        productId: line.productId,
+        quantity: line.quantity,
+        unit: line.unit,
+        lot: line.lot || null,
+      })),
+    });
+    const response = result.data as {
+      receptionId?: string;
+      folio?: string;
+      scheduledDate?: string;
+      purchaseOrderId?: string;
+      purchaseOrderNumber?: string;
+      supplierCode?: string;
+      supplierName?: string;
+      logisticsProvider?: string;
+      productName?: string;
+      palletCount?: number;
+      version?: number;
+      plannedPallets?: ReceptionDoc["plannedPallets"];
+    };
+    if (response?.receptionId !== receptionId || !Array.isArray(response.plannedPallets)) {
+      throw new Error("edit_reception returned an incomplete canonical reception");
+    }
+    return {
+      ...data,
+      id: receptionId,
+      organizationId: this.orgId,
+      folio: response.folio ?? data.folio,
+      scheduledDate: response.scheduledDate ?? data.scheduledDate,
+      purchaseOrderId: response.purchaseOrderId ?? data.purchaseOrderId,
+      purchaseOrderNumber: response.purchaseOrderNumber ?? data.purchaseOrderNumber,
+      supplierCode: response.supplierCode ?? data.supplierCode,
+      supplierName: response.supplierName ?? data.supplierName,
+      logisticsProvider: response.logisticsProvider ?? data.logisticsProvider,
+      productName: response.productName ?? data.productName,
+      palletCount: response.palletCount ?? response.plannedPallets.length,
+      plannedPallets: response.plannedPallets,
+      version: response.version,
+    } as unknown as ReceptionDoc;
   }
 
   // Update reception
