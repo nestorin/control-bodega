@@ -510,6 +510,10 @@ def register_reception_pallet(req: https_fn.CallableRequest):
         if pallet_snapshot is not None and pallet_snapshot.exists:
             raise _error("pallet id collision")
         now = firestore.SERVER_TIMESTAMP
+        # Firestore transforms cannot appear inside array elements. Keep the
+        # server transform on direct document fields and materialize the
+        # activation instant before replacing the planned-pallet array.
+        activated_at = datetime.now(timezone.utc)
         transaction.set(pallet_ref, {"id": pallet_id, "organizationId": ORG_ID,
             "warehouseId": warehouse_id, "receptionId": reception_id, "qrIdentifier": qr,
             "palletNumber": planned_pallet.get("palletNumber"),
@@ -529,7 +533,7 @@ def register_reception_pallet(req: https_fn.CallableRequest):
         if planned_pallet is not None:
             reception_update["plannedPallets"] = [
                 {**item, "status": "ACTIVE", "activated": True, "palletId": pallet_id,
-                 "activatedAt": now} if item.get("qrIdentifier") == qr else item
+                 "activatedAt": activated_at} if item.get("qrIdentifier") == qr else item
                 for item in planned_pallets
             ]
         transaction.update(reception_ref, reception_update)

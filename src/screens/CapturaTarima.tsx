@@ -6,6 +6,7 @@ import { WAREHOUSE_IDS } from "@/config/warehouses";
 import { useAuthorization } from "@/hooks/useAuthorization";
 import { Timestamp } from "firebase/firestore";
 import { resolveCatalogProduct } from "@/services/domain/productMatching";
+import { palletRegistrationErrorMessage } from "@/services/palletRegistrationError";
 import { Panel } from "@/components/ui";
 import { parseTarimaQR, buildTarimaQR } from "@/types/qrcode";
 import type { PlannedReceptionPallet } from "@/services/firestore/types";
@@ -549,9 +550,7 @@ export default function CapturaTarima({
       } catch (e) {
         console.error("Authorized pallet registration failed:", e);
         setIsSaving(false);
-        alert(
-          "No se pudo registrar la tarima. Verificá tu conexión y permisos e intentá nuevamente.",
-        );
+        alert(palletRegistrationErrorMessage(e));
         return;
       }
     }

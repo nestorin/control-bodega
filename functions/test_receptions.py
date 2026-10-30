@@ -1,7 +1,13 @@
+import inspect
 import unittest
+from datetime import datetime, timezone
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from firebase_functions import https_fn
+from firebase_admin import firestore
 
+import receptions
 from receptions import (
     _canonical_warehouse_id,
     _digest,
@@ -165,6 +171,105 @@ class ReceptionCommandContractTests(unittest.TestCase):
                         [{"productId": "prod-1", "quantity": 1, "unit": "cajas"}],
                         [{**base, "palletNumber": invalid_number}],
                     )
+
+    def test_register_pallet_materializes_activation_timestamp_in_planned_array(self):
+        class Reference:
+            def __init__(self, path):
+                self.path = path
+                self.id = path.rsplit("/", 1)[-1]
+
+            def collection(self, collection_id):
+                return Collection(f"{self.path}/{collection_id}")
+
+        class Collection:
+            def __init__(self, path):
+                self.path = path
+
+            def document(self, document_id=None):
+                return Reference(f"{self.path}/{document_id or 'generated'}")
+
+        class Snapshot:
+            def __init__(self, data=None):
+                self.exists = data is not None
+                self._data = data
+
+            def to_dict(self):
+                return self._data
+
+        class Transaction:
+            def __init__(self, documents):
+                self.documents = documents
+                self.updates = []
+                self.sets = []
+
+            def get(self, reference):
+                return Snapshot(self.documents.get(reference.path))
+
+            def set(self, reference, data):
+                self.sets.append((reference, data))
+
+            def update(self, reference, data):
+                self.updates.append((reference, data))
+
+        class Database:
+            def __init__(self, transaction):
+                self._transaction = transaction
+
+            def collection(self, collection_id):
+                return Collection(collection_id)
+
+            def transaction(self):
+                return self._transaction
+
+        reception_id = "reception-1"
+        qr_identifier = "TQR-reception-1-001"
+        root = f"organizations/{receptions.ORG_ID}"
+        transaction = Transaction({
+            f"{root}/receptions/{reception_id}": {
+                "organizationId": receptions.ORG_ID,
+                "warehouseId": "wh_tehuacan_1",
+                "status": "IN_PROGRESS",
+                "version": 4,
+                "plannedPallets": [{
+                    "palletId": "pallet-reception-1-001",
+                    "receptionId": reception_id,
+                    "palletNumber": 1,
+                    "productId": "product-1",
+                    "quantity": 24,
+                    "unit": "cajas",
+                    "qrIdentifier": qr_identifier,
+                    "status": "IN_CAPTURE",
+                    "activated": False,
+                    "lot": "L-001",
+                    "expiryDate": "2027-03-15",
+                }],
+            },
+        })
+        request = SimpleNamespace(data={
+            "operationId": "register-pallet-1",
+            "receptionId": reception_id,
+            "warehouseId": "wh_tehuacan_1",
+            "productId": "product-1",
+            "qrIdentifier": qr_identifier,
+            "quantity": 24,
+            "unit": "cajas",
+            "lot": "L-001",
+            "expiryDate": "2027-03-15",
+        })
+
+        with (
+            patch.object(receptions.firestore, "client", return_value=Database(transaction)),
+            patch.object(receptions.firestore, "transactional", side_effect=lambda callback: callback),
+            patch.object(receptions, "_check_actor", return_value={"userId": "operator-1"}),
+        ):
+            inspect.unwrap(receptions.register_reception_pallet)(request)
+
+        self.assertEqual(len(transaction.updates), 1)
+        planned_pallet = transaction.updates[0][1]["plannedPallets"][0]
+        self.assertIsInstance(planned_pallet["activatedAt"], datetime)
+        self.assertEqual(planned_pallet["activatedAt"].tzinfo, timezone.utc)
+        self.assertIsNot(planned_pallet["activatedAt"], firestore.SERVER_TIMESTAMP)
+        self.assertIs(transaction.updates[0][1]["updatedAt"], firestore.SERVER_TIMESTAMP)
 
 
 if __name__ == "__main__":
