@@ -2,8 +2,12 @@ import { useState, useRef, useEffect } from "react";
 import { isFeatureEnabled } from "@/config/featureFlags";
 import { createFirestoreServices } from "@/services/firestore";
 import { db, storage } from "@/lib/firebase";
-import { uploadInvoicePreview } from "@/services/invoiceEvidence";
 import { useAuthorization } from "@/hooks/useAuthorization";
+import { deleteObject, ref, uploadBytes } from "firebase/storage";
+import {
+  buildAuthenticatedEvidenceLink,
+  buildEvidenceShareMessage,
+} from "@/services/evidenceShare";
 
 const imgArrowRight = "/assets/55de6.svg";
 const ORG_ID = "org_exepa_001";
@@ -27,6 +31,8 @@ interface Props {
   receptionId?: string;
   currentReception?: {
     proveedor?: string;
+    proveedorLogistico?: string;
+    warehouseId?: string;
     productos?: Array<{ nombre?: string }>;
     tarimas?: number;
     caducidad?: string;
@@ -100,12 +106,18 @@ function TrailerIcon({ size = 56 }: { size?: number }) {
   );
 }
 
-function PhotoUploadBox({ slot, onFile }: { slot: PhotoSlot; onFile: (url: string) => void }) {
+function PhotoUploadBox({
+  slot,
+  onFile,
+}: {
+  slot: PhotoSlot;
+  onFile: (file: File, url: string) => void;
+}) {
   const ref = useRef<HTMLInputElement>(null);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
-    if (f) onFile(URL.createObjectURL(f));
+    if (f) onFile(f, URL.createObjectURL(f));
   }
 
   return (
@@ -187,6 +199,7 @@ function PhotoUploadBox({ slot, onFile }: { slot: PhotoSlot; onFile: (url: strin
 
 export default function CapturaEvidencia({ onContinue, currentReception, receptionId }: Props) {
   const [photos, setPhotos] = useState<[string | null, string | null]>([null, null]);
+  const [photoFiles, setPhotoFiles] = useState<[File | null, File | null]>([null, null]);
   const [form, setForm] = useState<EvidenceForm>({
     proveedor: currentReception?.proveedor || "",
     item: currentReception?.productos?.[0]?.nombre || "",
@@ -243,37 +256,53 @@ export default function CapturaEvidencia({ onContinue, currentReception, recepti
   }, [useFirestore]);
 
   function buildWhatsAppMessage() {
-    return [
-      "🏭 *RECEPCIÓN DE MERCANCÍA — BODEGA Exapa*",
-      "━━━━━━━━━━━━━━━━━━━━",
-      `📅 Fecha: 19 Sep 2026 · 09:42`,
-      "",
-      "📋 *Información de la mercancía*",
-      `• Proveedor: ${form.proveedor || "_(sin capturar)_"}`,
-      `• Ítem a recibir: ${form.item || "_(sin capturar)_"}`,
-      `• Tarimas a recibir: ${form.tarimas || "_(sin capturar)_"}`,
-      `• Caducidad del producto: ${form.caducidad || "_(sin capturar)_"}`,
-      `• Lote: ${form.lote || "_(sin capturar)_"}`,
-      "",
-      `📷 Fotos adjuntas: ${[photos[0], photos[1]].filter(Boolean).length} / 2`,
-      `  ${photos[0] ? "✅" : "⬜"} Mercancía dentro del tráiler`,
-      `  ${photos[1] ? "✅" : "⬜"} Producto y caducidad`,
-      "━━━━━━━━━━━━━━━━━━━━",
-      "_Enviado desde TarimaQR_",
-    ].join("\n");
+    return buildEvidenceShareMessage({
+      receptionId: receptionId || "Sin recepción",
+      supplier: form.proveedor,
+      item: form.item,
+      palletCount: form.tarimas,
+      evidenceLink: receptionId ? buildAuthenticatedEvidenceLink(receptionId) : null,
+    });
   }
 
   async function saveEvidenceToFirestore(): Promise<boolean> {
     if (!useFirestore || !firestoreReady || !fsServices) return true;
 
     try {
-      if (receptionId && user) {
-        // Convert blob URLs to base64 for storage (in production use Storage)
-        await fsServices.receptions.saveEvidence(
-          receptionId,
-          { trailer: photos[0] || undefined, product: photos[1] || undefined },
-          `op-evidence-${Date.now()}`,
-        );
+      const warehouseId = currentReception?.warehouseId;
+      if (receptionId && user && storage && warehouseId && photoFiles[0] && photoFiles[1]) {
+        const extension = (file: File) => {
+          if (file.type === "image/png") return "png";
+          if (file.type === "image/webp") return "webp";
+          return "jpg";
+        };
+        const evidencePhotos = {
+          trailer: `organizations/${ORG_ID}/warehouses/${warehouseId}/receptions/${receptionId}/evidence/trailer.${extension(photoFiles[0])}`,
+          product: `organizations/${ORG_ID}/warehouses/${warehouseId}/receptions/${receptionId}/evidence/product.${extension(photoFiles[1])}`,
+        };
+        await Promise.all([
+          uploadBytes(ref(storage, evidencePhotos.trailer), photoFiles[0], {
+            contentType: photoFiles[0].type,
+          }),
+          uploadBytes(ref(storage, evidencePhotos.product), photoFiles[1], {
+            contentType: photoFiles[1].type,
+          }),
+        ]);
+        try {
+          // Persist only protected Storage paths. Download-token URLs and blob URLs
+          // would make the evidence inaccessible or publicly shareable.
+          await fsServices.receptions.saveEvidence(
+            receptionId,
+            evidencePhotos,
+            `op-evidence-${Date.now()}`,
+          );
+        } catch (error) {
+          await Promise.allSettled([
+            deleteObject(ref(storage, evidencePhotos.trailer)),
+            deleteObject(ref(storage, evidencePhotos.product)),
+          ]);
+          throw error;
+        }
         return true;
       }
     } catch (e) {
@@ -371,7 +400,15 @@ export default function CapturaEvidencia({ onContinue, currentReception, recepti
             <div key={i} className="flex-1 flex flex-col gap-2">
               <PhotoUploadBox
                 slot={{ ...slot, file: photos[i] }}
-                onFile={(url) =>
+                onFile={(file, url) => {
+                  setPhotoFiles((prev) => {
+                    const next: [File | null, File | null] = [...prev] as [
+                      File | null,
+                      File | null,
+                    ];
+                    next[i] = file;
+                    return next;
+                  });
                   setPhotos((prev) => {
                     const next: [string | null, string | null] = [...prev] as [
                       string | null,
@@ -379,8 +416,8 @@ export default function CapturaEvidencia({ onContinue, currentReception, recepti
                     ];
                     next[i] = url;
                     return next;
-                  })
-                }
+                  });
+                }}
               />
               <div className="flex items-center gap-1">
                 <div

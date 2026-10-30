@@ -22,7 +22,7 @@ import TarimaDetalle from "./screens/TarimaDetalle";
 import ImpresionEtiquetas from "./screens/ImpresionEtiquetas";
 import EscanearQR from "./screens/EscanearQR";
 import EditarRecepcion from "./screens/EditarRecepcion";
-import Evidencias from "./screens/Evidencias";
+import Evidencias, { mapReceptionEvidence } from "./screens/Evidencias";
 import EvidenciaDetalle, { type EvidenciaData } from "./screens/EvidenciaDetalle";
 import LotesCaducidades from "./screens/LotesCaducidades";
 import Embarques from "./screens/Embarques";
@@ -446,6 +446,7 @@ function AppLayout() {
     tarimas: number;
     proveedor: string;
     proveedorLogistico: string;
+    warehouseId?: string;
     receptionId?: string;
     fechaRecepcion?: string;
     lote?: string;
@@ -506,6 +507,7 @@ function AppLayout() {
         tarimas: pallets.length,
         proveedor: reception.supplierName || reception.supplierCode || "Sin proveedor",
         proveedorLogistico: reception.logisticsProvider || "",
+        warehouseId: reception.warehouseId,
         receptionId: reception.id,
         fechaRecepcion: reception.scheduledDate,
         codigosQR: pallets.map((pallet) => pallet.qrIdentifier),
@@ -621,6 +623,29 @@ function AppLayout() {
     if (nav) setActiveNav(nav);
     if (isMobile) setSidebarOpen(false);
   }
+
+  // Canonical evidence links contain only the reception id. They never carry
+  // Storage download tokens, and this read remains subject to Firestore rules.
+  useEffect(() => {
+    const receptionId = new URLSearchParams(window.location.search).get("evidence");
+    if (!receptionId || !db || !canQuery) return;
+    let active = true;
+    const services = createFirestoreServices(db, "org_exepa_001");
+    services.receptions
+      .getById(receptionId)
+      .then((reception) => {
+        if (!active || !reception) return;
+        setSelectedEvidencia(mapReceptionEvidence(reception));
+        navigate("evidencia-detalle", "evidencias");
+      })
+      .catch((error) => {
+        // Permission-denied intentionally has the same user-safe outcome as a missing record.
+        console.warn("Unable to open protected evidence link:", error);
+      });
+    return () => {
+      active = false;
+    };
+  }, [canQuery]);
 
   const headerConfig: Record<Screen, HeaderConfig> = {
     home: {
@@ -1191,6 +1216,7 @@ function AppLayout() {
                   tarimas: data.tarimas,
                   proveedor: data.proveedor,
                   proveedorLogistico: data.proveedorLogistico,
+                  warehouseId: profile?.warehouseId || "wh_tehuacan_1",
                   receptionId: data.recepcionId,
                   productos: appReception.lineas,
                   fechaRecepcion: data.fechaRecepcion,
@@ -1226,7 +1252,9 @@ function AppLayout() {
                           documentation: undefined,
                         },
                         proveedor: evidence.form.proveedor,
-                        proveedorLogistico: evidence.form.item || prev?.proveedorLogistico,
+                        // The logistics provider comes from the scheduled reception.
+                        // Evidence item data must never overwrite it.
+                        proveedorLogistico: prev.proveedorLogistico || "Sin proveedor logístico",
                         lote: evidence.form.lote,
                         caducidad: evidence.form.caducidad,
                       }
@@ -1234,7 +1262,8 @@ function AppLayout() {
                         ocFolio: "OC-24891",
                         tarimas: parseInt(evidence.form.tarimas) || 20,
                         proveedor: evidence.form.proveedor,
-                        proveedorLogistico: evidence.form.item, // item becomes proveedorLogistico
+                        proveedorLogistico: "Sin proveedor logístico",
+                        warehouseId: profile?.warehouseId ?? undefined,
                         lote: evidence.form.lote,
                         caducidad: evidence.form.caducidad,
                         productos: [],

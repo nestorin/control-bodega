@@ -1,4 +1,12 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { getBlob, ref } from "firebase/storage";
+import { storage } from "@/lib/firebase";
+import { downloadBlob } from "@/services/pdfGenerator";
+import { generateEvidencePdf, type EvidencePalletRow } from "@/services/evidencePdf";
+import {
+  buildAuthenticatedEvidenceLink,
+  buildEvidenceShareMessage,
+} from "@/services/evidenceShare";
 
 export interface EvidenciaData {
   id: string;
@@ -17,6 +25,10 @@ export interface EvidenciaData {
   color: string;
   bg: string;
   img: string;
+  receptionId?: string;
+  evidenceId?: string;
+  purchaseOrderNumber?: string;
+  pallets?: EvidencePalletRow[];
 }
 
 interface Props {
@@ -183,10 +195,50 @@ function EditRow({
   );
 }
 
+function useProtectedEvidenceImage(path: string | null) {
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!path) {
+      setSrc(null);
+      return;
+    }
+    // Previews are valid only in the active tab. New evidence always uses the
+    // canonical protected Storage path below.
+    if (path.startsWith("blob:") || path.startsWith("data:")) {
+      setSrc(path);
+      return;
+    }
+    if (!storage || !path.startsWith("organizations/")) {
+      setSrc(null);
+      return;
+    }
+    let active = true;
+    let objectUrl: string | null = null;
+    getBlob(ref(storage, path))
+      .then((blob) => {
+        objectUrl = URL.createObjectURL(blob);
+        if (active) setSrc(objectUrl);
+      })
+      .catch(() => {
+        if (active) setSrc(null);
+      });
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [path]);
+
+  return src;
+}
+
 export default function EvidenciaDetalle({ evidencia: ev, onBack, onDelete }: Props) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(ev);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const trailerPhoto = useProtectedEvidenceImage(draft.fotoTrailer);
+  const productPhoto = useProtectedEvidenceImage(draft.fotoProducto);
 
   function field(key: keyof EvidenciaData) {
     return String(draft[key] ?? "");
@@ -197,28 +249,45 @@ export default function EvidenciaDetalle({ evidencia: ev, onBack, onDelete }: Pr
 
   function sendWhatsApp() {
     const d = draft;
-    const msg = [
-      "🏭 *EVIDENCIA DE RECEPCIÓN — BODEGA Exapa*",
-      "━━━━━━━━━━━━━━━━━━━━",
-      `🆔 ID: ${d.id}`,
-      `📅 Fecha: ${d.fecha} · ${d.hora}`,
-      "",
-      "📋 *Información de la mercancía*",
-      `• Ítem: ${d.item}`,
-      `• Proveedor: ${d.proveedor}`,
-      `• Proveedor logístico: ${d.proveedorLogistico}`,
-      `• Orden de compra: ${d.ocFolio}`,
-      `• Lote: ${d.lote}`,
-      `• Tarimas recibidas: ${d.tarimas}`,
-      `• Caducidad del producto: ${d.caducidad}`,
-      "",
-      `📷 Fotos de evidencia: ${[d.fotoTrailer, d.fotoProducto].filter(Boolean).length} / 2`,
-      `  ${d.fotoTrailer ? "✅" : "⬜"} Mercancía dentro del tráiler`,
-      `  ${d.fotoProducto ? "✅" : "⬜"} Producto y caducidad`,
-      "━━━━━━━━━━━━━━━━━━━━",
-      "_Enviado desde TarimaQR_",
-    ].join("\n");
+    const evidenceLink = d.receptionId ? buildAuthenticatedEvidenceLink(d.receptionId) : null;
+    const msg = buildEvidenceShareMessage({
+      receptionId: d.receptionId || d.id,
+      supplier: d.proveedor,
+      item: d.item,
+      palletCount: d.tarimas,
+      evidenceLink,
+    });
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+  }
+
+  async function downloadEvidence() {
+    setDownloadError(null);
+    try {
+      const blob = await generateEvidencePdf({
+        evidenceId: draft.evidenceId || draft.id,
+        receptionId: draft.receptionId || draft.id,
+        date: [draft.fecha, draft.hora].filter(Boolean).join(" "),
+        item: draft.item,
+        supplier: draft.proveedor,
+        logisticsProvider: draft.proveedorLogistico,
+        purchaseOrderNumber: draft.purchaseOrderNumber || draft.ocFolio,
+        lot: draft.lote,
+        expiryDate: draft.caducidad,
+        receivedPalletCount: draft.tarimas,
+        trailerPhoto,
+        productPhoto,
+        pallets: draft.pallets || [],
+      });
+      downloadBlob(
+        blob,
+        `Evidencia-${(draft.evidenceId || draft.id).replace(/[^a-zA-Z0-9-]/g, "-")}.pdf`,
+      );
+    } catch (error) {
+      console.error("Evidence PDF download failed:", error);
+      setDownloadError(
+        "No se pudo descargar la evidencia. Verificá tu conexión e intentá nuevamente.",
+      );
+    }
   }
 
   return (
@@ -265,13 +334,13 @@ export default function EvidenciaDetalle({ evidencia: ev, onBack, onDelete }: Pr
           <div className="flex flex-col lg:flex-row gap-3 w-full">
             <EditablePhotoCard
               label="Mercancía en tráiler"
-              src={draft.fotoTrailer}
+              src={trailerPhoto}
               editing={editing}
               onFile={(url) => setDraft((d) => ({ ...d, fotoTrailer: url }))}
             />
             <EditablePhotoCard
               label="Producto y caducidad"
-              src={draft.fotoProducto}
+              src={productPhoto}
               editing={editing}
               onFile={(url) => setDraft((d) => ({ ...d, fotoProducto: url }))}
             />
@@ -418,6 +487,22 @@ export default function EvidenciaDetalle({ evidencia: ev, onBack, onDelete }: Pr
                     </span>
                   </button>
                   <button
+                    onClick={() => window.print()}
+                    className="flex items-center gap-2 h-9 lg:h-10 px-3 lg:px-4 rounded-[10px] border border-[#dce4e7] bg-white hover:bg-[#f4f7f8] transition-colors touch-target"
+                  >
+                    <span className="text-[12px] lg:text-[13px] font-bold text-[#172126] whitespace-nowrap">
+                      Imprimir
+                    </span>
+                  </button>
+                  <button
+                    onClick={downloadEvidence}
+                    className="flex items-center gap-2 h-9 lg:h-10 px-3 lg:px-4 rounded-[10px] border border-[#dce4e7] bg-white hover:bg-[#f4f7f8] transition-colors touch-target"
+                  >
+                    <span className="text-[12px] lg:text-[13px] font-bold text-[#172126] whitespace-nowrap">
+                      Descargar PDF
+                    </span>
+                  </button>
+                  <button
                     onClick={() => setShowDeleteConfirm(true)}
                     className="flex items-center gap-2 h-9 lg:h-10 px-3 lg:px-4 rounded-[10px] border border-[#fce9e7] bg-[#fce9e7] hover:bg-[#f9d8d5] transition-colors touch-target"
                   >
@@ -549,6 +634,11 @@ export default function EvidenciaDetalle({ evidencia: ev, onBack, onDelete }: Pr
 
         {/* Info card */}
         <div className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex flex-col items-start px-4 lg:px-5 pt-4 pb-4 lg:pt-4 lg:pb-4 rounded-[20px] w-full">
+          {downloadError && (
+            <p className="mb-3 text-[13px] text-[#c54b45]" role="alert">
+              {downloadError}
+            </p>
+          )}
           <p
             className="font-bold text-[#172126] text-[14px] lg:text-[15px] pb-2"
             style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
