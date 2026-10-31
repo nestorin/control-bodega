@@ -3,7 +3,7 @@ import { generateReceptionQrPngs } from "@/services/receptionQr";
 
 describe("generateReceptionQrPngs", () => {
   it("generates real PNG QR images from the exact pallet identifiers", async () => {
-    const ids = ["TQR-REC-2026-9469-001", "TQR-REC-2026-9469-002"];
+    const ids = ["TQR-REC-2026-1035-003", "TQR-REC-2026-9469-001", "TQR-REC-2026-9469-002"];
 
     const images = await generateReceptionQrPngs(ids);
 

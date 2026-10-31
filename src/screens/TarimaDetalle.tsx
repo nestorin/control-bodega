@@ -5,6 +5,8 @@ import { TarimaDetailView, TarimaDetailState } from "@/types/tarimaDetail";
 import { parseTarimaQR } from "@/types/qrcode";
 import { createFirestoreServices } from "@/services/firestore";
 import { db } from "@/lib/firebase";
+import { downloadTarimaQr, type TarimaQrFormat } from "@/services/tarimaQrDownload";
+import { generateReceptionQrPngs } from "@/services/receptionQr";
 
 const assetPathPrefix = "/assets";
 const imgWarehouse = `${assetPathPrefix}/fc229.svg`;
@@ -13,7 +15,7 @@ const imgIndicadorBlue = `${assetPathPrefix}/cf2d3.svg`;
 const imgQrCode = `${assetPathPrefix}/60da5.svg`;
 
 const FORMATS = ["SVG", "PNG", "JPEG", "PDF"] as const;
-type Format = (typeof FORMATS)[number];
+type Format = TarimaQrFormat;
 
 const ORG_ID = "org_exepa_001";
 
@@ -45,8 +47,11 @@ export default function TarimaDetalle({
   authorizedWarehouseIds,
 }: Props) {
   const [showFormats, setShowFormats] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [customImage, setCustomImage] = useState<string | null>(null);
+  const [qrPreview, setQrPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fsServices = useMemo(() => createFirestoreServices(db!, ORG_ID), []);
@@ -66,6 +71,29 @@ export default function TarimaDetalle({
       setDetailState({ status: "success", data: buildLegacyData() });
     }
   }, [qrCode]);
+
+  useEffect(() => {
+    let active = true;
+    const identifier = detailState.status === "success" ? detailState.data.qrIdentifier : null;
+    setQrPreview(null);
+    if (!identifier)
+      return () => {
+        active = false;
+      };
+
+    void generateReceptionQrPngs([identifier])
+      .then(([image]) => {
+        if (active) setQrPreview(image ?? null);
+      })
+      .catch((error) => {
+        console.error("Error generando vista QR de tarima:", error);
+        if (active) setQrPreview(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [detailState]);
 
   async function fetchTarimaDetail(qrIdentifier: string) {
     setDetailState({ status: "loading" });
@@ -137,11 +165,21 @@ export default function TarimaDetalle({
     };
   }
 
-  function downloadAs(format: Format) {
-    const a = document.createElement("a");
-    a.href = imgQrCode;
-    a.download = `${getTarimaId()}.${format.toLowerCase()}`;
-    a.click();
+  async function downloadAs(format: Format) {
+    if (isDownloading) return;
+    setIsDownloading(true);
+    setDownloadError(null);
+    try {
+      await downloadTarimaQr(getTarimaId(), format);
+      setShowFormats(false);
+    } catch (error) {
+      console.error("Error descargando código QR de tarima:", error);
+      setDownloadError(
+        error instanceof Error ? error.message : "No se pudo descargar el código QR.",
+      );
+    } finally {
+      setIsDownloading(false);
+    }
   }
 
   function getTarimaId(): string {
@@ -342,6 +380,9 @@ export default function TarimaDetalle({
                 </div>
                 <button
                   onClick={() => setShowFormats(true)}
+                  disabled={isDownloading}
+                  aria-busy={isDownloading}
+                  aria-label={isDownloading ? "Preparando código QR" : "Descargar código QR"}
                   className="flex items-center gap-2 bg-[#f2b84b] text-white px-3 py-2 rounded-[8px] font-bold text-[11px] hover:bg-[#d9a03e] transition-colors touch-target"
                   style={{ fontFamily: "'Inter', sans-serif" }}
                 >
@@ -366,7 +407,7 @@ export default function TarimaDetalle({
                       fontWeight: 700,
                     }}
                   >
-                    Descargar
+                    {isDownloading ? "Preparando…" : "Descargar"}
                   </span>
                   <svg
                     width="10"
@@ -386,10 +427,8 @@ export default function TarimaDetalle({
                     {FORMATS.map((fmt) => (
                       <button
                         key={fmt}
-                        onClick={() => {
-                          downloadAs(fmt);
-                          setShowFormats(false);
-                        }}
+                        disabled={isDownloading}
+                        onClick={() => void downloadAs(fmt)}
                         className="flex items-center gap-2 w-full px-3 py-[9px] hover:bg-[#f4f7f8] transition-colors text-left"
                       >
                         <span
@@ -418,6 +457,11 @@ export default function TarimaDetalle({
                   </div>
                 )}
               </div>
+              {downloadError && (
+                <p role="alert" className="text-xs font-semibold text-red-700 text-center">
+                  {downloadError}
+                </p>
+              )}
             </div>
           </div>
 
@@ -615,11 +659,20 @@ export default function TarimaDetalle({
               {/* QR Visual */}
               <div className="w-full flex flex-col items-center gap-3 pt-2">
                 <div className="bg-white border border-[#dce4e7] rounded-[14px] p-4 flex flex-col items-center gap-2">
-                  <img
-                    alt={`QR ${data.qrIdentifier}`}
-                    className="size-[70px] lg:size-[86px]"
-                    src={imgQrCode}
-                  />
+                  {qrPreview ? (
+                    <img
+                      alt={`Código QR ${data.qrIdentifier}`}
+                      className="size-[180px] print:size-[240px]"
+                      src={qrPreview}
+                    />
+                  ) : (
+                    <div
+                      role="status"
+                      className="size-[180px] flex items-center justify-center text-center text-xs text-gray-500"
+                    >
+                      Generando código QR…
+                    </div>
+                  )}
                   <p
                     className="font-extrabold text-[#172126] text-[8px] lg:text-[9px] whitespace-nowrap"
                     style={{
@@ -643,6 +696,8 @@ export default function TarimaDetalle({
                 <div className="flex gap-2 w-full pt-1">
                   <button
                     onClick={() => window.print()}
+                    disabled={!qrPreview}
+                    aria-label="Imprimir código QR"
                     className="flex flex-1 items-center justify-center gap-2 h-10 lg:h-11 rounded-[10px] border border-[#dce4e7] bg-white hover:bg-[#f4f7f8] transition-colors touch-target"
                   >
                     <svg
