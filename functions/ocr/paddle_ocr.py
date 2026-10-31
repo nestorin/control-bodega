@@ -301,21 +301,26 @@ def parse_orden_compra(blocks: List[Dict]) -> Dict[str, Any]:
     if fixed_order is not None:
         orders = []
         for raw_order in fixed_order["ordenes"]:
+            products = [
+                {
+                    "linea": product.get("linea"),
+                    "codigo": product.get("codigo"),
+                    "nombre": product.get("nombre", ""),
+                    "unidad": product.get("u_med"),
+                    "cantidad": product.get("unidades"),
+                    "precio": product.get("precio", 0.0),
+                    "importe": product.get("importe", 0.0),
+                    "confianza": product.get("confianza", 1.0),
+                }
+                for product in raw_order["productos"]
+                if not _is_purchase_order_metadata_product(product.get("nombre", ""))
+            ]
+            for index, product in enumerate(products, start=1):
+                product["linea"] = index
             orders.append({
                 **raw_order,
-                "productos": [
-                    {
-                        "linea": product.get("linea"),
-                        "codigo": product.get("codigo"),
-                        "nombre": product.get("nombre", ""),
-                        "unidad": product.get("u_med"),
-                        "cantidad": product.get("unidades"),
-                        "precio": product.get("precio", 0.0),
-                        "importe": product.get("importe", 0.0),
-                        "confianza": product.get("confianza", 1.0),
-                    }
-                    for product in raw_order["productos"]
-                ],
+                "productos": products,
+                "lineas_detectadas": [product["nombre"] for product in products],
             })
         first_order = orders[0]
         parsed = {
@@ -332,7 +337,12 @@ def parse_orden_compra(blocks: List[Dict]) -> Dict[str, Any]:
         return parsed
     
     # Extraer productos estructurados (misma lógica que CFDI)
-    lines = _extract_product_lines(blocks)
+    lines = [
+        line for line in _extract_product_lines(blocks)
+        if not _is_purchase_order_metadata_product(line.get("nombre", ""))
+    ]
+    for index, line in enumerate(lines, start=1):
+        line["linea"] = index
     
     return {
         "folio": _search(FOLIO_PATTERN, full_text),
@@ -358,6 +368,12 @@ def parse_orden_compra(blocks: List[Dict]) -> Dict[str, Any]:
             if re.search(r"\d+[.,]\d{2}", b["text"]) and len(b["text"]) > 5
         ][:15]
     }
+
+
+def _is_purchase_order_metadata_product(name: str) -> bool:
+    """Reject document header text that the generic row parser mistook for an item."""
+    normalized = _normalized_layout_text(name)
+    return "ordendecompra" in normalized
 
 
 def _extract_proveedor(text: str, is_oc: bool = False) -> Optional[str]:

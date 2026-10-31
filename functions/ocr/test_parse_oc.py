@@ -99,6 +99,28 @@ def test_oc_horizontal_format():
     print("✅ Horizontal format test passed\n")
 
 
+def test_oc_header_text_is_not_returned_as_a_product():
+    """A numbered purchase-order header must not be treated as a product row."""
+    blocks = [
+        make_block("SMART & FINAL DEL NOROESTE", y=50),
+        make_block(
+            "51119 ORDEN DE COMPRA 15 DIAS CONDICIONES VENDEDOR",
+            y=200,
+        ),
+        make_block(
+            "1200 CAJA BEBIDA SABOR COLA 235ML C/24 PZS S",
+            y=230,
+        ),
+    ]
+
+    result = parse_orden_compra(blocks)
+
+    assert [
+        (product["linea"], product["nombre"], product["cantidad"])
+        for product in result["productos"]
+    ] == [(1, "BEBIDA SABOR COLA 235ML C/24 PZS S", 1200.0)]
+
+
 def test_oc_with_codes():
     """Test OC with product codes."""
     blocks = [
@@ -214,6 +236,7 @@ if __name__ == "__main__":
     print("Running parse_orden_compra tests...\n")
     test_oc_tabular_format()
     test_oc_horizontal_format()
+    test_oc_header_text_is_not_returned_as_a_product()
     test_oc_with_codes()
     test_oc_mixed_units()
     test_total_vs_subtotal_regex()
