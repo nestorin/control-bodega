@@ -582,6 +582,7 @@ export default function CapturaTarima({
     setTimeout(async () => {
       setShowSuccess(false);
       if (!isLastTarima) {
+        setScannedCode(null);
         setCurrentIndex((i) => i + 1);
       } else {
         // Todas completadas
@@ -657,6 +658,7 @@ export default function CapturaTarima({
 
   function manualTarimaSelect(index: number) {
     if (index >= 0 && index < tarimasList.length) {
+      setScannedCode(null);
       setCurrentIndex(index);
       if (!tarimasList[index].completed) {
         startScanner();
