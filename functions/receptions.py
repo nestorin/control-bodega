@@ -41,6 +41,8 @@ CORS_OPTS = CorsOptions(
 
 
 MAX_LINES = 500
+MAX_TRANSACTION_WRITES = 500
+CREATE_RECEPTION_FIXED_WRITES = 3  # reception, audit event, operation record
 MAX_PLANNED_PALLETS = 999
 MAX_EVIDENCE_URL = 4096
 
@@ -63,6 +65,13 @@ def _version(value):
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise https_fn.HttpsError("invalid-argument", "expectedVersion is invalid")
     return value
+
+
+def _validate_reception_create_write_count(line_count):
+    if line_count + CREATE_RECEPTION_FIXED_WRITES > MAX_TRANSACTION_WRITES:
+        raise https_fn.HttpsError(
+            "resource-exhausted", "Reception has too many lines to create atomically"
+        )
 
 
 def _normalize_planned_pallets(reception_id, lines, planned_pallets):
@@ -289,6 +298,7 @@ def create_reception(req: https_fn.CallableRequest):
     lines = data.get("lines")
     if not isinstance(lines, list) or not lines or len(lines) > MAX_LINES:
         raise https_fn.HttpsError("invalid-argument", "lines is invalid")
+    _validate_reception_create_write_count(len(lines))
     actor = _check_actor(req, firestore.client(), warehouse_id)
     db = firestore.client()
     normalized_lines = []

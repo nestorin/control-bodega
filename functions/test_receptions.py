@@ -18,10 +18,17 @@ from receptions import (
     _validate_planned_scan,
     _transaction_snapshot,
     _validate_operation_id,
+    _validate_reception_create_write_count,
 )
 
 
 class ReceptionCommandContractTests(unittest.TestCase):
+    def test_create_reception_line_limit_matches_transaction_write_boundary(self):
+        _validate_reception_create_write_count(497)
+        with self.assertRaises(https_fn.HttpsError) as raised:
+            _validate_reception_create_write_count(498)
+        self.assertEqual(raised.exception.code, "resource-exhausted")
+
     def test_edit_reception_rejects_after_capture_has_started(self):
         class Reference:
             def __init__(self, path):
