@@ -149,6 +149,7 @@ describe("TarimaDetalle QR Component", () => {
         onViewReference={onViewReference}
         currentReception={{
           ocFolio: "OC-24891",
+          receptionId: "reception-1",
           tarimas: 12,
           proveedor: "Distribuidora del Norte",
           proveedorLogistico: "Logística Veloz",
@@ -159,7 +160,7 @@ describe("TarimaDetalle QR Component", () => {
     await userEvent.click(screen.getByRole("button", { name: /ver referencia/i }));
 
     expect(onViewReference).toHaveBeenCalledWith({
-      recId: "OC-24891",
+      recId: "reception-1",
       tarimas: 12,
       proveedor: "Distribuidora del Norte",
       proveedorLogistico: "Logística Veloz",
