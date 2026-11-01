@@ -196,6 +196,7 @@ export interface PalletDoc extends BaseDoc {
   receptionId: string;
   palletNumber?: number;
   qrIdentifier: string;
+  shipmentId?: string;
   status: "CREATED" | "RECEIVED" | "STORED" | "BLOCKED";
   productId: string;
   quantity: number;

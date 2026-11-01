@@ -18,6 +18,31 @@ def _error(message: str) -> https_fn.HttpsError:
     return https_fn.HttpsError("failed-precondition", message)
 
 
+def _validate_completion_status(status: object) -> None:
+    if status != "IN_PROGRESS":
+        raise _error("Only IN_PROGRESS shipments can be completed")
+
+
+def _validate_scanned_pallet_products(lines: list, pallets_by_id: dict) -> None:
+    for line in lines:
+        for pallet_id in line["palletsScanned"]:
+            pallet = pallets_by_id.get(pallet_id)
+            if pallet is not None and pallet.get("productId") != line["productId"]:
+                raise _error("Scanned pallet product does not match its shipment line")
+
+
+def _claim_scanned_pallets(
+    transaction, lines: list, pallets_by_id: dict, pallet_refs_by_id: dict, shipment_id: str
+) -> None:
+    pallet_ids = [pallet_id for line in lines for pallet_id in line["palletsScanned"]]
+    for pallet_id in pallet_ids:
+        pallet = pallets_by_id[pallet_id]
+        if "shipmentId" in pallet:
+            raise _error("A scanned pallet has already been assigned to a shipment")
+    for pallet_id in pallet_ids:
+        transaction.update(pallet_refs_by_id[pallet_id], {"shipmentId": shipment_id})
+
+
 @https_fn.on_call(cors=CORS_OPTS)
 def confirm_shipment(req: https_fn.CallableRequest):
     """Confirm a shipment with membership, stock and pallet checks in one transaction."""
@@ -73,10 +98,7 @@ def confirm_shipment(req: https_fn.CallableRequest):
             if previous.get("operationId") == operation_id:
                 return {"shipmentId": shipment_id, "status": "COMPLETED", "idempotent": True}
             raise _error("Shipment confirmation already has another operation")
-        if shipment.get("status") == "COMPLETED":
-            return {"shipmentId": shipment_id, "status": "COMPLETED", "idempotent": True}
-        if shipment.get("status") == "CANCELLED":
-            raise _error("Cancelled shipment cannot be completed")
+        _validate_completion_status(shipment.get("status"))
 
         lines = shipment.get("lines")
         if not isinstance(lines, list) or not lines or len(lines) > 30:
@@ -149,9 +171,22 @@ def confirm_shipment(req: https_fn.CallableRequest):
                 .where("warehouseId", "==", warehouse_id)
                 .where("id", "in", pallet_ids[:30])
             )
-            found = {snapshot.to_dict().get("id") for snapshot in transaction.get(pallet_query)}
+            pallet_snapshots = list(transaction.get(pallet_query))
+            pallets_by_id = {
+                (snapshot.to_dict() or {}).get("id"): snapshot.to_dict() or {}
+                for snapshot in pallet_snapshots
+            }
+            pallet_refs_by_id = {
+                (snapshot.to_dict() or {}).get("id"): snapshot.reference
+                for snapshot in pallet_snapshots
+            }
+            found = set(pallets_by_id)
             if found != set(pallet_ids):
                 raise _error("One or more pallets are missing or belong to another warehouse")
+            _validate_scanned_pallet_products(lines, pallets_by_id)
+            _claim_scanned_pallets(
+                transaction, lines, pallets_by_id, pallet_refs_by_id, shipment_id
+            )
 
         transaction.update(shipment_ref, {"status": "COMPLETED"})
         for lock_ref in lock_refs:

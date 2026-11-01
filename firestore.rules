@@ -80,6 +80,12 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
     }
 
+    function shipmentClaimUnchanged() {
+      return (!('shipmentId' in resource.data) && !('shipmentId' in request.resource.data)) ||
+        ('shipmentId' in resource.data && 'shipmentId' in request.resource.data &&
+          request.resource.data.shipmentId == resource.data.shipmentId);
+    }
+
     // Role checks
     function isOrgAdmin(orgId) {
       return hasRole(orgId, ['SUPER_ADMIN', 'ADMIN']);
@@ -338,6 +344,7 @@ service cloud.firestore {
             request.resource.data.warehouseId ==
               getAfter(/databases/$(database)/documents/organizations/$(orgId)/receptions/$(receptionId)).data.warehouseId &&
             isOperatorOrAbove(orgId) &&
+            !('shipmentId' in request.resource.data) &&
             // QR identifier must be unique (validated by unique index)
             request.resource.data.qrIdentifier != '';
           allow update: if isMemberOf(orgId) &&
@@ -346,6 +353,7 @@ service cloud.firestore {
             resource.data.id == palletId &&
             resource.data.organizationId == orgId &&
             resource.data.receptionId == receptionId &&
+            shipmentClaimUnchanged() &&
             isOperatorOrAbove(orgId);
           allow delete: if isSupervisorOrAdmin(orgId);
         }
@@ -416,7 +424,8 @@ service cloud.firestore {
         allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId);
         allow create: if isMemberOf(orgId) &&
           canAccessWarehouse(orgId, request.resource.data.warehouseId) &&
-          isOperatorOrAbove(orgId);
+          isOperatorOrAbove(orgId) &&
+          request.resource.data.status == 'PROGRAMMED';
         allow update: if isMemberOf(orgId) &&
           canAccessWarehouse(orgId, resource.data.warehouseId) &&
           warehouseAssignmentUnchanged() &&

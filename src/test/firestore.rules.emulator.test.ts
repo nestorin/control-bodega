@@ -511,6 +511,48 @@ describe("Firestore security rules (emulator)", () => {
     );
   });
 
+  rulesTest("denies creating a shipment directly in a terminal status", async () => {
+    const db = testEnv!.authenticatedContext("operator-1").firestore();
+    await assertFails(
+      setDoc(doc(db, `organizations/${orgId}/shipments/shipment-already-completed`), {
+        id: "shipment-already-completed",
+        organizationId: orgId,
+        warehouseId: wh1,
+        status: "COMPLETED",
+        lines: [],
+      }),
+    );
+  });
+
+  rulesTest("keeps pallet shipment claims backend-owned", async () => {
+    await testEnv!.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `organizations/${orgId}/receptions/reception-claim`), {
+        id: "reception-claim",
+        organizationId: orgId,
+        warehouseId: wh1,
+        status: "IN_PROGRESS",
+      });
+    });
+
+    const db = testEnv!.authenticatedContext("operator-1").firestore();
+    await assertFails(
+      setDoc(doc(db, `organizations/${orgId}/receptions/reception-claim/pallets/pallet-claimed`), {
+        id: "pallet-claimed",
+        organizationId: orgId,
+        warehouseId: wh1,
+        receptionId: "reception-claim",
+        productId: "CB0301",
+        qrIdentifier: "TQR-CLAIM-001",
+        shipmentId: "shipment-1",
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(db, `organizations/${orgId}/receptions/rec-pallet-wh1/pallets/pallet-wh1`), {
+        shipmentId: "shipment-1",
+      }),
+    );
+  });
+
   rulesTest("denies a tarima created against another warehouse's embarque", async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), `organizations/${orgId}/embarques/embarque-wh2`), {
