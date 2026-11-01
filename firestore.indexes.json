@@ -35,6 +35,15 @@
     },
     {
       "collectionGroup": "pallets",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "receptionId", "order": "ASCENDING" },
+        { "fieldPath": "warehouseId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pallets",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "warehouseId", "order": "ASCENDING" },
