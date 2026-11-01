@@ -387,6 +387,7 @@ export default function TarimaDetalle({
 
   function renderSuccess(data: TarimaDetailView) {
     const tarimaId = data.qrIdentifier;
+    const receptionId = currentReception?.receptionId ?? data.receptionId;
     const printPages = Array.from({ length: Math.ceil(printPallets.length / 4) }, (_, page) =>
       printPallets.slice(page * 4, page * 4 + 4),
     );
@@ -892,25 +893,22 @@ export default function TarimaDetalle({
                   {data.receptionFolio?.split("·")[1]?.trim().split(" ")[0] || "20"} tarimas
                 </p>
               </div>
-              <button
-                onClick={() =>
-                  onViewReference?.({
-                    recId:
-                      currentReception?.receptionId ||
-                      data.receptionId ||
-                      currentReception?.ocFolio ||
-                      data.receptionFolio?.split("·")[0]?.trim() ||
-                      "OC-24891",
-                    tarimas: currentReception?.tarimas ?? 20,
-                    proveedor: currentReception?.proveedor || data.supplierName || "—",
-                    proveedorLogistico: currentReception?.proveedorLogistico || "Logística Veloz",
-                  })
-                }
-                className="font-extrabold text-[#16343f] text-[14px] lg:text-[15px] whitespace-nowrap hover:underline touch-target"
-                style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
-              >
-                Ver referencia →
-              </button>
+              {onViewReference && receptionId && (
+                <button
+                  onClick={() =>
+                    onViewReference({
+                      recId: receptionId,
+                      tarimas: currentReception?.tarimas ?? 20,
+                      proveedor: currentReception?.proveedor || data.supplierName || "—",
+                      proveedorLogistico: currentReception?.proveedorLogistico || "Logística Veloz",
+                    })
+                  }
+                  className="font-extrabold text-[#16343f] text-[14px] lg:text-[15px] whitespace-nowrap hover:underline touch-target"
+                  style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
+                >
+                  Ver referencia →
+                </button>
+              )}
             </div>
           </div>
         </div>

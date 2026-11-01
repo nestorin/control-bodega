@@ -29,27 +29,18 @@ test.describe("Flujo: Captura de Tarima (Ciclo Completo)", () => {
     return captura;
   }
 
-  test("Ver referencia abre la recepción en modo consulta", async ({ page }) => {
+  test("no ofrece una referencia ficticia cuando falta el id de recepción", async ({ page }) => {
     const detalle = new TarimaDetallePage(page);
 
     // ===== PASO 1: TarimaDetalle modo legacy (sin query Firestore) =====
     await detalle.gotoLegacy();
     await detalle.assertNoErrors();
 
-    // Verificar datos clave visibles (en modo legacy usa datos mock)
+    // El modo legacy no tiene un id de recepción real y no debe navegar con un folio inventado.
     await expect(page.getByText("Detalle de Tarima")).toBeVisible();
     await expect(page.getByText("Lote")).toBeVisible();
     await expect(page.getByText("Caducidad")).toBeVisible();
-
-    // Ver referencia ya no abre CapturaTarima: abre EditarRecepcion en modo lectura.
-    await detalle.clickVerReferencia();
-
-    await expect(page.getByText("Editar recepción", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("CONSULTANDO · 19 Sep 2026")).toBeVisible();
-    await expect(page.locator("input").nth(0)).toHaveValue("20");
-    await expect(page.locator("input").nth(1)).toHaveValue("Distribuidora del Norte");
-    await expect(page.locator("input").nth(2)).toHaveValue("Logística Veloz");
-    await expect(page.getByRole("button", { name: "Editar recepción" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: /Ver referencia/ })).toHaveCount(0);
   });
 
   test("flujo completo de captura: 5 tarimas → finalización automática", async ({ page }) => {
@@ -106,21 +97,6 @@ test.describe("Flujo: Captura de Tarima (Ciclo Completo)", () => {
     });
 
     await captura.assertNoErrors();
-  });
-
-  test("navegación backward: Cancelar en consulta vuelve a recepciones", async ({ page }) => {
-    const detalle = new TarimaDetallePage(page);
-
-    await detalle.gotoLegacy();
-    await detalle.assertNoErrors();
-    await detalle.clickVerReferencia();
-
-    await expect(page.getByRole("button", { name: "Cancelar" })).toBeVisible();
-    await page.getByRole("button", { name: "Cancelar" }).click();
-
-    await expect(page.getByPlaceholder("Buscar recepción...")).toBeVisible({
-      timeout: 5000,
-    });
   });
 
   test("guardar borrador persiste datos al navegar entre tarimas", async ({ page }) => {

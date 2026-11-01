@@ -128,6 +128,25 @@ describe("TarimaDetalle QR", () => {
     ).toBeInTheDocument();
   });
 
+  it("opens only the reception document linked to the scanned pallet", async () => {
+    const onViewReference = vi.fn();
+    render(
+      <TarimaDetalle onBack={vi.fn()} onViewReference={onViewReference} qrCode={QR_IDENTIFIER} />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /Ver referencia/ }));
+
+    expect(onViewReference).toHaveBeenCalledWith(expect.objectContaining({ recId: "reception-1" }));
+  });
+
+  it("does not offer a fake reception reference when the detail has no reception id", async () => {
+    render(<TarimaDetalle onBack={vi.fn()} onViewReference={vi.fn()} />);
+
+    await screen.findAllByText("TQR-24891-003");
+
+    expect(screen.queryByRole("button", { name: /Ver referencia/ })).not.toBeInTheDocument();
+  });
+
   it("prints every registered and planned QR code for the reception", async () => {
     getReception.mockResolvedValue({
       id: "reception-1",
