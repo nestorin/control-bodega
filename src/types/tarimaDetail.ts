@@ -2,6 +2,7 @@ import { PalletDoc } from "@/services/firestore/types";
 import { Timestamp } from "firebase/firestore";
 
 export interface TarimaDetailView {
+  receptionId?: string;
   qrIdentifier: string;
   lot: string;
   expiryDate: Timestamp;

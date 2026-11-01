@@ -123,6 +123,7 @@ export interface PurchaseOrderLine {
 }
 
 export interface ReceptionDoc extends BaseDoc {
+  version?: number;
   organizationId: string;
   warehouseId: string;
   evidenceId?: string;

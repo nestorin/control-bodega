@@ -277,11 +277,13 @@ export class ReceptionService extends BaseService<ReceptionDoc> {
     >,
     actorUserId: string,
     operationId: string,
+    expectedVersion?: number,
   ): Promise<ReceptionDoc> {
     const edit = httpsCallable(getFunctions(), "edit_reception");
     const result = await edit({
       operationId,
       receptionId,
+      ...(expectedVersion === undefined ? {} : { expectedVersion }),
       warehouseId: data.warehouseId,
       supplierId: data.supplierId,
       purchaseOrderId: data.purchaseOrderId,

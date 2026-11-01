@@ -1,0 +1,77 @@
+#reception-list-qr-print {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  #reception-list-qr-print,
+  #reception-list-qr-print * {
+    visibility: visible !important;
+  }
+
+  #reception-list-qr-print {
+    position: fixed !important;
+    inset: 0 !important;
+    display: block !important;
+    width: 186mm !important;
+    background: white !important;
+  }
+
+  .reception-list-qr-page {
+    box-sizing: border-box;
+    width: 186mm;
+    height: 273mm;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: 4mm;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .reception-list-qr-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .reception-list-qr-label {
+    box-sizing: border-box;
+    border: 1px dashed #aab9be;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4mm;
+    padding: 8mm;
+    text-align: center;
+    break-inside: avoid;
+  }
+
+  .reception-list-qr-label svg {
+    width: 52mm;
+    height: 52mm;
+  }
+
+  .reception-list-qr-label strong {
+    color: #172126;
+    font:
+      700 12pt Inter,
+      sans-serif;
+  }
+
+  .reception-list-qr-label span {
+    color: #607078;
+    font:
+      9pt Inter,
+      sans-serif;
+    overflow-wrap: anywhere;
+  }
+}

@@ -5,8 +5,14 @@ import { TarimaDetailView, TarimaDetailState } from "@/types/tarimaDetail";
 import { parseTarimaQR } from "@/types/qrcode";
 import { createFirestoreServices } from "@/services/firestore";
 import { db } from "@/lib/firebase";
-import { downloadTarimaQr, type TarimaQrFormat } from "@/services/tarimaQrDownload";
+import {
+  downloadTarimaQr,
+  downloadTarimaQrBatch,
+  type TarimaQrFormat,
+} from "@/services/tarimaQrDownload";
 import { generateReceptionQrPngs } from "@/services/receptionQr";
+import { QRCodeSVG } from "qrcode.react";
+import "./TarimaDetalle.css";
 
 const assetPathPrefix = "/assets";
 const imgWarehouse = `${assetPathPrefix}/fc229.svg`;
@@ -21,6 +27,7 @@ const ORG_ID = "org_exepa_001";
 
 interface ReceptionReference {
   recId: string;
+  receptionId?: string;
   tarimas: number;
   proveedor: string;
   proveedorLogistico: string;
@@ -32,6 +39,7 @@ interface Props {
   currentReception?: {
     ocFolio: string;
     tarimas: number;
+    receptionId?: string;
     proveedor?: string;
     proveedorLogistico?: string;
   } | null;
@@ -49,6 +57,11 @@ export default function TarimaDetalle({
   const [showFormats, setShowFormats] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [printError, setPrintError] = useState<string | null>(null);
+  const [printPallets, setPrintPallets] = useState<
+    Array<{ qrIdentifier: string; palletNumber: number }>
+  >([]);
+  const [isPreparingPrint, setIsPreparingPrint] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [customImage, setCustomImage] = useState<string | null>(null);
   const [qrPreview, setQrPreview] = useState<string | null>(null);
@@ -95,6 +108,12 @@ export default function TarimaDetalle({
     };
   }, [detailState]);
 
+  useEffect(() => {
+    if (printPallets.length === 0) return;
+    const timer = window.setTimeout(() => window.print(), 100);
+    return () => window.clearTimeout(timer);
+  }, [printPallets]);
+
   async function fetchTarimaDetail(qrIdentifier: string) {
     setDetailState({ status: "loading" });
     try {
@@ -114,6 +133,7 @@ export default function TarimaDetalle({
       const supplier = reception?.supplierId ? await suppliers.getById(reception.supplierId) : null;
 
       const detail: TarimaDetailView = {
+        receptionId: pallet.receptionId,
         qrIdentifier: pallet.qrIdentifier,
         lot: pallet.lot || "",
         expiryDate: pallet.expiryDate ?? ({ toDate: () => new Date() } as any),
@@ -179,6 +199,89 @@ export default function TarimaDetalle({
       );
     } finally {
       setIsDownloading(false);
+    }
+  }
+
+  async function printReceptionCodes(currentQrIdentifier: string) {
+    if (isPreparingPrint) return;
+    setIsPreparingPrint(true);
+    setPrintError(null);
+    try {
+      const warehouseIds = authorizedWarehouseIds ?? [];
+      const currentPallet = await pallets.getByQR(currentQrIdentifier, warehouseIds);
+      if (!currentPallet) throw new Error("No se pudo identificar la recepción de esta tarima.");
+
+      const [registeredPallets, reception] = await Promise.all([
+        pallets.getByReception(currentPallet.receptionId, warehouseIds),
+        receptions.getById(currentPallet.receptionId),
+      ]);
+      const qrIdentifiers = new Set([
+        ...registeredPallets.map((pallet) => pallet.qrIdentifier),
+        ...(reception?.plannedPallets ?? []).map((pallet) => pallet.qrIdentifier),
+      ]);
+      if (qrIdentifiers.size === 0) throw new Error("Esta recepción todavía no tiene códigos QR.");
+
+      const expectedPalletCount = reception?.palletCount ?? reception?.plannedPallets?.length;
+      if (expectedPalletCount && qrIdentifiers.size < expectedPalletCount) {
+        throw new Error(
+          "No se pudieron cargar todos los códigos QR de la recepción. Intentá nuevamente.",
+        );
+      }
+
+      const orderedCodes = [...qrIdentifiers].sort((left, right) => {
+        const leftNumber = Number(left.match(/-(\d+)$/)?.[1] ?? 0);
+        const rightNumber = Number(right.match(/-(\d+)$/)?.[1] ?? 0);
+        return leftNumber - rightNumber || left.localeCompare(right);
+      });
+      setPrintPallets(
+        orderedCodes.map((qrIdentifier, index) => ({
+          qrIdentifier,
+          palletNumber: Number(qrIdentifier.match(/-(\d+)$/)?.[1]) || index + 1,
+        })),
+      );
+    } catch (error) {
+      setPrintError(error instanceof Error ? error.message : "No se pudo preparar la impresión.");
+    } finally {
+      setIsPreparingPrint(false);
+    }
+  }
+
+  async function downloadReceptionCodes() {
+    if (isPreparingPrint) return;
+    setIsPreparingPrint(true);
+    setPrintError(null);
+    try {
+      const warehouseIds = authorizedWarehouseIds ?? [];
+      const currentPallet = await pallets.getByQR(getTarimaId(), warehouseIds);
+      if (!currentPallet) throw new Error("No se pudo identificar la recepción de esta tarima.");
+
+      const [registeredPallets, reception] = await Promise.all([
+        pallets.getByReception(currentPallet.receptionId, warehouseIds),
+        receptions.getById(currentPallet.receptionId),
+      ]);
+      const identifiers = new Set([
+        ...registeredPallets.map((pallet) => pallet.qrIdentifier),
+        ...(reception?.plannedPallets ?? []).map((pallet) => pallet.qrIdentifier),
+      ]);
+      const expectedCount = reception?.palletCount ?? reception?.plannedPallets?.length;
+      if (identifiers.size === 0 || (expectedCount && identifiers.size < expectedCount)) {
+        throw new Error("No se pudieron cargar todos los códigos QR de la recepción.");
+      }
+      const orderedIdentifiers = [...identifiers].sort((left, right) => {
+        const leftNumber = Number(left.match(/-(\d+)$/)?.[1] ?? 0);
+        const rightNumber = Number(right.match(/-(\d+)$/)?.[1] ?? 0);
+        return leftNumber - rightNumber || left.localeCompare(right);
+      });
+      await downloadTarimaQrBatch(
+        orderedIdentifiers,
+        reception?.purchaseOrderId || currentPallet.receptionId,
+      );
+    } catch (error) {
+      setPrintError(
+        error instanceof Error ? error.message : "No se pudieron descargar los códigos QR.",
+      );
+    } finally {
+      setIsPreparingPrint(false);
     }
   }
 
@@ -284,6 +387,9 @@ export default function TarimaDetalle({
 
   function renderSuccess(data: TarimaDetailView) {
     const tarimaId = data.qrIdentifier;
+    const printPages = Array.from({ length: Math.ceil(printPallets.length / 4) }, (_, page) =>
+      printPallets.slice(page * 4, page * 4 + 4),
+    );
 
     return (
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 p-4 lg:p-7 size-full overflow-y-auto">
@@ -365,7 +471,7 @@ export default function TarimaDetalle({
               >
                 {data.qrIdentifier}
               </p>
-              <div className="flex gap-2 items-start flex-wrap justify-center">
+              <div className="relative flex gap-2 items-start flex-wrap justify-center">
                 <div className="bg-[#e2f5ec] flex gap-[7px] items-center px-[11px] py-[7px] rounded-full">
                   <img alt="" className="size-[7px]" src={imgIndicador} />
                   <p
@@ -379,7 +485,8 @@ export default function TarimaDetalle({
                   </p>
                 </div>
                 <button
-                  onClick={() => setShowFormats(true)}
+                  onClick={() => setShowFormats((show) => !show)}
+                  aria-expanded={showFormats}
                   disabled={isDownloading}
                   aria-busy={isDownloading}
                   aria-label={isDownloading ? "Preparando código QR" : "Descargar código QR"}
@@ -423,7 +530,7 @@ export default function TarimaDetalle({
                   </svg>
                 </button>
                 {showFormats && (
-                  <div className="absolute bottom-[calc(100%+6px)] left-0 right-0 bg-white border border-[#dce4e7] rounded-[10px] shadow-[0px_8px_20px_rgba(22,52,63,0.14)] overflow-hidden z-50">
+                  <div className="absolute top-full right-0 mt-2 min-w-48 bg-white border border-[#dce4e7] rounded-[10px] shadow-[0px_8px_20px_rgba(22,52,63,0.14)] overflow-hidden z-50">
                     {FORMATS.map((fmt) => (
                       <button
                         key={fmt}
@@ -695,9 +802,9 @@ export default function TarimaDetalle({
 
                 <div className="flex gap-2 w-full pt-1">
                   <button
-                    onClick={() => window.print()}
-                    disabled={!qrPreview}
-                    aria-label="Imprimir código QR"
+                    onClick={() => void printReceptionCodes(data.qrIdentifier)}
+                    disabled={!qrPreview || isPreparingPrint}
+                    aria-label="Imprimir códigos de la recepción"
                     className="flex flex-1 items-center justify-center gap-2 h-10 lg:h-11 rounded-[10px] border border-[#dce4e7] bg-white hover:bg-[#f4f7f8] transition-colors touch-target"
                   >
                     <svg
@@ -721,11 +828,13 @@ export default function TarimaDetalle({
                         fontWeight: 700,
                       }}
                     >
-                      Imprimir
+                      {isPreparingPrint ? "Preparando…" : "Imprimir todos"}
                     </span>
                   </button>
                   <button
-                    onClick={() => setShowFormats(true)}
+                    onClick={() => void downloadReceptionCodes()}
+                    disabled={isPreparingPrint}
+                    aria-busy={isPreparingPrint}
                     className="flex flex-1 items-center justify-center gap-2 h-10 lg:h-11 rounded-[10px] border border-[#dce4e7] bg-white hover:bg-[#f4f7f8] transition-colors touch-target"
                   >
                     <svg
@@ -749,22 +858,15 @@ export default function TarimaDetalle({
                         fontWeight: 700,
                       }}
                     >
-                      Descargar
+                      {isPreparingPrint ? "Preparando…" : "Descargar todos (PDF)"}
                     </span>
-                    <svg
-                      width="10"
-                      height="10"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#172126"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
                   </button>
                 </div>
+                {printError && (
+                  <p role="alert" className="text-xs font-semibold text-red-700 text-center">
+                    {printError}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -794,6 +896,8 @@ export default function TarimaDetalle({
                 onClick={() =>
                   onViewReference?.({
                     recId:
+                      currentReception?.receptionId ||
+                      data.receptionId ||
                       currentReception?.ocFolio ||
                       data.receptionFolio?.split("·")[0]?.trim() ||
                       "OC-24891",
@@ -810,6 +914,23 @@ export default function TarimaDetalle({
             </div>
           </div>
         </div>
+        {printPallets.length > 0 && (
+          <div id="reception-qr-print-set" aria-hidden="true">
+            {printPages.map((page, pageIndex) => (
+              <section className="reception-qr-print-page" key={pageIndex}>
+                {page.map((pallet) => (
+                  <article className="reception-qr-print-label" key={pallet.qrIdentifier}>
+                    <QRCodeSVG value={pallet.qrIdentifier} size={210} level="H" marginSize={2} />
+                    <strong>
+                      Tarima {pallet.palletNumber} de {printPallets.length}
+                    </strong>
+                    <span>{pallet.qrIdentifier}</span>
+                  </article>
+                ))}
+              </section>
+            ))}
+          </div>
+        )}
       </div>
     );
   }

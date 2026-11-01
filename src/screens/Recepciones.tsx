@@ -10,6 +10,9 @@ import { WAREHOUSE_IDS } from "@/config/warehouses";
 import { useAuthorization, isPermissionDenied } from "@/hooks/useAuthorization";
 import { Panel, StatusBadge, TouchTarget } from "@/components/ui";
 import { mapReceptionListItem } from "@/domains/reception/receptionLifecycle";
+import { QRCodeSVG } from "qrcode.react";
+import { downloadTarimaQrBatch } from "@/services/tarimaQrDownload";
+import "./Recepciones.css";
 
 const imgIndicador = "/assets/08d70.svg";
 const imgIndicadorRed = "/assets/9d6fd.svg";
@@ -149,6 +152,26 @@ const menuItems = [
     color: "#172126",
   },
   {
+    label: "Descargar QR",
+    icon: (
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+    ),
+    color: "#172126",
+  },
+  {
     label: "Borrar",
     icon: (
       <svg
@@ -172,12 +195,16 @@ const menuItems = [
 ];
 
 function RowMenu({
-  recId,
+  canEdit,
   onEdit,
+  onPrint,
+  onDownload,
   onDelete,
 }: {
-  recId: string;
+  canEdit: boolean;
   onEdit: () => void;
+  onPrint: () => void;
+  onDownload: () => void;
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -193,22 +220,33 @@ function RowMenu({
   }, [open]);
 
   const items = [
-    {
-      ...menuItems[0],
-      action: () => {
-        setOpen(false);
-        onEdit();
-      },
-    },
+    ...(canEdit
+      ? [
+          {
+            ...menuItems[0],
+            action: () => {
+              setOpen(false);
+              onEdit();
+            },
+          },
+        ]
+      : []),
     {
       ...menuItems[1],
       action: () => {
         setOpen(false);
-        alert(`Imprimiendo QRs de ${recId}`);
+        onPrint();
       },
     },
     {
       ...menuItems[2],
+      action: () => {
+        setOpen(false);
+        onDownload();
+      },
+    },
+    {
+      ...menuItems[3],
       action: () => {
         setOpen(false);
         onDelete();
@@ -384,6 +422,11 @@ export default function Recepciones({
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [loadingFs, setLoadingFs] = useState(false);
   const [errorFs, setErrorFs] = useState<string | null>(null);
+  const [qrActionError, setQrActionError] = useState<string | null>(null);
+  const [qrActionBusy, setQrActionBusy] = useState<string | null>(null);
+  const [qrPrintSet, setQrPrintSet] = useState<{ folio: string; identifiers: string[] } | null>(
+    null,
+  );
 
   // Estados de filtro
   const [searchText, setSearchText] = useState("");
@@ -501,6 +544,12 @@ export default function Recepciones({
       });
   }, [canQueryNorthWarehouse, fsServices]);
 
+  useEffect(() => {
+    if (!qrPrintSet) return;
+    const timer = window.setTimeout(() => window.print(), 100);
+    return () => window.clearTimeout(timer);
+  }, [qrPrintSet]);
+
   // Use Firestore data when enabled, otherwise local
   const lista = useFirestore && !loadingFs ? listaLocal : listaLocal;
 
@@ -514,6 +563,49 @@ export default function Recepciones({
     const matchesEstado = filterEstado === "todos" || rec.estado === filterEstado;
     return matchesSearch && matchesEstado;
   });
+
+  async function handleReceptionQrAction(recId: string, action: "print" | "download") {
+    setQrActionBusy(recId);
+    setQrActionError(null);
+    try {
+      if (!fsServices || !canQueryNorthWarehouse) {
+        throw new Error(
+          "Conectate con permisos de almacén para acceder a los QR de esta recepción.",
+        );
+      }
+      const reception = await fsServices.receptions.getById(recId);
+      if (!reception) throw new Error("No se encontró la recepción seleccionada.");
+
+      const registeredPallets = await fsServices.pallets.getByReception(reception.id, [
+        WAREHOUSE_IDS.NORTH,
+      ]);
+      const identifiers = [
+        ...new Set([
+          ...registeredPallets.map((pallet) => pallet.qrIdentifier),
+          ...(reception.plannedPallets ?? []).map((pallet) => pallet.qrIdentifier),
+        ]),
+      ].sort((left, right) => {
+        const leftNumber = Number(left.match(/-(\d+)$/)?.[1] ?? 0);
+        const rightNumber = Number(right.match(/-(\d+)$/)?.[1] ?? 0);
+        return leftNumber - rightNumber || left.localeCompare(right);
+      });
+      const expectedCount = reception.palletCount ?? reception.plannedPallets?.length;
+      if (identifiers.length === 0) throw new Error("Esta recepción todavía no tiene códigos QR.");
+      if (expectedCount && identifiers.length < expectedCount) {
+        throw new Error(
+          "No se cargaron todos los códigos QR. Revisá la conexión e intentá nuevamente.",
+        );
+      }
+
+      const folio = reception.folio || reception.purchaseOrderNumber || reception.id;
+      if (action === "print") setQrPrintSet({ folio, identifiers });
+      else await downloadTarimaQrBatch(identifiers, folio);
+    } catch (error) {
+      setQrActionError(error instanceof Error ? error.message : "No se pudieron procesar los QR.");
+    } finally {
+      setQrActionBusy(null);
+    }
+  }
 
   function confirmDelete() {
     if (!deleteTarget) return;
@@ -552,6 +644,43 @@ export default function Recepciones({
           onConfirm={confirmDelete}
           onCancel={() => setDeleteTarget(null)}
         />
+      )}
+      {qrActionError && (
+        <div
+          role="alert"
+          className="mx-4 mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 md:mx-7"
+        >
+          {qrActionError}
+          <button type="button" className="ml-3 underline" onClick={() => setQrActionError(null)}>
+            Cerrar
+          </button>
+        </div>
+      )}
+      {qrActionBusy && (
+        <div role="status" className="mx-4 mt-3 text-sm font-semibold text-[#3276a8] md:mx-7">
+          Preparando códigos QR de {qrActionBusy}…
+        </div>
+      )}
+      {qrPrintSet && (
+        <div id="reception-list-qr-print" aria-hidden="true">
+          {Array.from({ length: Math.ceil(qrPrintSet.identifiers.length / 4) }, (_, page) => (
+            <section className="reception-list-qr-page" key={page}>
+              {qrPrintSet.identifiers.slice(page * 4, page * 4 + 4).map((identifier) => {
+                const number = Number(identifier.match(/-(\d+)$/)?.[1]) || 1;
+                return (
+                  <article className="reception-list-qr-label" key={identifier}>
+                    <QRCodeSVG value={identifier} size={210} level="H" marginSize={2} />
+                    <strong>
+                      Tarima {number} de {qrPrintSet.identifiers.length}
+                    </strong>
+                    <span>{qrPrintSet.folio}</span>
+                    <span>{identifier}</span>
+                  </article>
+                );
+              })}
+            </section>
+          ))}
+        </div>
       )}
       <div className="flex flex-col gap-5 items-start p-4 md:p-7 size-full overflow-y-auto">
         <div className="flex items-center justify-between w-full">
@@ -719,11 +848,11 @@ export default function Recepciones({
               tabIndex={0}
               aria-label={`Abrir recepción ${rec.displayId || rec.id}`}
               className="flex items-center justify-between px-4 md:px-5 py-3 md:py-4 w-full hover:shadow-[0px_12px_20px_rgba(22,52,63,0.12)] transition-shadow touch-target cursor-pointer"
-              onClick={() => onSelectTarima(rec.displayId || rec.id)}
+              onClick={() => onSelectTarima(rec.id)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  onSelectTarima(rec.displayId || rec.id);
+                  onSelectTarima(rec.id);
                 }
               }}
             >
@@ -812,8 +941,10 @@ export default function Recepciones({
                   </button>
                 )}
                 <RowMenu
-                  recId={rec.id}
+                  canEdit={rec.estado === "Borrador"}
                   onEdit={() => onEdit(rec.id)}
+                  onPrint={() => void handleReceptionQrAction(rec.id, "print")}
+                  onDownload={() => void handleReceptionQrAction(rec.id, "download")}
                   onDelete={() => setDeleteTarget(rec.id)}
                 />
               </div>

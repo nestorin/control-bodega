@@ -116,14 +116,8 @@ function AppLayout() {
   const [screen, setScreen] = useState<Screen>("home");
   const [activeNav, setActiveNav] = useState<NavItem>("home");
   const [editId, setEditId] = useState<string>("OC-24891");
-  const [editReceptionData, setEditReceptionData] = useState<{
-    tarimas: number;
-    proveedor: string;
-    proveedorLogistico: string;
-  } | null>(null);
   const [selectedEvidencia, setSelectedEvidencia] = useState<EvidenciaData | null>(null);
   const [tarimaActual, setTarimaActual] = useState(3);
-  const [selectedReception, setSelectedReception] = useState<string | null>(null);
   const [scannedQrCode, setScannedQrCode] = useState<string | null>(null);
 
   // TEST-ONLY: Legacy mode for TarimaDetalle (bypasses Firestore query)
@@ -482,6 +476,29 @@ function AppLayout() {
       stickers: number;
     }>;
   } | null>(null);
+  const tarimaTotal = Math.max(1, currentReception?.tarimas ?? TARIMA_TOTAL);
+  const scannedTarimaSuffix = scannedQrCode?.match(/-(\d+)$/)?.[1];
+  const scannedTarimaNumber = Number(scannedTarimaSuffix);
+  const tarimaPosition = Math.min(
+    tarimaTotal,
+    Math.max(
+      1,
+      Number.isFinite(scannedTarimaNumber) && scannedTarimaNumber > 0
+        ? scannedTarimaNumber
+        : tarimaActual,
+    ),
+  );
+  function goToTarima(position: number) {
+    const nextPosition = Math.min(tarimaTotal, Math.max(1, position));
+    setTarimaActual(nextPosition);
+    if (scannedTarimaSuffix) {
+      setScannedQrCode(
+        (code) =>
+          code?.replace(/\d+$/, String(nextPosition).padStart(scannedTarimaSuffix.length, "0")) ??
+          null,
+      );
+    }
+  }
 
   async function resumeReception(receptionId: string) {
     if (!db || !canQuery) {
@@ -678,7 +695,7 @@ function AppLayout() {
       subtitle: currentReception
         ? `${currentReception.ocFolio} · DETALLE DE TARIMA`
         : "OC-24891 · DETALLE DE TARIMA",
-      title: `Tarima ${tarimaActual} de ${currentReception?.tarimas ?? TARIMA_TOTAL}`,
+      title: `Tarima ${tarimaPosition} de ${tarimaTotal}`,
     },
     impresion: {
       subtitle: currentReception ? currentReception.ocFolio : "OC-24891",
@@ -1042,8 +1059,8 @@ function AppLayout() {
                   }}
                 >
                   <button
-                    onClick={() => setTarimaActual((t) => Math.max(1, t - 1))}
-                    disabled={tarimaActual === 1}
+                    onClick={() => setTarimaActual(Math.max(1, tarimaPosition - 1))}
+                    disabled={tarimaPosition === 1}
                     className="touch-target"
                     style={{
                       display: "flex",
@@ -1055,8 +1072,8 @@ function AppLayout() {
                       flexShrink: 0,
                       border: "1px solid #dce4e7",
                       background: "white",
-                      cursor: tarimaActual === 1 ? "not-allowed" : "pointer",
-                      opacity: tarimaActual === 1 ? 0.35 : 1,
+                      cursor: tarimaPosition === 1 ? "not-allowed" : "pointer",
+                      opacity: tarimaPosition === 1 ? 0.35 : 1,
                       transition: "all 0.15s",
                       color: "#607078",
                     }}
@@ -1076,8 +1093,8 @@ function AppLayout() {
                     </svg>
                   </button>
                   <button
-                    onClick={() => setTarimaActual((t) => Math.min(TARIMA_TOTAL, t + 1))}
-                    disabled={tarimaActual === TARIMA_TOTAL}
+                    onClick={() => setTarimaActual(Math.min(tarimaTotal, tarimaPosition + 1))}
+                    disabled={tarimaPosition === tarimaTotal}
                     className="touch-target"
                     style={{
                       display: "flex",
@@ -1089,9 +1106,9 @@ function AppLayout() {
                       borderRadius: 8,
                       flexShrink: 0,
                       border: "1px solid #16343f",
-                      background: tarimaActual === TARIMA_TOTAL ? "#dce4e7" : "#16343f",
-                      cursor: tarimaActual === TARIMA_TOTAL ? "not-allowed" : "pointer",
-                      opacity: tarimaActual === TARIMA_TOTAL ? 0.5 : 1,
+                      background: tarimaPosition === tarimaTotal ? "#dce4e7" : "#16343f",
+                      cursor: tarimaPosition === tarimaTotal ? "not-allowed" : "pointer",
+                      opacity: tarimaPosition === tarimaTotal ? 0.5 : 1,
                       transition: "all 0.15s",
                     }}
                   >
@@ -1100,18 +1117,18 @@ function AppLayout() {
                         fontFamily: "'Inter', sans-serif",
                         fontSize: 13,
                         fontWeight: 700,
-                        color: tarimaActual === TARIMA_TOTAL ? "#607078" : "white",
+                        color: tarimaPosition === tarimaTotal ? "#607078" : "white",
                         whiteSpace: "nowrap",
                       }}
                     >
-                      Tarima {Math.min(TARIMA_TOTAL, tarimaActual + 1)} de {TARIMA_TOTAL}
+                      Tarima {Math.min(tarimaTotal, tarimaPosition + 1)} de {tarimaTotal}
                     </span>
                     <svg
                       width="12"
                       height="12"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke={tarimaActual === TARIMA_TOTAL ? "#607078" : "white"}
+                      stroke={tarimaPosition === tarimaTotal ? "#607078" : "white"}
                       strokeWidth="2.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1413,12 +1430,11 @@ function AppLayout() {
             <Recepciones
               onResume={resumeReception}
               onSelectTarima={(id) => {
-                setSelectedReception(id);
-                navigate("tarima-detalle", "recepciones");
+                setEditId(id);
+                navigate("editar-recepcion", "recepciones");
               }}
               onEdit={(id) => {
                 setEditId(id);
-                setEditReceptionData(null);
                 navigate("editar-recepcion", "recepciones");
               }}
             />
@@ -1427,7 +1443,6 @@ function AppLayout() {
             <EscanearQR
               onFound={(qrCode) => {
                 setScannedQrCode(qrCode);
-                setSelectedReception(null);
                 navigate("tarima-detalle", "qr");
               }}
               onClose={() => navigate("home", "home")}
@@ -1436,16 +1451,11 @@ function AppLayout() {
           {screen === "editar-recepcion" && (
             <EditarRecepcion
               recId={editId}
-              readOnly={!!editReceptionData}
-              initialData={editReceptionData ?? undefined}
+              suppliers={catalogoProveedores}
               onBack={() => {
-                setEditReceptionData(null);
                 navigate("recepciones", "recepciones");
               }}
-              onSave={() => {
-                setEditReceptionData(null);
-                navigate("recepciones", "recepciones");
-              }}
+              onSave={() => navigate("recepciones", "recepciones")}
             />
           )}
           {screen === "tarima-detalle" && (
@@ -1459,22 +1469,13 @@ function AppLayout() {
               }
               onBack={() => {
                 setScannedQrCode(null);
-                setSelectedReception(null);
                 navigate("recepciones", "recepciones");
               }}
               onViewReference={(reference) => {
                 setEditId(reference.recId);
-                setEditReceptionData({
-                  tarimas: reference.tarimas,
-                  proveedor: reference.proveedor,
-                  proveedorLogistico: reference.proveedorLogistico,
-                });
                 navigate("editar-recepcion", "recepciones");
               }}
-              currentReception={
-                currentReception ||
-                (selectedReception ? { ocFolio: selectedReception, tarimas: 20 } : null)
-              }
+              currentReception={currentReception}
               qrCode={scannedQrCode ?? undefined}
             />
           )}

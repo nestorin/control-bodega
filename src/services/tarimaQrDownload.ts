@@ -78,6 +78,54 @@ export async function createTarimaQrFile(
   return pdf.output("blob");
 }
 
+export async function createTarimaQrBatchPdf(qrIdentifiers: string[]): Promise<Blob> {
+  const identifiers = [
+    ...new Set(qrIdentifiers.map((identifier) => identifier.trim()).filter(Boolean)),
+  ];
+  if (identifiers.length === 0) throw new Error("No hay códigos QR para descargar.");
+
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 12;
+  const columns = 2;
+  const rows = 2;
+  const cellWidth = (pageWidth - margin * 2) / columns;
+  const cellHeight = (pageHeight - margin * 2) / rows;
+  const qrSize = 55;
+  const total = identifiers.length;
+
+  for (const [index, identifier] of identifiers.entries()) {
+    if (index > 0 && index % (columns * rows) === 0) pdf.addPage();
+    const position = index % (columns * rows);
+    const column = position % columns;
+    const row = Math.floor(position / columns);
+    const left = margin + column * cellWidth;
+    const top = margin + row * cellHeight;
+    const qrDataUrl = await QRCode.toDataURL(identifier, QR_OPTIONS);
+    const palletNumber = Number(identifier.match(/-(\d+)$/)?.[1]) || index + 1;
+
+    pdf.setDrawColor(170, 185, 190);
+    pdf.setLineDashPattern([2, 2], 0);
+    pdf.rect(left + 4, top + 4, cellWidth - 8, cellHeight - 8);
+    pdf.setLineDashPattern([], 0);
+    pdf.addImage(qrDataUrl, "PNG", left + (cellWidth - qrSize) / 2, top + 15, qrSize, qrSize);
+    pdf.setFontSize(12);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(`Tarima ${palletNumber} de ${total}`, left + cellWidth / 2, top + 80, {
+      align: "center",
+    });
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(identifier, left + cellWidth / 2, top + 88, {
+      align: "center",
+      maxWidth: cellWidth - 16,
+    });
+  }
+
+  return pdf.output("blob");
+}
+
 /** Trigger a mobile-friendly download and delay URL revocation for Android browsers. */
 export async function downloadTarimaQr(
   qrIdentifier: string,
@@ -89,6 +137,22 @@ export async function downloadTarimaQr(
   const safeIdentifier = qrIdentifier.replace(/[^a-zA-Z0-9._-]/g, "_");
   anchor.href = objectUrl;
   anchor.download = `${safeIdentifier}.${format.toLowerCase()}`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+}
+
+export async function downloadTarimaQrBatch(
+  qrIdentifiers: string[],
+  receptionFolio: string,
+): Promise<void> {
+  const blob = await createTarimaQrBatchPdf(qrIdentifiers);
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  const safeFolio = receptionFolio.replace(/[^a-zA-Z0-9._-]/g, "_");
+  anchor.href = objectUrl;
+  anchor.download = `QRs-${safeFolio}.pdf`;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
