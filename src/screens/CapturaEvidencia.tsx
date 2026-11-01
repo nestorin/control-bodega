@@ -8,6 +8,7 @@ import {
   buildAuthenticatedEvidenceLink,
   buildEvidenceShareMessage,
 } from "@/services/evidenceShare";
+import { uploadEvidencePair } from "@/services/evidenceUpload";
 
 const imgArrowRight = "/assets/55de6.svg";
 const ORG_ID = "org_exepa_001";
@@ -270,24 +271,35 @@ export default function CapturaEvidencia({ onContinue, currentReception, recepti
 
     try {
       const warehouseId = currentReception?.warehouseId;
-      if (receptionId && user && storage && warehouseId && photoFiles[0] && photoFiles[1]) {
+      const evidenceStorage = storage;
+      const trailerFile = photoFiles[0];
+      const productFile = photoFiles[1];
+      if (receptionId && user && evidenceStorage && warehouseId && trailerFile && productFile) {
         const extension = (file: File) => {
           if (file.type === "image/png") return "png";
           if (file.type === "image/webp") return "webp";
           return "jpg";
         };
         const evidencePhotos = {
-          trailer: `organizations/${ORG_ID}/warehouses/${warehouseId}/receptions/${receptionId}/evidence/trailer.${extension(photoFiles[0])}`,
-          product: `organizations/${ORG_ID}/warehouses/${warehouseId}/receptions/${receptionId}/evidence/product.${extension(photoFiles[1])}`,
+          trailer: `organizations/${ORG_ID}/warehouses/${warehouseId}/receptions/${receptionId}/evidence/trailer.${extension(trailerFile)}`,
+          product: `organizations/${ORG_ID}/warehouses/${warehouseId}/receptions/${receptionId}/evidence/product.${extension(productFile)}`,
         };
-        await Promise.all([
-          uploadBytes(ref(storage, evidencePhotos.trailer), photoFiles[0], {
-            contentType: photoFiles[0].type,
-          }),
-          uploadBytes(ref(storage, evidencePhotos.product), photoFiles[1], {
-            contentType: photoFiles[1].type,
-          }),
-        ]);
+        await uploadEvidencePair(
+          [
+            () =>
+              uploadBytes(ref(evidenceStorage, evidencePhotos.trailer), trailerFile, {
+                contentType: trailerFile.type,
+              }),
+            () =>
+              uploadBytes(ref(evidenceStorage, evidencePhotos.product), productFile, {
+                contentType: productFile.type,
+              }),
+          ],
+          [
+            () => deleteObject(ref(evidenceStorage, evidencePhotos.trailer)),
+            () => deleteObject(ref(evidenceStorage, evidencePhotos.product)),
+          ],
+        );
         try {
           // Persist only protected Storage paths. Download-token URLs and blob URLs
           // would make the evidence inaccessible or publicly shareable.
@@ -298,8 +310,8 @@ export default function CapturaEvidencia({ onContinue, currentReception, recepti
           );
         } catch (error) {
           await Promise.allSettled([
-            deleteObject(ref(storage, evidencePhotos.trailer)),
-            deleteObject(ref(storage, evidencePhotos.product)),
+            deleteObject(ref(evidenceStorage, evidencePhotos.trailer)),
+            deleteObject(ref(evidenceStorage, evidencePhotos.product)),
           ]);
           throw error;
         }
