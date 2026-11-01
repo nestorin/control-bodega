@@ -18,6 +18,7 @@ except ValueError:
 
 ORG_ID = "org_exepa_001"
 WAREHOUSE_IDS = {"wh_tehuacan_1", "wh_tehuacan_2"}
+MAX_TRANSACTION_WRITES = 500
 WAREHOUSE_ALIASES = {
     "almacen-001": "wh_tehuacan_1", "almacen-002": "wh_tehuacan_2",
     "alm_norte": "wh_tehuacan_1", "alm_sur": "wh_tehuacan_2",
@@ -91,6 +92,13 @@ def _warehouse_allowed(member: dict, warehouse_id: object) -> bool:
 
 def _canonical_warehouse_id(value: str) -> str:
     return WAREHOUSE_ALIASES.get(value, value)
+
+
+def _validate_inventory_import_write_count(movement_count: int) -> None:
+    if movement_count + 1 > MAX_TRANSACTION_WRITES:
+        raise https_fn.HttpsError(
+            "resource-exhausted", "Inventory import exceeds the atomic write limit"
+        )
 
 
 def _actor(req: https_fn.CallableRequest, db) -> dict:
@@ -332,11 +340,15 @@ def import_inventory(req: https_fn.CallableRequest):
             for warehouse_id, product_id in list(current):
                 if warehouse_id in {row[1] for row in normalized} and (warehouse_id, product_id) not in requested:
                     requested[(warehouse_id, product_id)] = 0
-        movement_count = 0
+        changes = []
         for (warehouse_id, product_id), target in requested.items():
             delta = target if mode == "ADD" else target - current.get((warehouse_id, product_id), 0)
             if delta == 0:
                 continue
+            changes.append((warehouse_id, product_id, delta))
+        _validate_inventory_import_write_count(len(changes))
+        movement_count = 0
+        for warehouse_id, product_id, delta in changes:
             movement_ref = db.collection(f"organizations/{ORG_ID}/inventory_movements").document()
             transaction.set(movement_ref, {
                 "organizationId": ORG_ID, "warehouseId": warehouse_id, "productId": product_id,
