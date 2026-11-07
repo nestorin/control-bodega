@@ -49,6 +49,23 @@ const mocks = vi.hoisted(() => {
     conversions: {
       getAll: vi.fn().mockResolvedValue({ data: [] }),
     },
+    userMemberships: {
+      getAllMembers: vi.fn().mockResolvedValue({
+        data: [
+          {
+            id: "membership-1",
+            userId: "user-1",
+            displayName: "Ana Operadora",
+            email: "ana@example.com",
+            role: "ALMACENISTA",
+            status: "ACTIVE",
+            warehouseId: "warehouse-1",
+          },
+        ],
+      }),
+      updateRole: vi.fn().mockResolvedValue(undefined),
+      updateStatus: vi.fn().mockResolvedValue(undefined),
+    },
   };
 
   return { deleteProduct, deleteSupplier, services };
@@ -119,5 +136,28 @@ describe("Configuracion catalog deletion", () => {
       expect(mocks.deleteSupplier).toHaveBeenCalledWith("supplier-1", "user", expect.any(String)),
     );
     expect(screen.getByText("Proveedor de prueba")).toBeInTheDocument();
+  });
+
+  it("offers mobile role and status controls without requiring a wide table", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await user.click(screen.getByRole("tab", { name: "Roles y usuarios" }));
+    const mobileList = screen.getByLabelText("Usuarios y roles");
+    expect(await within(mobileList).findByText("Ana Operadora")).toBeInTheDocument();
+    expect(within(mobileList).getByText("ana@example.com")).toBeInTheDocument();
+
+    await user.selectOptions(
+      within(mobileList).getByRole("combobox", { name: "Cambiar rol de Ana Operadora" }),
+      "SUPERVISOR",
+    );
+    await waitFor(() =>
+      expect(mocks.services.userMemberships.updateRole).toHaveBeenCalledWith(
+        "user-1",
+        "SUPERVISOR",
+        "current-user",
+        expect.any(String),
+      ),
+    );
   });
 });

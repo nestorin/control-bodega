@@ -1824,8 +1824,8 @@ function TabRoles({
   };
 
   return (
-    <div className="flex-1 overflow-auto space-y-5">
-      <div className="flex items-center justify-between">
+    <div className="min-w-0 flex-1 space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-bold text-[#172126]">Roles y usuarios</h2>
         <Btn variant="secondary" small onClick={loadMembers} disabled={loading}>
           {loading ? "Cargando..." : "Actualizar"}
@@ -1847,9 +1847,9 @@ function TabRoles({
         </div>
       )}
 
-      <Panel className="p-0 overflow-hidden">
+      <Panel className="hidden overflow-hidden p-0 sm:block">
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full min-w-[760px] text-left">
             <thead>
               <tr className="bg-[#f4f7f8] text-[12px] text-[#607078] uppercase tracking-wider">
                 <th className="px-4 py-3 font-semibold">Usuario</th>
@@ -1925,6 +1925,71 @@ function TabRoles({
           </table>
         </div>
       </Panel>
+
+      <div className="space-y-3 sm:hidden" aria-label="Usuarios y roles">
+        {members.length === 0 ? (
+          <Panel className="p-4 text-center text-sm text-[#607078]">
+            {loading ? "Cargando usuarios..." : "No hay usuarios registrados"}
+          </Panel>
+        ) : (
+          members.map((member) => (
+            <Panel key={member.userId} className="min-w-0 space-y-4 p-4">
+              <div className="min-w-0">
+                <p className="break-words font-semibold text-[#172126]">
+                  {member.displayName || member.userId}
+                </p>
+                <p className="break-all text-sm text-[#607078]">{member.email || "—"}</p>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#607078]">
+                <span
+                  className={`inline-flex rounded-full px-2.5 py-1 font-semibold ${getRoleColor(member.role)}`}
+                >
+                  {getRoleLabel(member.role)}
+                </span>
+                <span>Almacén: {member.warehouseId || "—"}</span>
+              </div>
+              <div className="grid gap-3">
+                <label className="grid gap-1 text-sm font-semibold text-[#607078]">
+                  Cambiar rol
+                  <select
+                    aria-label={`Cambiar rol de ${member.displayName || member.userId}`}
+                    value={member.role}
+                    onChange={(e) =>
+                      handleRoleChange(
+                        member.userId,
+                        e.target.value as (typeof ROLE_OPTIONS)[0]["value"],
+                      )
+                    }
+                    className="min-h-11 w-full min-w-0 rounded-lg border border-[#dce4e7] bg-white px-3 text-[#172126] focus:border-[#3276a8] focus:outline-none"
+                    disabled={!firestoreReady || loading}
+                  >
+                    {ROLE_OPTIONS.map((role) => (
+                      <option key={role.value} value={role.value}>
+                        {role.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-sm font-semibold text-[#607078]">
+                  Estado
+                  <select
+                    aria-label={`Estado de ${member.displayName || member.userId}`}
+                    value={member.status}
+                    onChange={(e) =>
+                      handleStatusChange(member.userId, e.target.value as "ACTIVE" | "INACTIVE")
+                    }
+                    className="min-h-11 w-full min-w-0 rounded-lg border border-[#dce4e7] bg-white px-3 text-[#172126] focus:border-[#3276a8] focus:outline-none"
+                    disabled={!firestoreReady || loading}
+                  >
+                    <option value="ACTIVE">Activo</option>
+                    <option value="INACTIVE">Inactivo</option>
+                  </select>
+                </label>
+              </div>
+            </Panel>
+          ))
+        )}
+      </div>
 
       <div className="text-xs text-[#607078] bg-[#f4f7f8] rounded-lg p-3">
         <p className="font-semibold text-[#172126] mb-1">Notas:</p>
@@ -2561,10 +2626,10 @@ export default function Configuracion({
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex h-full min-w-0 flex-col overflow-hidden">
       {/* Top tabs bar */}
       <div
-        className="bg-white border-b border-[#dce4e7] flex items-center gap-1 px-4 py-3 shrink-0 overflow-x-auto hide-scrollbar"
+        className="hide-scrollbar flex shrink-0 items-center gap-1 overflow-x-auto overscroll-x-contain border-b border-[#dce4e7] bg-white px-2 py-3 sm:px-4"
         role="tablist"
         aria-label="Módulos de configuración"
       >
@@ -2576,7 +2641,7 @@ export default function Configuracion({
               onClick={() => setTab(t.id)}
               role="tab"
               aria-selected={active}
-              className="flex items-center gap-2 px-4 py-2 rounded-[10px] whitespace-nowrap text-sm transition-colors"
+              className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-[10px] px-3 py-2 text-sm transition-colors sm:px-4"
               style={{
                 background: active ? "#16343f" : "transparent",
                 color: active ? "white" : "#607078",
@@ -2593,7 +2658,7 @@ export default function Configuracion({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-4 lg:p-7 flex flex-col gap-5">
+      <div className="flex min-w-0 flex-1 flex-col gap-5 overflow-auto p-4 lg:p-7">
         {/* Active warehouse banner */}
         {almacenActivo && tab !== "almacenes" && (
           <div className="bg-[#e8f2f7] border border-[#b6d4e7] rounded-[12px] px-4 py-[10px] flex items-center gap-3">

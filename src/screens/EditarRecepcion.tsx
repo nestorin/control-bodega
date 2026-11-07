@@ -372,7 +372,7 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-bold text-[#172126]">Productos programados</h2>
             {editable && (
               <button
@@ -389,9 +389,9 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
               {productLines.map((line) => (
                 <div
                   key={`${line.lineIndex}`}
-                  className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
+                  className="grid min-w-0 gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
                 >
-                  <div className="flex flex-col gap-1 min-w-[200px] flex-1">
+                  <div className="flex min-w-0 flex-col gap-1">
                     {editable ? (
                       <AutocompleteProducto
                         id={`edit-product-${line.lineIndex}`}
@@ -430,10 +430,10 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
                       Línea {line.lineIndex + 1} · {line.pallets} tarimas
                     </span>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3">
                     {editable ? (
                       <>
-                        <div className="flex items-center gap-1">
+                        <label className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center">
                           <span className="text-xs text-[#607078]">Cant:</span>
                           <input
                             type="number"
@@ -445,28 +445,28 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
                                 parseInt(e.target.value) || 1,
                               )
                             }
-                            className="w-20 min-h-11 rounded-lg border border-[#dce4e7] px-2 text-[#172126] text-right"
+                            className="min-h-11 w-full rounded-lg border border-[#dce4e7] px-2 text-right text-[#172126] sm:w-20"
                           />
-                        </div>
-                        <div className="flex items-center gap-1">
+                        </label>
+                        <label className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center">
                           <span className="text-xs text-[#607078]">Und:</span>
                           <select
                             value={line.unit}
                             onChange={(e) =>
                               handleProductUnitChange(line.lineIndex, e.target.value)
                             }
-                            className="min-h-11 rounded-lg border border-[#dce4e7] px-2 text-[#172126]"
+                            className="min-h-11 w-full min-w-0 rounded-lg border border-[#dce4e7] px-2 text-[#172126] sm:w-auto"
                           >
                             <option value="cajas">Cajas</option>
                             <option value="piezas">Piezas</option>
                             <option value="unidades">Unidades</option>
                             <option value="pallets">Pallets</option>
                           </select>
-                        </div>
+                        </label>
                         <button
                           type="button"
                           onClick={() => handleRemoveProductLine(line.lineIndex)}
-                          className="text-red-600 hover:text-red-800 text-sm"
+                          className="col-span-2 min-h-11 justify-self-end rounded-lg px-3 text-sm text-red-600 hover:bg-red-50 hover:text-red-800 sm:col-span-1"
                           aria-label="Eliminar línea de producto"
                         >
                           Eliminar
