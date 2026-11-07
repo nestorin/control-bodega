@@ -64,7 +64,7 @@ export default function EscanearQR({ onFound, onClose }: Props) {
           cameraError.name === "NotAllowedError" || cameraError.name === "PermissionDeniedError"
             ? "El permiso de cámara está bloqueado. Habilítalo en los ajustes del sitio y vuelve a intentar."
             : cameraError.name === "NotFoundError" || cameraError.name === "DevicesNotFoundError"
-              ? "No se encontró una cámara disponible en este dispositivo."
+              ? "No se detectó ninguna cámara en este equipo. Podés ingresar el código QR manualmente usando el campo de abajo."
               : cameraError.name === "NotReadableError" || cameraError.name === "TrackStartError"
                 ? "La cámara está siendo usada por otra aplicación. Ciérrala e inténtalo de nuevo."
                 : "No se pudo iniciar la cámara. Revisa los permisos del navegador e inténtalo de nuevo.",

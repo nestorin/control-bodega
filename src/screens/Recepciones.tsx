@@ -551,7 +551,7 @@ export default function Recepciones({
   }, [qrPrintSet]);
 
   // Use Firestore data when enabled, otherwise local
-  const lista = useFirestore && !loadingFs ? listaLocal : listaLocal;
+  const lista = useFirestore && !loadingFs ? recepcionesFirestore : listaLocal;
 
   // Lista filtrada
   const listaFiltrada = lista.filter((rec) => {

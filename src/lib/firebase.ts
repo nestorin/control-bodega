@@ -122,11 +122,16 @@ export const appCheck =
 
 export const auth: Auth | null = app ? getAuth(app) : null;
 
-// En modo E2E, usar localStorage persistence para que Playwright pueda capturar el auth state
-if (auth && useE2EEmulatorPorts) {
+// Set persistence for both production and E2E modes
+if (auth) {
   setPersistence(auth, browserLocalPersistence).catch((err) => {
-    console.warn("[E2E] No se pudo establecer localStorage persistence:", err);
+    console.warn("[Auth] No se pudo establecer localStorage persistence:", err);
   });
+}
+
+// En modo E2E, conectar emuladores
+if (useE2EEmulatorPorts) {
+  // Already handled by persistence above
 }
 const functions = app ? getFunctions(app, "us-central1") : null;
 // Use the current Firestore cache API. The previous
@@ -158,6 +163,11 @@ if (useFirebaseEmulators && !useMockAuth && auth && db && storage && functions) 
 }
 
 export const googleProvider = new GoogleAuthProvider();
+
+// Set language code to Spanish to avoid Firefox translation popup
+if (auth) {
+  auth.languageCode = 'es';
+}
 
 // Network detection for offline queue
 if (db && typeof window !== "undefined") {

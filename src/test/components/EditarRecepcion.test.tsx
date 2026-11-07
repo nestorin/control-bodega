@@ -101,7 +101,7 @@ describe("EditarRecepcion", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "REC-1001" })).toBeInTheDocument();
-    expect(screen.getByText("Producto real")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Producto real")).toBeInTheDocument();
     expect(screen.getByText("2 tarimas", { exact: false })).toBeInTheDocument();
     expect(screen.getByTitle("Código QR TQR-reception-1-001")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));

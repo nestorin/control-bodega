@@ -74,7 +74,7 @@ def _validate_reception_create_write_count(line_count):
         )
 
 
-def _normalize_planned_pallets(reception_id, lines, planned_pallets):
+def _normalize_planned_pallets(operation_id, reception_id, lines, planned_pallets):
     if not isinstance(planned_pallets, list) or not planned_pallets or len(planned_pallets) > MAX_PLANNED_PALLETS:
         raise https_fn.HttpsError("invalid-argument", "plannedPallets is invalid")
 
@@ -100,9 +100,12 @@ def _normalize_planned_pallets(reception_id, lines, planned_pallets):
         if product_id != line["productId"] or unit != line["unit"]:
             raise https_fn.HttpsError("invalid-argument", "planned pallet does not match its reception line")
 
-        qr_identifier = f"TQR-{reception_id}-{pallet_number:03d}"
+        # Short Tarima ID: TQR-{shortOpId}-{palletNumber:03d}
+        # shortOpId = last 8 chars of operation_id (e.g., "a1b2c3d4")
+        short_op_id = operation_id[-8:] if len(operation_id) >= 8 else operation_id
+        qr_identifier = f"TQR-{short_op_id}-{pallet_number:03d}"
         normalized.append({
-            "palletId": f"pallet-{reception_id}-{pallet_number:03d}",
+            "palletId": f"pallet-{short_op_id}-{pallet_number:03d}",
             "receptionId": reception_id,
             "palletNumber": pallet_number,
             "lineIndex": line_index,
@@ -328,7 +331,7 @@ def create_reception(req: https_fn.CallableRequest):
     evidence_id = f"EV-{evidence_date}-{sha256(reception_id.encode('utf-8')).hexdigest()[:6].upper()}"
     raw_plan = data.get("plannedPallets")
     planned_pallets = (
-        _normalize_planned_pallets(reception_id, normalized_lines, raw_plan)
+        _normalize_planned_pallets(operation_id, reception_id, normalized_lines, raw_plan)
         if raw_plan is not None
         else None
     )
@@ -457,7 +460,7 @@ def edit_reception(req: https_fn.CallableRequest):
             "lot": _string(line.get("lot"), "lot", 128, False),
         })
     planned_pallets = _normalize_planned_pallets(
-        reception_id, normalized_lines, data.get("plannedPallets")
+        operation_id, reception_id, normalized_lines, data.get("plannedPallets")
     )
     payload = {
         "receptionId": reception_id,

@@ -329,7 +329,12 @@ export default function CapturaTarima({
 
       const devices = await BrowserQRCodeReader.listVideoInputDevices();
       if (devices.length === 0) {
-        throw new Error("No se encontró una cámara disponible en este dispositivo.");
+        const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+        throw new Error(
+          isMobile
+            ? "No se encontró una cámara disponible en este dispositivo."
+            : "No se detectó ninguna cámara en este equipo. Podés ingresar el código QR manualmente usando el botón 'Entrada manual' abajo."
+        );
       }
 
       // Prefer back camera
@@ -359,7 +364,7 @@ export default function CapturaTarima({
         error.name === "NotAllowedError" || error.name === "PermissionDeniedError"
           ? "El navegador bloqueó el permiso de cámara. Habilítalo en los ajustes del sitio y vuelve a intentar."
           : error.name === "NotFoundError" || error.name === "DevicesNotFoundError"
-            ? "No se encontró una cámara disponible en este dispositivo."
+            ? "No se detectó ninguna cámara en este equipo. Podés ingresar el código QR manualmente usando el botón 'Entrada manual' abajo."
             : error.name === "NotReadableError" || error.name === "TrackStartError"
               ? "La cámara está siendo usada por otra aplicación. Ciérrala e inténtalo de nuevo."
               : error.message ||

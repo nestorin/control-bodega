@@ -2751,6 +2751,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
               disabled={isSaving}
               aria-busy={isSaving}
               className="bg-[#16343f] border border-[#16343f] flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 hover:bg-[#1e4456] active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f2b84b] transition-all touch-target w-full md:w-auto disabled:cursor-wait disabled:opacity-70"
+              title={isSaving ? "Generando códigos..." : "Completá todos los campos requeridos para generar códigos"}
             >
               {isSaving ? (
                 <span

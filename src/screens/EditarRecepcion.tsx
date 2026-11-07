@@ -19,6 +19,15 @@ interface Props {
   onSave: () => void;
 }
 
+interface EditableProductLine {
+  lineIndex: number;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unit: string;
+  pallets: number;
+}
+
 function isEditableDraft(reception: ReceptionDoc): boolean {
   const pallets = reception.plannedPallets ?? [];
   return (
@@ -49,6 +58,7 @@ export default function EditarRecepcion({ recId, suppliers, onBack, onSave }: Pr
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [productLines, setProductLines] = useState<EditableProductLine[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -77,6 +87,27 @@ export default function EditarRecepcion({ recId, suppliers, onBack, onSave }: Pr
             "",
         );
         setLogisticsProvider(loaded.logisticsProvider || "");
+
+        // Initialize editable product lines from plannedPallets
+        const plannedPallets = loaded.plannedPallets ?? [];
+        const linesMap = new Map<number, EditableProductLine>();
+        plannedPallets.forEach((pallet) => {
+          const existing = linesMap.get(pallet.lineIndex);
+          if (existing) {
+            existing.quantity += pallet.quantity;
+            existing.pallets += 1;
+          } else {
+            linesMap.set(pallet.lineIndex, {
+              lineIndex: pallet.lineIndex,
+              productId: pallet.productId,
+              productName: pallet.productName,
+              quantity: pallet.quantity,
+              unit: pallet.unit,
+              pallets: 1,
+            });
+          }
+        });
+        setProductLines(Array.from(linesMap.values()).sort((a, b) => a.lineIndex - b.lineIndex));
       })
       .catch((loadError) => {
         if (active) setError(receptionErrorMessage(loadError));
@@ -90,27 +121,45 @@ export default function EditarRecepcion({ recId, suppliers, onBack, onSave }: Pr
     };
   }, [canQuery, recId, services, suppliers]);
 
-  const plannedPallets = reception?.plannedPallets ?? [];
   const editable = reception ? isEditableDraft(reception) : false;
-  const totalPallets = plannedPallets.length || reception?.palletCount || 0;
-  const productLines = [
-    ...plannedPallets
-      .reduce((lines, pallet) => {
-        const current = lines.get(pallet.lineIndex) ?? {
-          productName: pallet.productName,
-          quantity: 0,
-          unit: pallet.unit,
-          pallets: 0,
-        };
-        current.quantity += pallet.quantity;
-        current.pallets += 1;
-        lines.set(pallet.lineIndex, current);
-        return lines;
-      }, new Map<number, { productName: string; quantity: number; unit: string; pallets: number }>())
-      .entries(),
-  ]
-    .sort(([left], [right]) => left - right)
-    .map(([, line]) => line);
+  const totalPallets = reception?.plannedPallets?.length ?? productLines.reduce((sum, l) => sum + l.pallets, 0);
+
+  function handleProductQuantityChange(lineIndex: number, quantity: number) {
+    setProductLines((prev) =>
+      prev.map((line) =>
+        line.lineIndex === lineIndex ? { ...line, quantity: Math.max(1, quantity) } : line
+      )
+    );
+  }
+
+  function handleProductUnitChange(lineIndex: number, unit: string) {
+    setProductLines((prev) =>
+      prev.map((line) =>
+        line.lineIndex === lineIndex ? { ...line, unit } : line
+      )
+    );
+  }
+
+  function handleAddProductLine() {
+    const nextLineIndex = productLines.length > 0
+      ? Math.max(...productLines.map(l => l.lineIndex)) + 1
+      : 0;
+    setProductLines((prev) => [
+      ...prev,
+      {
+        lineIndex: nextLineIndex,
+        productId: "",
+        productName: "",
+        quantity: 1,
+        unit: "cajas",
+        pallets: 1,
+      },
+    ]);
+  }
+
+  function handleRemoveProductLine(lineIndex: number) {
+    setProductLines((prev) => prev.filter((line) => line.lineIndex !== lineIndex));
+  }
 
   async function handleSave() {
     if (!reception || !editable || !services || !user?.uid) return;
@@ -126,33 +175,39 @@ export default function EditarRecepcion({ recId, suppliers, onBack, onSave }: Pr
       const supplierRecord = await services.suppliers.getById(supplierId);
       if (!supplierRecord) throw new Error("No se encontró el proveedor en el catálogo.");
 
+      // Build lines from productLines
+      const lines = productLines.map((line) => ({
+        productId: line.productId || line.productName, // fallback for new lines
+        quantity: line.quantity,
+        unit: line.unit,
+        lot: undefined,
+        palletsCreated: 0,
+      }));
+
       const groupedLines = new Map<
         number,
         { productId: string; quantity: number; unit: string; palletsCreated: number }
       >();
-      for (const pallet of plannedPallets) {
-        const line = groupedLines.get(pallet.lineIndex) ?? {
-          productId: pallet.productId,
+      for (const line of productLines) {
+        const existing = groupedLines.get(line.lineIndex) ?? {
+          productId: line.productId || line.productName,
           quantity: 0,
-          unit: pallet.unit,
+          unit: line.unit,
           palletsCreated: 0,
         };
-        line.quantity += pallet.quantity;
-        groupedLines.set(pallet.lineIndex, line);
+        existing.quantity += line.quantity;
+        groupedLines.set(line.lineIndex, existing);
       }
-      const lines = [...groupedLines.entries()]
-        .sort(([left], [right]) => left - right)
-        .map(([, line]) => line);
-      const palletDrafts: PlannedReceptionPalletDraft[] = plannedPallets.map(
-        ({ palletNumber, lineIndex, productId, productName, quantity, unit }) => ({
-          palletNumber,
-          lineIndex,
-          productId,
-          productName,
-          quantity,
-          unit,
-        }),
-      );
+
+      const plannedPallets: PlannedReceptionPalletDraft[] = productLines.map((line) => ({
+        palletNumber: line.pallets,
+        lineIndex: line.lineIndex,
+        productId: line.productId || line.productName,
+        productName: line.productName,
+        quantity: line.quantity,
+        unit: line.unit,
+      }));
+
       const operationId = `op-edit-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       const editData: ReceptionCreateInput = {
         warehouseId: reception.warehouseId,
@@ -164,9 +219,9 @@ export default function EditarRecepcion({ recId, suppliers, onBack, onSave }: Pr
         supplierCode: supplierRecord.code,
         supplierName: supplierRecord.name,
         logisticsProvider: logisticsProvider.trim(),
-        productName: reception.productName,
+        productName: productLines.map(l => l.productName).join(", "),
         palletCount: plannedPallets.length,
-        plannedPallets: palletDrafts,
+        plannedPallets,
         status: "DRAFT",
         operationId,
         actorUserId: user.uid,
@@ -314,33 +369,105 @@ export default function EditarRecepcion({ recId, suppliers, onBack, onSave }: Pr
         </div>
 
         <div>
-          <h2 className="mb-3 text-base font-bold text-[#172126]">Productos programados</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-bold text-[#172126]">Productos programados</h2>
+            {editable && (
+              <button
+                type="button"
+                onClick={handleAddProductLine}
+                className="text-sm text-[#3276a8] hover:underline"
+              >
+                + Agregar producto
+              </button>
+            )}
+          </div>
           {productLines.length ? (
             <div className="divide-y divide-[#edf1f3] rounded-xl border border-[#edf1f3]">
-              {productLines.map((line, index) => (
+              {productLines.map((line) => (
                 <div
-                  key={`${line.productName}-${index}`}
+                  key={`${line.lineIndex}`}
                   className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
                 >
-                  <span className="font-semibold text-[#172126]">{line.productName}</span>
-                  <span className="text-sm text-[#607078]">
-                    {line.quantity} {line.unit} · {line.pallets} tarimas
-                  </span>
+                  <div className="flex flex-col gap-1 min-w-[200px] flex-1">
+                    {editable ? (
+                      <input
+                        type="text"
+                        value={line.productName}
+                        onChange={(e) =>
+                          setProductLines((prev) =>
+                            prev.map((l) =>
+                              l.lineIndex === line.lineIndex
+                                ? { ...l, productName: e.target.value, productId: e.target.value }
+                                : l
+                            )
+                          )
+                        }
+                        placeholder="Nombre del producto"
+                        className="min-h-11 rounded-lg border border-[#dce4e7] px-3 text-[#172126] font-semibold"
+                      />
+                    ) : (
+                      <span className="font-semibold text-[#172126]">{line.productName}</span>
+                    )}
+                    <span className="text-sm text-[#607078]">
+                      Línea {line.lineIndex + 1} · {line.pallets} tarimas
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {editable ? (
+                      <>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-[#607078]">Cant:</span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={line.quantity}
+                            onChange={(e) => handleProductQuantityChange(line.lineIndex, parseInt(e.target.value) || 1)}
+                            className="w-20 min-h-11 rounded-lg border border-[#dce4e7] px-2 text-[#172126] text-right"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-[#607078]">Und:</span>
+                          <select
+                            value={line.unit}
+                            onChange={(e) => handleProductUnitChange(line.lineIndex, e.target.value)}
+                            className="min-h-11 rounded-lg border border-[#dce4e7] px-2 text-[#172126]"
+                          >
+                            <option value="cajas">Cajas</option>
+                            <option value="unidades">Unidades</option>
+                            <option value="pallets">Pallets</option>
+                          </select>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveProductLine(line.lineIndex)}
+                          className="text-red-600 hover:text-red-800 text-sm"
+                          aria-label="Eliminar línea de producto"
+                        >
+                          Eliminar
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-sm text-[#607078]">
+                        {line.quantity} {line.unit} · {line.pallets} tarimas
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
           ) : (
             <p className="rounded-xl bg-[#f4f7f8] p-4 text-sm text-[#607078]">
               Esta recepción no tiene un plan detallado de tarimas.
+              {editable && " Agregá productos usando el botón de arriba."}
             </p>
           )}
         </div>
 
         <div>
           <h2 className="mb-3 text-base font-bold text-[#172126]">Tarimas y códigos QR</h2>
-          {plannedPallets.length ? (
+          {reception.plannedPallets && reception.plannedPallets.length ? (
             <div className="grid gap-3 sm:grid-cols-2">
-              {plannedPallets.map((pallet) => (
+              {reception.plannedPallets.map((pallet) => (
                 <article
                   key={pallet.qrIdentifier}
                   className="flex min-w-0 items-center gap-3 rounded-xl border border-[#edf1f3] p-3"

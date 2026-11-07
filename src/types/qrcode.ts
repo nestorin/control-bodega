@@ -6,7 +6,8 @@ export interface ParsedQR {
 }
 
 export function parseTarimaQR(qr: string): ParsedQR | null {
-  const match = qr.match(/^TQR-([A-Z0-9]+(?:-[A-Z0-9]+)*)-(\d{3})$/i);
+  // Accept both old format (TQR-{anything}-{3digits}) and new format (TQR-{8chars}-{3digits})
+  const match = qr.match(/^TQR-([A-Za-z0-9_-]+)-(\d{3})$/i);
   if (!match) return null;
   return { ocNumber: match[1], tarimaIndex: parseInt(match[2], 10) };
 }
