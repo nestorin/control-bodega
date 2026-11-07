@@ -41,7 +41,7 @@ service firebase.storage {
       allow read: if receptionIsInScope(orgId, warehouseId, receptionId) &&
         fileName.matches('^(invoice-preview|trailer|product|documentation)\\.(jpg|jpeg|png|webp)$');
       allow create, update: if receptionIsInScope(orgId, warehouseId, receptionId) &&
-        hasRole(orgId, ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'AUXILIAR_ALMACENISTA', 'SUPERVISOR', 'OPERATOR']) &&
+        hasRole(orgId, ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'AUXILIAR_ALMACENISTA', 'ALMACENISTA', 'SUPERVISOR', 'OPERATOR']) &&
         fileName.matches('^(invoice-preview|trailer|product|documentation)\\.(jpg|jpeg|png|webp)$') && validEvidenceUpload();
       allow delete: if receptionIsInScope(orgId, warehouseId, receptionId) &&
         hasRole(orgId, ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'SUPERVISOR']);
@@ -51,7 +51,7 @@ service firebase.storage {
     match /receptions/{receptionId}/invoice-preview.jpg {
       allow read: if hasActiveMembership('org_exepa_001') &&
         firestore.get(/databases/(default)/documents/organizations/org_exepa_001/receptions/$(receptionId)).data.actorUserId == request.auth.uid;
-      allow create, update: if hasRole('org_exepa_001', ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'AUXILIAR_ALMACENISTA', 'SUPERVISOR', 'OPERATOR']) &&
+      allow create, update: if hasRole('org_exepa_001', ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'AUXILIAR_ALMACENISTA', 'ALMACENISTA', 'SUPERVISOR', 'OPERATOR']) &&
         firestore.get(/databases/(default)/documents/organizations/org_exepa_001/receptions/$(receptionId)).data.actorUserId == request.auth.uid && validEvidenceUpload();
       allow delete: if hasRole('org_exepa_001', ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'SUPERVISOR']);
     }

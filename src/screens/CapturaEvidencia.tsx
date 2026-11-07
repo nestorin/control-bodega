@@ -209,6 +209,7 @@ export default function CapturaEvidencia({ onContinue, currentReception, recepti
     lote: currentReception?.lote || "",
   });
   const [notices, setNotices] = useState<string[]>([]);
+  const [noticeKind, setNoticeKind] = useState<"warning" | "error">("warning");
   const [saved, setSaved] = useState(false);
   const [saveNotice, setSaveNotice] = useState(false);
 
@@ -325,19 +326,23 @@ export default function CapturaEvidencia({ onContinue, currentReception, recepti
   }
 
   async function handleSave(): Promise<boolean> {
-    setSaveNotice(true);
-    setTimeout(() => setSaveNotice(false), 3000);
+    setSaveNotice(false);
 
     // Dual-write: save to Firestore if enabled
     if (useFirestore) {
       const persisted = await saveEvidenceToFirestore();
       if (!persisted) {
+        setSaved(false);
+        setNoticeKind("error");
         setNotices(["No se pudo guardar la evidencia. Verificá tus permisos y conexión."]);
         return false;
       }
     }
 
+    setNotices([]);
     setSaved(true);
+    setSaveNotice(true);
+    setTimeout(() => setSaveNotice(false), 3000);
     return true;
   }
 
@@ -362,6 +367,7 @@ export default function CapturaEvidencia({ onContinue, currentReception, recepti
     if (!form.caducidad.trim()) missing.push("Caducidad del producto");
 
     if (missing.length > 0) {
+      setNoticeKind("warning");
       setNotices(missing);
       setTimeout(() => setNotices([]), 5000);
       return;
@@ -518,20 +524,38 @@ export default function CapturaEvidencia({ onContinue, currentReception, recepti
 
         {/* Notices */}
         {notices.length > 0 && (
-          <div className="bg-[#fff8e6] border border-[#f2b84b] flex gap-3 items-start p-[14px] rounded-[12px] w-full">
-            <span className="text-[#f2b84b] text-[16px] shrink-0 mt-[1px]">⚠</span>
+          <div
+            className={`flex gap-3 items-start p-[14px] rounded-[12px] w-full ${
+              noticeKind === "error"
+                ? "bg-[#fff0ee] border border-[#d9534f]"
+                : "bg-[#fff8e6] border border-[#f2b84b]"
+            }`}
+          >
+            <span
+              className={`text-[16px] shrink-0 mt-[1px] ${
+                noticeKind === "error" ? "text-[#d9534f]" : "text-[#f2b84b]"
+              }`}
+            >
+              ⚠
+            </span>
             <div className="flex flex-col gap-1">
               <p
-                className="font-bold text-[#7a5c00] text-[13px]"
+                className={`font-bold text-[13px] ${
+                  noticeKind === "error" ? "text-[#a32d2a]" : "text-[#7a5c00]"
+                }`}
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
               >
-                Datos incompletos — se registrará sin ellos:
+                {noticeKind === "error"
+                  ? "No se pudo guardar la evidencia:"
+                  : "Revisá los datos requeridos:"}
               </p>
               <ul className="flex flex-col gap-[2px]">
                 {notices.map((n) => (
                   <li
                     key={n}
-                    className="text-[#7a5c00] text-[12px]"
+                    className={`text-[12px] ${
+                      noticeKind === "error" ? "text-[#a32d2a]" : "text-[#7a5c00]"
+                    }`}
                     style={{
                       fontFamily: "'Inter', sans-serif",
                       fontWeight: 400,

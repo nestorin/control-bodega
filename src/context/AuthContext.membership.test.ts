@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canAccessWarehouseForProfile, isValidMembership, type UserProfile } from "./AuthContext";
+import { rolesMatch } from "@/schemas/membership";
 
 const activeMember: UserProfile = {
   userId: "user-1",
@@ -66,6 +67,15 @@ describe("organization membership authorization", () => {
 
     expect(isValidMembership(legacy, "user-1")).toBe(true);
     expect(canAccessWarehouseForProfile("ACTIVE", canonical, "wh_tehuacan_1")).toBe(true);
+  });
+
+  it("treats ALMACENISTA as an operational warehouse-scoped role", () => {
+    const member: UserProfile = { ...activeMember, role: "ALMACENISTA" };
+
+    expect(isValidMembership(member, "user-1")).toBe(true);
+    expect(rolesMatch(member.role, "AUXILIAR_ALMACENISTA")).toBe(true);
+    expect(canAccessWarehouseForProfile("ACTIVE", member, "wh_tehuacan_1")).toBe(true);
+    expect(canAccessWarehouseForProfile("ACTIVE", member, "wh_tehuacan_2")).toBe(false);
   });
 
   it("does not grant scoped members access to an unassigned warehouse", () => {

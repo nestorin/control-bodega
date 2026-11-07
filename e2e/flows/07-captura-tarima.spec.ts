@@ -92,7 +92,7 @@ test.describe("Flujo: Captura de Tarima (Ciclo Completo)", () => {
     await captura.clickSiguiente();
 
     // Current CapturaTarima finalizes automatically after saving the last pallet.
-    await expect(page.getByText("Recepción completada")).toBeVisible({
+    await expect(page.getByText("5 tarimas registradas")).toBeVisible({
       timeout: 10000,
     });
 
@@ -115,7 +115,7 @@ test.describe("Flujo: Captura de Tarima (Ciclo Completo)", () => {
     await captura.expectLoaded(1, 5);
 
     // Verificar que se mantuvo el lote
-    const lote = await page.locator('input[type="text"]').first().inputValue();
+    const lote = await page.getByLabel("Lote *").inputValue();
     expect(lote).toBe("LT-BORRADOR-001");
   });
 
@@ -168,7 +168,7 @@ test.describe("Flujo: Captura de Tarima (Ciclo Completo)", () => {
     await captura.clickSiguiente();
 
     // Verificar finalización
-    await expect(page.getByText("Recepción completada")).toBeVisible({
+    await expect(page.getByText("5 tarimas registradas")).toBeVisible({
       timeout: 10000,
     });
 

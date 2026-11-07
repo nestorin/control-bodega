@@ -207,6 +207,8 @@ export default function CapturaTarima({
   const [scanning, setScanning] = useState(false);
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [scannedCode, setScannedCode] = useState<string | null>(null);
+  const [manualPalletId, setManualPalletId] = useState("");
+  const [isValidatingManualId, setIsValidatingManualId] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
@@ -426,6 +428,7 @@ export default function CapturaTarima({
         );
       }
       setScannedCode(code);
+      setManualPalletId("");
       setCurrentIndex(tarimaIndex);
       stopScanner();
       setCaptureError(null);
@@ -434,6 +437,17 @@ export default function CapturaTarima({
       alert("Este QR no está disponible para esta recepción o ya fue activado.");
     } finally {
       handlingScanRef.current = false;
+    }
+  }
+
+  async function handleManualPalletValidation() {
+    const palletId = manualPalletId.trim();
+    if (!palletId || isValidatingManualId) return;
+    setIsValidatingManualId(true);
+    try {
+      await handleScannedCode(palletId);
+    } finally {
+      setIsValidatingManualId(false);
     }
   }
 
@@ -485,6 +499,7 @@ export default function CapturaTarima({
     }
 
     setIsSaving(true);
+    setConfirmationError(null);
 
     // Guardar en Firestore si está habilitado
     if (useFirestore) {
@@ -575,41 +590,36 @@ export default function CapturaTarima({
       }
     }
 
-    setShowSuccess(true);
-    setIsSaving(false);
-
-    // Auto-avance a la siguiente tarima
-    setTimeout(async () => {
-      setShowSuccess(false);
-      if (!isLastTarima) {
-        setScannedCode(null);
-        setCurrentIndex((i) => i + 1);
-      } else {
-        // Todas completadas
+    if (isLastTarima) {
+      try {
         if (currentReception?.receptionId && useFirestore && firestoreReady && fsServices) {
-          try {
-            await fsServices.receptions.confirmReception(
-              currentReception.receptionId,
-              "user",
-              `op-${Date.now()}`,
-            );
-          } catch (e) {
-            console.error("Authorized reception confirmation failed:", e);
-            setConfirmationError(
-              "Las tarimas se guardaron, pero no se confirmó la recepción. Reintentá.",
-            );
-            alert(
-              "Las tarimas se guardaron, pero no se pudo confirmar la recepción. Reintentá desde el historial.",
-            );
-            return;
-          }
+          await fsServices.receptions.confirmReception(
+            currentReception.receptionId,
+            "user",
+            `op-${Date.now()}`,
+          );
         }
-        // Limpiar localStorage
         if (currentReception?.ocFolio) {
           localStorage.removeItem(STORAGE_KEY);
         }
         onFinish();
+      } catch (error) {
+        console.error("Authorized reception confirmation failed:", error);
+        setConfirmationError(
+          "Las tarimas se guardaron, pero no se confirmó la recepción. Reintentá desde esta pantalla.",
+        );
+      } finally {
+        setIsSaving(false);
       }
+      return;
+    }
+
+    setShowSuccess(true);
+    window.setTimeout(() => {
+      setShowSuccess(false);
+      setScannedCode(null);
+      setCurrentIndex((index) => index + 1);
+      setIsSaving(false);
     }, 1500);
   }
 
@@ -851,6 +861,45 @@ export default function CapturaTarima({
           )}
         </div>
 
+        {!currentTarima?.completed && (
+          <div className="flex flex-col gap-2 rounded-xl border border-[#dce4e7] bg-[#f8fafb] p-3">
+            <label htmlFor="manual-pallet-id" className="text-sm font-bold text-[#172126]">
+              Ingresar ID de tarima manualmente
+            </label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                id="manual-pallet-id"
+                type="text"
+                autoCapitalize="characters"
+                autoComplete="off"
+                spellCheck={false}
+                value={manualPalletId}
+                onChange={(event) => setManualPalletId(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void handleManualPalletValidation();
+                  }
+                }}
+                placeholder="TQR-..."
+                className="min-h-11 min-w-0 flex-1 rounded-lg border border-[#dce4e7] bg-white px-3 text-sm text-[#172126]"
+                disabled={isValidatingManualId || isSaving}
+              />
+              <button
+                type="button"
+                onClick={() => void handleManualPalletValidation()}
+                disabled={!manualPalletId.trim() || isValidatingManualId || isSaving}
+                className="min-h-11 rounded-lg bg-[#16343f] px-4 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {isValidatingManualId ? "Validando..." : "Validar ID"}
+              </button>
+            </div>
+            <p className="text-xs text-[#607078]">
+              El ID debe pertenecer a una tarima pendiente de esta recepción.
+            </p>
+          </div>
+        )}
+
         {/* Datos Preliminares (Auto-llenados del QR) */}
         <div className="bg-[#e7f0f2] border border-[#3276a8] rounded-[14px] p-4 w-full">
           <p
@@ -901,12 +950,14 @@ export default function CapturaTarima({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
             <div className="flex flex-col gap-1">
               <label
+                htmlFor="pallet-lot"
                 className="font-bold text-[#607078] text-[11px]"
                 style={{ fontFamily: "'Inter', sans-serif" }}
               >
                 Lote *
               </label>
               <input
+                id="pallet-lot"
                 type="text"
                 value={currentTarima?.lote || autoLote}
                 onBlur={() =>

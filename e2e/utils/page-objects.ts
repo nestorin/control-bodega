@@ -361,12 +361,12 @@ export class CapturaTarimaPage extends BasePage {
     await expect(this.page.getByText(new RegExp(`Tarima ${tarima} de ${total}`))).toBeVisible({
       timeout: 10000,
     });
-    await expect(this.page.locator('input[type="text"]').first()).toBeVisible();
+    await expect(this.page.getByLabel("Lote *")).toBeVisible();
     await expect(this.page.locator('input[type="date"]').first()).toBeVisible();
   }
 
   async fillLote(value: string): Promise<void> {
-    await this.page.locator('input[type="text"]').first().fill(value);
+    await this.page.getByLabel("Lote *").fill(value);
   }
 
   async fillCaducidad(value: string): Promise<void> {
@@ -405,7 +405,7 @@ export class CapturaTarimaPage extends BasePage {
         this.page.getByText(new RegExp(`Tarima ${currentTarima + 1} de ${totalTarimas}`)),
       ).toBeVisible({ timeout: 10000 });
     } else {
-      await expect(this.page.getByText("Recepción completada")).toBeVisible({
+      await expect(this.page.getByText(`${totalTarimas} tarimas registradas`)).toBeVisible({
         timeout: 10000,
       });
     }

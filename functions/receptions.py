@@ -136,7 +136,7 @@ def _refs(db, operation_id):
 def _check_actor(req, db, warehouse_id):
     actor = _actor(req, db)
     if actor.get("role") not in {
-        "OPERATOR", "SUPERVISOR", "ADMIN", "AUXILIAR_ALMACENISTA",
+        "OPERATOR", "SUPERVISOR", "ADMIN", "AUXILIAR_ALMACENISTA", "ALMACENISTA",
         "GERENTE_ALMACEN", "SUPER_ADMIN",
     }:
         raise https_fn.HttpsError("permission-denied", "Reception write denied")

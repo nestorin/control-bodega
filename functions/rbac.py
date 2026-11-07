@@ -27,7 +27,7 @@ WAREHOUSE_ALIASES = {
 }
 ROLES = {
     "OPERATOR", "SUPERVISOR", "AUDITOR", "ADMIN",
-    "AUXILIAR_ALMACENISTA", "GERENTE_ALMACEN",
+    "AUXILIAR_ALMACENISTA", "ALMACENISTA", "GERENTE_ALMACEN",
 }
 # PENDING is gone: open sign-up provisions ACTIVE profiles directly, so there
 # is no approval queue for an admin to move anyone out of.
@@ -134,7 +134,7 @@ def adjust_inventory(req: https_fn.CallableRequest):
     db = firestore.client()
     member = _actor(req, db)
     if member.get("role") not in {
-        "OPERATOR", "SUPERVISOR", "ADMIN", "AUXILIAR_ALMACENISTA", "GERENTE_ALMACEN",
+        "OPERATOR", "SUPERVISOR", "ADMIN", "AUXILIAR_ALMACENISTA", "ALMACENISTA", "GERENTE_ALMACEN",
         "SUPER_ADMIN",
     }:
         raise https_fn.HttpsError("permission-denied", "Inventory write denied")

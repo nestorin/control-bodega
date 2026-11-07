@@ -70,6 +70,7 @@ async function seedFixtures() {
         "SUPER_ADMIN",
         "GERENTE_ALMACEN",
         "AUXILIAR_ALMACENISTA",
+        "ALMACENISTA",
         "AUDITOR",
         "OPERATOR",
         "SUPERVISOR",
@@ -191,6 +192,23 @@ describe("Firestore security rules (emulator)", () => {
     const adminDb = testEnv!.authenticatedContext("admin-1").firestore();
     await assertFails(deleteDoc(doc(adminDb, `organizations/${orgId}/users/operator-1`)));
     await assertFails(deleteDoc(doc(adminDb, `organizations/${orgId}/users/admin-1`)));
+  });
+
+  rulesTest("allows ALMACENISTA to create a scoped draft but not delete memberships", async () => {
+    const db = testEnv!.authenticatedContext("role-3").firestore();
+    await assertSucceeds(
+      setDoc(doc(db, `organizations/${orgId}/receptions/alma-draft`), {
+        id: "alma-draft",
+        organizationId: orgId,
+        warehouseId: wh1,
+        status: "DRAFT",
+        operationId: "alma-draft-op",
+        actorUserId: "role-3",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    );
+    await assertFails(deleteDoc(doc(db, `organizations/${orgId}/users/role-3`)));
   });
 
   rulesTest(

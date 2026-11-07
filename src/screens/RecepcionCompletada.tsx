@@ -84,21 +84,6 @@ export default function RecepcionCompletada({ onHome, onPrint, currentReception 
   const fecha = "19 Sep 2026 · 09:42";
   const evidencia = `orden_${ocFolio}.pdf`;
 
-  if (loading && observeReception) {
-    return (
-      <div className="flex flex-col gap-5 p-4 md:p-7 size-full items-center justify-center">
-        <div className="bg-[#fff5dd] flex flex-col gap-2 items-center justify-center rounded-[28px] w-full max-w-[190px] py-5">
-          <p
-            className="font-extrabold text-[#8e592e] text-[11px] whitespace-nowrap"
-            style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
-          >
-            Cargando...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   // If reception is IN_PROGRESS but not yet CONFIRMED, allow confirming from here
   const canConfirm =
     useFirestore &&
@@ -129,6 +114,11 @@ export default function RecepcionCompletada({ onHome, onPrint, currentReception 
 
   return (
     <div className="flex flex-col gap-5 p-4 md:p-7 size-full">
+      {loading && observeReception && (
+        <p role="status" className="rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
+          La recepción quedó registrada. Cargando el resumen guardado…
+        </p>
+      )}
       {receptionError && (
         <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
           No se pudo cargar el detalle desde Firestore. Se muestra el resumen local.

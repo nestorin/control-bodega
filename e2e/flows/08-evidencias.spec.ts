@@ -94,7 +94,7 @@ test.describe("Flujo: Evidencias Fotográficas (P0)", () => {
     await captura.clickContinue();
 
     // Debe mostrar notificaciones de campos faltantes
-    await expect(page.getByText("Datos incompletos")).toBeVisible({
+    await expect(page.getByText("Revisá los datos requeridos:")).toBeVisible({
       timeout: 5000,
     });
     await expect(page.getByText("Foto del tráiler")).toBeVisible();

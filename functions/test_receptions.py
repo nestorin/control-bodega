@@ -23,6 +23,18 @@ from receptions import (
 
 
 class ReceptionCommandContractTests(unittest.TestCase):
+    def test_almacenista_can_pass_reception_actor_boundary(self):
+        request = SimpleNamespace(auth=SimpleNamespace(uid="warehouse-user", token={}))
+        actor = {
+            "userId": "warehouse-user",
+            "role": "ALMACENISTA",
+            "warehouseId": "wh_tehuacan_1",
+        }
+        with patch.object(receptions, "_actor", return_value=actor):
+            self.assertEqual(
+                receptions._check_actor(request, object(), "wh_tehuacan_1"), actor
+            )
+
     def test_create_reception_line_limit_matches_transaction_write_boundary(self):
         _validate_reception_create_write_count(497)
         with self.assertRaises(https_fn.HttpsError) as raised:

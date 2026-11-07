@@ -27,7 +27,7 @@ service cloud.firestore {
         membership.data.status == 'ACTIVE' &&
         membership.data.role in [
           'SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN',
-          'AUXILIAR_ALMACENISTA', 'AUDITOR', 'OPERATOR', 'SUPERVISOR'
+          'AUXILIAR_ALMACENISTA', 'ALMACENISTA', 'AUDITOR', 'OPERATOR', 'SUPERVISOR'
         ];
     }
 
@@ -97,7 +97,7 @@ service cloud.firestore {
 
     function isOperatorOrAbove(orgId) {
       return hasRole(orgId, [
-        'AUXILIAR_ALMACENISTA', 'OPERATOR', 'GERENTE_ALMACEN',
+        'AUXILIAR_ALMACENISTA', 'ALMACENISTA', 'OPERATOR', 'GERENTE_ALMACEN',
         'SUPERVISOR', 'SUPER_ADMIN', 'ADMIN'
       ]);
     }
@@ -178,7 +178,8 @@ service cloud.firestore {
               && (!('email' in request.resource.data) ||
                   (request.resource.data.email is string &&
                    request.resource.data.email.size() <= 254)));
-        allow delete: if isOrgAdmin(orgId);
+        // Revocation preserves the membership and its audit history.
+        allow delete: if false;
       }
 
       // ===== SUPPLIERS =====
