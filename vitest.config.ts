@@ -11,7 +11,10 @@ export default defineConfig({
     // Firestore emulator integration tests run only through `pnpm test:rules`.
     // Keeping them out of the unit suite prevents a missing emulator from
     // becoming skipped or misleading coverage.
-    exclude: ["src/test/services/palletService.getByQR.test.ts"],
+    exclude: [
+      "src/test/services/palletService.getByQR.test.ts",
+      "src/test/storage.rules.emulator.test.ts",
+    ],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html", "lcov"],

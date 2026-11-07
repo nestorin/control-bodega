@@ -6,10 +6,12 @@ export default defineConfig({
     environment: "node",
     include: [
       "src/test/firestore.rules.emulator.test.ts",
+      "src/test/storage.rules.emulator.test.ts",
       "src/test/services/palletService.getByQR.test.ts",
     ],
     testTimeout: 30000,
     hookTimeout: 30000,
+    maxWorkers: 1,
   },
   resolve: {
     alias: {
