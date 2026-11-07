@@ -36,9 +36,13 @@ function authenticationErrorMessage(error: unknown): string {
       return "Se canceló el inicio de sesión con Google.";
     case "auth/operation-not-supported-in-this-environment":
       return "Este navegador no permite iniciar sesión con Google. Prueba con otro navegador.";
+    case "auth/internal-error":
+    case "auth/web-storage-unsupported":
+      return "No se pudo completar el acceso con Google. Inténtalo de nuevo o usa email y contraseña.";
     case "auth/cancelled-popup-request":
       return "Se inició otra solicitud de acceso. Inténtalo de nuevo.";
     case "auth/network-request-failed":
+    case "auth/timeout":
     case "unavailable":
       return "No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.";
     case "permission-denied":

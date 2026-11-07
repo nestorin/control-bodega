@@ -16,13 +16,22 @@ const activeMember: UserProfile = {
 };
 
 describe("organization membership authorization", () => {
-  it("uses redirect only for popup restrictions, not user cancellation or configuration errors", () => {
+  it("retries popup infrastructure failures with redirect, but not user or configuration failures", () => {
     expect(shouldRetryGoogleWithRedirect("auth/popup-blocked")).toBe(true);
     expect(shouldRetryGoogleWithRedirect("auth/operation-not-supported-in-this-environment")).toBe(
       true,
     );
+    expect(shouldRetryGoogleWithRedirect("auth/internal-error")).toBe(true);
+    expect(shouldRetryGoogleWithRedirect("auth/network-request-failed")).toBe(true);
+    expect(shouldRetryGoogleWithRedirect("auth/timeout")).toBe(true);
+    expect(shouldRetryGoogleWithRedirect("auth/web-storage-unsupported")).toBe(true);
     expect(shouldRetryGoogleWithRedirect("auth/popup-closed-by-user")).toBe(false);
+    expect(shouldRetryGoogleWithRedirect("auth/cancelled-popup-request")).toBe(false);
     expect(shouldRetryGoogleWithRedirect("auth/unauthorized-domain")).toBe(false);
+    expect(shouldRetryGoogleWithRedirect("auth/operation-not-allowed")).toBe(false);
+    expect(shouldRetryGoogleWithRedirect("auth/account-exists-with-different-credential")).toBe(
+      false,
+    );
   });
   it("accepts an active membership from the canonical organization path", () => {
     expect(isValidMembership(activeMember, "user-1")).toBe(true);

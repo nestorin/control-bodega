@@ -161,4 +161,22 @@ describe("Login enrollment", () => {
     );
     log.mockRestore();
   });
+
+  it("maps a Google infrastructure error to actionable copy without exposing diagnostics", async () => {
+    setAuthState({
+      ...authState,
+      loginWithGoogle: vi.fn().mockRejectedValue({
+        code: "auth/internal-error",
+        message: "private Firebase diagnostic",
+      }),
+    });
+
+    render(<Login />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Google" }));
+
+    expect(
+      await screen.findByText(/Inténtalo de nuevo o usa email y contraseña/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("private Firebase diagnostic")).not.toBeInTheDocument();
+  });
 });

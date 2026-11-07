@@ -52,9 +52,16 @@ export interface UserProfile {
 export type AccessStatus = "UNAUTHENTICATED" | "ACTIVE" | "INACTIVE" | "ERROR";
 
 export function shouldRetryGoogleWithRedirect(code: string): boolean {
-  return (
-    code === "auth/popup-blocked" || code === "auth/operation-not-supported-in-this-environment"
-  );
+  // A redirect bypasses popup/iframe/storage failures, but cannot fix a
+  // disabled provider, unauthorized domain, or a user-cancelled sign-in.
+  return [
+    "auth/popup-blocked",
+    "auth/operation-not-supported-in-this-environment",
+    "auth/internal-error",
+    "auth/network-request-failed",
+    "auth/timeout",
+    "auth/web-storage-unsupported",
+  ].includes(code);
 }
 
 // Open sign-up: every authenticated account gets an immediately usable
