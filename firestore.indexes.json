@@ -158,6 +158,14 @@
         { "fieldPath": "warehouseId", "order": "ASCENDING" },
         { "fieldPath": "productId", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "pallets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "qrIdentifier", "order": "ASCENDING" },
+        { "fieldPath": "warehouseId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

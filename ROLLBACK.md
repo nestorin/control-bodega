@@ -7,39 +7,56 @@
 
 ## 🚨 Rollback de Código (Git)
 
-### Opción A: Tag estable (recomendado)
+**Regla de oro: en `main` se usa `git revert`, nunca `git reset --hard` ni `git push -f`.**
+
+`reset --hard` + force push reescribe historia compartida: rompe el `origin/main` de cualquier
+persona que tenga el repo clonado, invalida los tags ya publicados y hace que el reflog local deje
+de coincidir con el remoto. Un `revert` crea un commit nuevo que deshace el cambio: el historial
+se mantiene lineal, el CI vuelve a correr sobre el resultado y el deploy se repite solo.
+
+### Opción A: Revertir el último commit (recomendado)
 
 ```bash
-# 1. Verificar tags disponibles
-git tag -l "v1.4.*" --sort=-v:refname
+# Ver qué se quiere deshacer
+git log --oneline -5
 
-# 2. Checkout al tag estable
-git checkout v1.4.0-audit-complete
+# Deshacer el commit como un commit nuevo (no reescribe historia)
+git revert --no-edit <commit-hash>
 
-# 3. Forzar push a main (requiere permisos admin)
-git push -f origin main
+# Push normal, sin force
+git push origin main
+# El CI corre y vuelve a desplegar automáticamente la versión sana
 ```
 
-### Opción B: Commit específico
+### Opción B: Revertir un merge (si se metió vía PR)
 
 ```bash
-# Ver historial reciente
-git log --oneline -20
-
-# Resetear a commit conocido bueno
-git reset --hard <commit-hash>
-
-# Forzar push
-git push -f origin main
-```
-
-### Opción C: Revertir último merge (si fue PR)
-
-```bash
-# En GitHub UI: PR → "Revert" → crea PR de revert
-# O desde CLI:
 git revert -m 1 <merge-commit-hash>
 git push origin main
+```
+
+### Opción C: Volver a un tag estable
+
+```bash
+# 1. Ver tags disponibles
+git tag -l "v1.4.*" --sort=-v:refname
+
+# 2. Aplicar el contenido de ese tag sobre main, sin tocar el historial
+git revert --no-edit <tag>          # o: git merge <tag>
+git push origin main
+```
+
+> ⚠️ `git push -f origin main` y `git reset --hard` se reservan **únicamente** para un desastre
+> local (historial corrupto, rebase a medias) y siempre coordinados: avisar antes, y nunca si
+> alguien más ya clonó el estado a descartar. Si dudas, haz `revert`.
+
+### Recuperación accidental (si ya se hizo un reset)
+
+```bash
+# El reflog conserva el estado previo durante ~90 días
+git reflog                      # localizar el hash anterior al reset
+git reset --hard <hash-previo>  # solo si nadie más tiene el remoto avanzado
+git push --force-with-lease     # NUNCA --force a ciegas
 ```
 
 ---
@@ -134,9 +151,19 @@ gcloud firestore import gs://exepa-almacen-backups/firestore/20261107-030000 \
 
 ---
 
-## 🔄 Backup Automático Firestore (Configurado)
+## 🔄 Backup Automático Firestore (⚠️ PENDIENTE — no está configurado)
 
-Ver: `BACKUP_AUTOMATICO.md` para configuración de `gcloud scheduler` + Cloud Function diaria a las 03:00 UTC.
+Estado real verificado el 2026-11-07: **el backup automático NO existe todavía.**
+
+| Requisito                           | Estado                                   |
+| ----------------------------------- | ---------------------------------------- |
+| API `cloudscheduler.googleapis.com` | ❌ deshabilitada en `exepa-almacen-safe` |
+| Bucket `gs://exepa-almacen-backups` | ❌ no creado                             |
+| Job diario 03:00 UTC                | ❌ no existe                             |
+
+Ver `BACKUP_AUTOMATICO.md` para los comandos exactos de configuración. Hasta que esto quede
+verde, **no existe backup de los datos de producción**: `ROLLBACK.md` solo puede restaurar
+código, no recepciones ni tarimas.
 
 ---
 
