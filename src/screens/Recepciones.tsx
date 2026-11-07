@@ -543,8 +543,8 @@ export default function Recepciones({
     return () => window.clearTimeout(timer);
   }, [qrPrintSet]);
 
-  // Use Firestore data when enabled, otherwise local
-  const lista = useFirestore && !loadingFs ? recepcionesFirestore : listaLocal;
+  // The warehouse-scoped server read populates this list when Firestore is enabled.
+  const lista = listaLocal;
 
   // Lista filtrada
   const listaFiltrada = lista.filter((rec) => {
