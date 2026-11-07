@@ -83,6 +83,11 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
+// App Check must use the project-registered Enterprise key injected by the
+// deployment environment. Do not silently substitute a key: that can make an
+// apparently healthy production bundle mint tokens for the wrong Firebase app.
+const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+
 if (useFirebaseEmulators && firebaseConfig.projectId !== E2E_FIREBASE_PROJECT_ID) {
   throw new Error(
     `Firebase emulator mode requires project ${E2E_FIREBASE_PROJECT_ID}; refusing ${firebaseConfig.projectId || "an unset project"}.`,
@@ -110,7 +115,7 @@ const app = isFirebaseConfigured
 export const appCheck =
   app && import.meta.env.PROD && !useFirebaseEmulators
     ? initializeAppCheck(app, {
-        provider: new ReCaptchaEnterpriseProvider("6LcdhP4tAAAAALeq2aFA9Z-0zXdAAsH8nfk6Q4hs"),
+        provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
         isTokenAutoRefreshEnabled: true,
       })
     : null;

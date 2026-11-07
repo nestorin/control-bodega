@@ -1,5 +1,6 @@
 # functions/main.py - Entry point para Firebase Functions Gen2 (Python)
 # Re-exporta las funciones desde el módulo ocr
+# App Check enforcement: OFF (temporal - ver firebase.json)
 
 from ocr.main import health
 from ocr.main_secure import extract_ocr_secure

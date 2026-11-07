@@ -1,0 +1,21 @@
+{
+  "origins": [
+    {
+      "origin": "http://localhost:5173",
+      "localStorage": [
+        {
+          "name": "auth_user",
+          "value": "{\"uid\":\"test-user-qa\",\"email\":\"qa@exepa.com\",\"displayName\":\"QA User\",\"emailVerified\":true,\"stsTokenManager\":{\"accessToken\":\"mock-access-token\",\"refreshToken\":\"mock-refresh-token\",\"expirationTime\":1791777549842}}"
+        },
+        {
+          "name": "auth_profile",
+          "value": "{\"userId\":\"test-user-qa\",\"organizationId\":\"org_exepa_001\",\"role\":\"OPERATOR\",\"status\":\"ACTIVE\",\"warehouseId\":\"wh_tehuacan_1\",\"warehouseIds\":[\"wh_tehuacan_1\"],\"createdAt\":{\"seconds\":1791773949,\"nanoseconds\":0},\"updatedAt\":{\"seconds\":1791773949,\"nanoseconds\":0}}"
+        },
+        {
+          "name": "feature_flags",
+          "value": "{\"USE_FIRESTORE_RECEPCIONES\":true,\"USE_FIRESTORE_CATALOGOS\":true,\"USE_FIRESTORE_EVIDENCIAS\":true,\"USE_FIRESTORE_INVENTARIO\":true,\"USE_FIRESTORE_EMBARQUES\":true,\"USE_FIRESTORE_LOTES\":true,\"USE_FIRESTORE_OFFLINE_QUEUE\":true,\"USE_NEW_RECEPTION_FLOW\":false}"
+        }
+      ]
+    }
+  ]
+}

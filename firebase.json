@@ -35,7 +35,7 @@
     "runtime": "python311",
     "region": "us-central1",
     "appCheck": {
-      "enforcement": "ENFORCE"
+      "enforcement": "OFF"
     }
   },
   "firestore": {
