@@ -166,6 +166,17 @@ export abstract class BaseService<T extends { id: string }> {
     return this.getById(id) as Promise<T>;
   }
 
+  /**
+   * Rules can allow a writer to UPDATE a document without letting it READ it
+   * back: memberships let an admin change another member's role, but `get` is
+   * restricted to the member's own document. The write has already committed
+   * when the read-back runs, so classes whose documents their writer cannot
+   * read must skip it instead of reporting a success as a failure.
+   */
+  protected canReadBackAfterWrite(): boolean {
+    return true;
+  }
+
   async update(id: string, data: Partial<T>, actorUserId: string, operationId: string): Promise<T> {
     const ref = this.getDocRef(id);
     const now = serverTimestamp();
@@ -178,6 +189,10 @@ export abstract class BaseService<T extends { id: string }> {
     await runTransaction(this.db, async (tx) => {
       tx.update(ref, updateData);
     });
+
+    if (!this.canReadBackAfterWrite()) {
+      return { ...updateData, id } as T;
+    }
 
     return this.getById(id) as Promise<T>;
   }

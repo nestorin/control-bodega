@@ -13,6 +13,7 @@ export default defineConfig({
     // becoming skipped or misleading coverage.
     exclude: [
       "src/test/services/palletService.getByQR.test.ts",
+      "src/test/services/userMembership.updateRole.test.ts",
       "src/test/storage.rules.emulator.test.ts",
     ],
     coverage: {

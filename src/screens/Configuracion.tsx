@@ -1715,6 +1715,7 @@ function TabRoles({
   >([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const ROLE_OPTIONS = [
     { value: "SUPER_ADMIN", label: "Super Admin" },
@@ -1730,6 +1731,7 @@ function TabRoles({
     if (!firestoreReady || !fsServices || !canQuery) return;
     setLoading(true);
     setError(null);
+    setNotice(null);
     try {
       const { data } = await fsServices.userMemberships.getAllMembers();
       setMembers(
@@ -1757,6 +1759,8 @@ function TabRoles({
 
   const handleRoleChange = async (userId: string, newRole: (typeof ROLE_OPTIONS)[0]["value"]) => {
     if (!firestoreReady || !fsServices || !canQuery) return;
+    setError(null);
+    setNotice(null);
     try {
       await fsServices.userMemberships.updateRole(
         userId,
@@ -1765,15 +1769,17 @@ function TabRoles({
         `op-${Date.now()}`,
       );
       setMembers((prev) => prev.map((m) => (m.userId === userId ? { ...m, role: newRole } : m)));
+      setNotice(`Rol actualizado a ${getRoleLabel(newRole)} — el cambio ya está guardado.`);
     } catch (e) {
       console.error("Error updating role:", e);
-      alert("No se pudo actualizar el rol");
-      loadMembers();
+      setError("No se pudo actualizar el rol. Verifica que seas ADMIN o SUPER_ADMIN.");
     }
   };
 
   const handleStatusChange = async (userId: string, newStatus: "ACTIVE" | "INACTIVE") => {
     if (!firestoreReady || !fsServices || !canQuery) return;
+    setError(null);
+    setNotice(null);
     try {
       await fsServices.userMemberships.updateStatus(
         userId,
@@ -1784,10 +1790,12 @@ function TabRoles({
       setMembers((prev) =>
         prev.map((m) => (m.userId === userId ? { ...m, status: newStatus } : m)),
       );
+      setNotice(
+        `Estado actualizado a ${newStatus === "ACTIVE" ? "Activo" : "Inactivo"} — el cambio ya está guardado.`,
+      );
     } catch (e) {
       console.error("Error updating status:", e);
-      alert("No se pudo actualizar el estado");
-      loadMembers();
+      setError("No se pudo actualizar el estado. Verifica que seas ADMIN o SUPER_ADMIN.");
     }
   };
 
@@ -1827,6 +1835,15 @@ function TabRoles({
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
           {error}
+        </div>
+      )}
+
+      {notice && (
+        <div
+          role="status"
+          className="bg-green-50 border border-green-200 text-green-700 rounded-lg p-3 text-sm"
+        >
+          {notice}
         </div>
       )}
 

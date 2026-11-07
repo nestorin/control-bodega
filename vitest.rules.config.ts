@@ -8,6 +8,7 @@ export default defineConfig({
       "src/test/firestore.rules.emulator.test.ts",
       "src/test/storage.rules.emulator.test.ts",
       "src/test/services/palletService.getByQR.test.ts",
+      "src/test/services/userMembership.updateRole.test.ts",
     ],
     testTimeout: 30000,
     hookTimeout: 30000,

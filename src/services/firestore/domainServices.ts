@@ -78,6 +78,13 @@ export class UserMembershipService extends BaseService<UserMembershipDoc> {
     return "user_membership";
   }
 
+  // Firestore rules only let a member `get` their own membership document, so an
+  // admin changing someone else's role would be denied on read-back even though
+  // the write itself succeeded. Skip it: callers get the committed state.
+  protected canReadBackAfterWrite(): boolean {
+    return false;
+  }
+
   async getAllMembers(): Promise<{ data: UserMembershipDoc[] }> {
     const result = await this.getAll({ orderBy: ["userId", "asc"] });
     return result;
