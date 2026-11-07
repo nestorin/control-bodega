@@ -38,6 +38,7 @@ import type {
   ShipmentDoc,
   ShipmentLine,
   LotCaducidadDoc,
+  UserMembershipDoc,
 } from "./types";
 
 export class WarehouseService extends BaseService<WarehouseDoc> {
@@ -62,6 +63,52 @@ export class WarehouseService extends BaseService<WarehouseDoc> {
       .map((warehouse) => this.fromFirestore(warehouse))
       .sort((left, right) => (left.code ?? "").localeCompare(right.code ?? ""));
     return { data };
+  }
+}
+
+export class UserMembershipService extends BaseService<UserMembershipDoc> {
+  protected collectionPath = "organizations/{orgId}/users";
+  protected fromFirestore(doc: any): UserMembershipDoc {
+    return { id: doc.id, ...doc.data() } as UserMembershipDoc;
+  }
+  protected toFirestore(data: Partial<UserMembershipDoc>) {
+    return data;
+  }
+  protected getAuditEntityType() {
+    return "user_membership";
+  }
+
+  async getAllMembers(): Promise<{ data: UserMembershipDoc[] }> {
+    const result = await this.getAll({ orderBy: ["userId", "asc"] });
+    return result;
+  }
+
+  async updateRole(
+    userId: string,
+    role: UserMembershipDoc["role"],
+    actorUserId: string,
+    operationId: string,
+  ): Promise<UserMembershipDoc> {
+    return this.update(
+      userId,
+      { role, updatedAt: serverTimestamp() as any },
+      actorUserId,
+      operationId,
+    );
+  }
+
+  async updateStatus(
+    userId: string,
+    status: UserMembershipDoc["status"],
+    actorUserId: string,
+    operationId: string,
+  ): Promise<UserMembershipDoc> {
+    return this.update(
+      userId,
+      { status, updatedAt: serverTimestamp() as any },
+      actorUserId,
+      operationId,
+    );
   }
 }
 

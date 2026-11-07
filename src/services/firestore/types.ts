@@ -52,7 +52,15 @@ export interface UserMembershipDoc extends BaseDoc {
   organizationId: string;
   warehouseId?: string | null;
   userId: string;
-  role: "OPERATOR" | "SUPERVISOR" | "AUDITOR" | "ADMIN";
+  role:
+    | "SUPER_ADMIN"
+    | "ADMIN"
+    | "SUPERVISOR"
+    | "AUDITOR"
+    | "OPERATOR"
+    | "GERENTE_ALMACEN"
+    | "AUXILIAR_ALMACENISTA"
+    | "ALMACENISTA";
   status: "ACTIVE" | "INACTIVE";
 }
 

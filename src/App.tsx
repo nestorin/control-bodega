@@ -1291,7 +1291,9 @@ function AppLayout() {
                         },
                       },
                 );
-                receptionSession.transition("PALLETS");
+                if (receptionSession.session.phase === "EVIDENCE") {
+                  receptionSession.transition("PALLETS");
+                }
                 navigate("captura-tarima");
               }}
             />

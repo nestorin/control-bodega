@@ -4,6 +4,7 @@ import { createFirestoreServices } from "@/services/firestore";
 import { db } from "@/lib/firebase";
 import { useAuthorization, isPermissionDenied } from "@/hooks/useAuthorization";
 import { WAREHOUSE_IDS } from "@/config/warehouses";
+import { Panel } from "@/components/ui";
 import {
   CANONICAL_SUPPLIER_LOCAL,
   mergeSupplierCatalog,
@@ -260,7 +261,7 @@ export const PRODUCTOS_INIT: Producto[] = [
 
 // ─── Helpers / shared UI ──────────────────────────────────────────────────────
 
-type Tab = "almacenes" | "conversiones" | "mercancias" | "logistica" | "productos";
+type Tab = "almacenes" | "conversiones" | "mercancias" | "logistica" | "productos" | "roles";
 
 function SectionCard({
   children,
@@ -1692,6 +1693,256 @@ function TabProductos({
   );
 }
 
+function TabRoles({
+  fsServices,
+  firestoreReady,
+  canQuery,
+}: {
+  fsServices: ReturnType<typeof createFirestoreServices> | null;
+  firestoreReady: boolean;
+  canQuery: boolean;
+}) {
+  const [members, setMembers] = useState<
+    Array<{
+      id: string;
+      userId: string;
+      role: string;
+      status: string;
+      warehouseId?: string | null;
+      displayName?: string;
+      email?: string;
+    }>
+  >([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const ROLE_OPTIONS = [
+    { value: "SUPER_ADMIN", label: "Super Admin" },
+    { value: "ADMIN", label: "Admin" },
+    { value: "GERENTE_ALMACEN", label: "Gerente de Almacén" },
+    { value: "SUPERVISOR", label: "Supervisor" },
+    { value: "AUXILIAR_ALMACENISTA", label: "Auxiliar Almacenista" },
+    { value: "ALMACENISTA", label: "Almacenista" },
+    { value: "AUDITOR", label: "Auditor" },
+  ] as const;
+
+  const loadMembers = async () => {
+    if (!firestoreReady || !fsServices || !canQuery) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await fsServices.userMemberships.getAllMembers();
+      setMembers(
+        data.map((m) => ({
+          id: m.id,
+          userId: m.userId,
+          role: m.role,
+          status: m.status,
+          warehouseId: m.warehouseId ?? null,
+          displayName: (m as any).displayName ?? "",
+          email: (m as any).email ?? "",
+        })),
+      );
+    } catch (e) {
+      console.error("Error loading members:", e);
+      setError("No se pudieron cargar los usuarios");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMembers();
+  }, [firestoreReady, canQuery]);
+
+  const handleRoleChange = async (userId: string, newRole: (typeof ROLE_OPTIONS)[0]["value"]) => {
+    if (!firestoreReady || !fsServices || !canQuery) return;
+    try {
+      await fsServices.userMemberships.updateRole(
+        userId,
+        newRole,
+        "current-user",
+        `op-${Date.now()}`,
+      );
+      setMembers((prev) => prev.map((m) => (m.userId === userId ? { ...m, role: newRole } : m)));
+    } catch (e) {
+      console.error("Error updating role:", e);
+      alert("No se pudo actualizar el rol");
+      loadMembers();
+    }
+  };
+
+  const handleStatusChange = async (userId: string, newStatus: "ACTIVE" | "INACTIVE") => {
+    if (!firestoreReady || !fsServices || !canQuery) return;
+    try {
+      await fsServices.userMemberships.updateStatus(
+        userId,
+        newStatus,
+        "current-user",
+        `op-${Date.now()}`,
+      );
+      setMembers((prev) =>
+        prev.map((m) => (m.userId === userId ? { ...m, status: newStatus } : m)),
+      );
+    } catch (e) {
+      console.error("Error updating status:", e);
+      alert("No se pudo actualizar el estado");
+      loadMembers();
+    }
+  };
+
+  const getRoleLabel = (role: string) => {
+    return ROLE_OPTIONS.find((r) => r.value === role)?.label ?? role;
+  };
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case "SUPER_ADMIN":
+        return "bg-purple-100 text-purple-800";
+      case "ADMIN":
+        return "bg-blue-100 text-blue-800";
+      case "GERENTE_ALMACEN":
+        return "bg-green-100 text-green-800";
+      case "SUPERVISOR":
+        return "bg-yellow-100 text-yellow-800";
+      case "AUXILIAR_ALMACENISTA":
+      case "ALMACENISTA":
+        return "bg-gray-100 text-gray-800";
+      case "AUDITOR":
+        return "bg-indigo-100 text-indigo-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  return (
+    <div className="flex-1 overflow-auto space-y-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-[#172126]">Roles y usuarios</h2>
+        <Btn variant="secondary" small onClick={loadMembers} disabled={loading}>
+          {loading ? "Cargando..." : "Actualizar"}
+        </Btn>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
+          {error}
+        </div>
+      )}
+
+      <Panel className="p-0 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-[#f4f7f8] text-[12px] text-[#607078] uppercase tracking-wider">
+                <th className="px-4 py-3 font-semibold">Usuario</th>
+                <th className="px-4 py-3 font-semibold">Email</th>
+                <th className="px-4 py-3 font-semibold">Rol actual</th>
+                <th className="px-4 py-3 font-semibold">Cambiar rol</th>
+                <th className="px-4 py-3 font-semibold">Estado</th>
+                <th className="px-4 py-3 font-semibold">Almacén</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#edf1f3]">
+              {members.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-[#607078]">
+                    {loading ? "Cargando usuarios..." : "No hay usuarios registrados"}
+                  </td>
+                </tr>
+              ) : (
+                members.map((member) => (
+                  <tr key={member.userId} className="hover:bg-[#fafbfc]">
+                    <td className="px-4 py-3 text-sm text-[#172126] font-medium">
+                      {member.displayName || member.userId}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-[#607078]">{member.email || "—"}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${getRoleColor(
+                          member.role,
+                        )}`}
+                      >
+                        {getRoleLabel(member.role)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={member.role}
+                        onChange={(e) =>
+                          handleRoleChange(
+                            member.userId,
+                            e.target.value as (typeof ROLE_OPTIONS)[0]["value"],
+                          )
+                        }
+                        className="border border-[#dce4e7] rounded-lg px-3 py-1.5 text-sm text-[#172126] bg-white focus:border-[#3276a8] focus:outline-none w-full"
+                        disabled={!firestoreReady || loading}
+                      >
+                        {ROLE_OPTIONS.map((r) => (
+                          <option key={r.value} value={r.value}>
+                            {r.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={member.status}
+                        onChange={(e) =>
+                          handleStatusChange(member.userId, e.target.value as "ACTIVE" | "INACTIVE")
+                        }
+                        className="border border-[#dce4e7] rounded-lg px-3 py-1.5 text-sm text-[#172126] bg-white focus:border-[#3276a8] focus:outline-none w-full"
+                        disabled={!firestoreReady || loading}
+                      >
+                        <option value="ACTIVE">Activo</option>
+                        <option value="INACTIVE">Inactivo</option>
+                      </select>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-[#607078]">
+                      {member.warehouseId || "—"}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+
+      <div className="text-xs text-[#607078] bg-[#f4f7f8] rounded-lg p-3">
+        <p className="font-semibold text-[#172126] mb-1">Notas:</p>
+        <ul className="list-disc list-inside space-y-1">
+          <li>
+            Solo <strong>ADMIN</strong> y <strong>SUPER_ADMIN</strong> pueden modificar roles.
+          </li>
+          <li>
+            Los cambios se aplican inmediatamente y requieren que el usuario vuelva a iniciar
+            sesión.
+          </li>
+          <li>
+            <strong>SUPER_ADMIN</strong> tiene acceso total a todas las organizaciones y almacenes.
+          </li>
+          <li>
+            <strong>ADMIN</strong> gestiona usuarios y configuración dentro de su organización.
+          </li>
+          <li>
+            <strong>GERENTE_ALMACEN</strong> gestiona operaciones de almacén y supervisores.
+          </li>
+          <li>
+            <strong>SUPERVISOR</strong> supervisa recepciones, embarques e inventario.
+          </li>
+          <li>
+            <strong>AUXILIAR_ALMACENISTA / ALMACENISTA</strong> ejecutan tareas operativas.
+          </li>
+          <li>
+            <strong>AUDITOR</strong> tiene acceso de solo lectura para auditorías.
+          </li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 const TABS: {
@@ -1796,6 +2047,27 @@ const TABS: {
         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
         <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
         <line x1="12" y1="22.08" x2="12" y2="12" />
+      </svg>
+    ),
+  },
+  {
+    id: "roles",
+    label: "Roles y usuarios",
+    icon: (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </svg>
     ),
   },
@@ -2379,6 +2651,9 @@ export default function Configuracion({
             onDelete={handleDeleteProducto}
             onToggleActivo={handleToggleProductoActivo}
           />
+        )}
+        {tab === "roles" && (
+          <TabRoles fsServices={fsServices} firestoreReady={firestoreReady} canQuery={canQuery} />
         )}
       </div>
     </div>

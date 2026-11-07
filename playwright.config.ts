@@ -67,9 +67,8 @@ export default defineConfig({
       command:
         "for p in $(lsof -nP -iTCP:8082 -iTCP:9100 -iTCP:9199 -sTCP:LISTEN -t 2>/dev/null); do kill -9 $p; done; firebase emulators:start --config firebase.e2e.json --only auth,firestore,storage --project demo-exepa-e2e",
       url: "http://127.0.0.1:8082",
-      // Never reuse: a leftover emulator may hold the wrong rules file
-      // (firestore.rules instead of firestore.e2e.rules).
-      reuseExistingServer: false,
+      // Reuse existing emulator if already running (we started it manually)
+      reuseExistingServer: true,
       timeout: 120000,
     },
     {

@@ -17,6 +17,7 @@ import {
   InventoryMovementService,
   ShipmentService,
   LotCaducidadService,
+  UserMembershipService,
 } from "./domainServices";
 import { InventoryService } from "./inventoryService";
 
@@ -32,6 +33,7 @@ export interface FirestoreServices {
   inventoryMovements: InventoryMovementService;
   shipments: ShipmentService;
   lotesCaducidades: LotCaducidadService;
+  userMemberships: UserMembershipService;
 }
 
 export function createFirestoreServices(db: Firestore, orgId: string): FirestoreServices {
@@ -47,6 +49,7 @@ export function createFirestoreServices(db: Firestore, orgId: string): Firestore
     inventoryMovements: new InventoryMovementService(db, orgId),
     shipments: new ShipmentService(db, orgId),
     lotesCaducidades: new LotCaducidadService(db, orgId),
+    userMemberships: new UserMembershipService(db, orgId),
   };
 }
 
