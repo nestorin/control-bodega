@@ -24,14 +24,15 @@ es la prueba que se vuelve a correr cuando algo cambia.
 
 ## 2. Verificación antes de cada commit
 
-| Punto                      | Estado | Evidencia                                                  |
-| -------------------------- | ------ | ---------------------------------------------------------- |
-| CI en cada push a `main`   | ✅     | `.github/workflows/ci-cd.yml` → lint, typecheck, unit, E2E |
-| Lint (`oxfmt --check`)     | ✅     | corregido en `16ed718` (18 archivos formateados)           |
-| Typecheck (`tsc --noEmit`) | ✅     | 0 errores                                                  |
-| Unit tests                 | ✅     | 320 passed / 29 skipped                                    |
-| E2E (Playwright)           | ✅     | 44 passed / 1 skipped                                      |
-| Deploy atado al CI         | ✅     | `deploy-production` necesita los 3 jobs verdes             |
+| Punto                      | Estado | Evidencia                                                         |
+| -------------------------- | ------ | ----------------------------------------------------------------- |
+| CI en cada push a `main`   | ✅     | `.github/workflows/ci-cd.yml` → lint, typecheck, unit, rules, E2E |
+| Lint (`oxfmt --check`)     | ✅     | corregido en `16ed718` (18 archivos formateados)                  |
+| Typecheck (`tsc --noEmit`) | ✅     | 0 errores                                                         |
+| Unit tests                 | ✅     | 323 passed / 29 skipped                                           |
+| E2E (Playwright)           | ✅     | 44 passed / 1 skipped                                             |
+| Reglas Firestore/Storage   | ✅     | job `rules-tests` → `pnpm test:rules` (emulador, 38 tests)        |
+| Deploy atado al CI         | ✅     | `deploy-production` necesita los 4 jobs verdes                    |
 
 **Disciplina:** un commit deja el árbol en verde. Si un commit rompe los tests, no se sube.
 
@@ -82,6 +83,7 @@ git clone control-bodega-<fecha>.bundle control-bodega-restored
 
 ```bash
 pnpm lint && pnpm typecheck && pnpm test:run   # local, < 1 min
+pnpm test:rules                                # reglas (requiere Java en el PATH)
 git status -sb && git ls-remote origin main    # repo sincronizado
 gh run list --limit 1                          # último CI
 curl -s https://exepa-almacen-safe.web.app/ | grep -o 'assets/index-[^"]*\.js'

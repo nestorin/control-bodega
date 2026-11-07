@@ -70,6 +70,43 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
+  rules-tests:
+    name: Firestore & Storage Rules Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set up Java for Firebase emulators
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools@15.30.2
+
+      # Security rules are the authorization boundary (multi-tenant, RBAC,
+      # warehouse isolation). They are only verified here: unit tests mock the
+      # SDK and never execute firestore.rules / storage.rules.
+      - name: Run rules tests
+        run: pnpm test:rules
+
   e2e-tests:
     name: E2E Tests (Playwright)
     runs-on: ubuntu-latest
@@ -140,7 +177,7 @@ jobs:
 
   build-and-deploy-preview:
     name: Build & Deploy Preview
-    needs: [lint-and-typecheck, unit-tests, e2e-tests]
+    needs: [lint-and-typecheck, unit-tests, rules-tests, e2e-tests]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -212,7 +249,7 @@ jobs:
 
   deploy-production:
     name: Deploy Production
-    needs: [lint-and-typecheck, unit-tests, e2e-tests]
+    needs: [lint-and-typecheck, unit-tests, rules-tests, e2e-tests]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
