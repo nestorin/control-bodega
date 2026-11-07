@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Select, type Proveedor, type Producto } from "./Configuracion";
 import { useOcr } from "../hooks/useOcr";
@@ -227,6 +227,91 @@ export function AutocompleteProducto({
           Sin coincidencias
         </div>
       )}
+    </div>
+  );
+}
+
+export function ReceptionProductCard({
+  number,
+  inputId,
+  inputName,
+  inputAriaLabel,
+  value,
+  onChange,
+  onSelect,
+  catalogos,
+  onRemove,
+  children,
+}: {
+  number: number;
+  inputId: string;
+  inputName?: string;
+  inputAriaLabel?: string;
+  value: string;
+  onChange: (value: string) => void;
+  onSelect: (product: Producto) => void;
+  catalogos: Producto[];
+  onRemove: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      data-testid="reception-product-card"
+      className="rounded-2xl border border-[#dce4e7] bg-[#fbfcfc] p-4 shadow-sm sm:p-5"
+    >
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <span
+          className="text-[11px] font-bold uppercase tracking-wide text-[#607078]"
+          style={{ fontFamily: "'Inter', sans-serif" }}
+        >
+          Producto {number}
+        </span>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="touch-target flex size-11 shrink-0 items-center justify-center rounded-xl border border-[#f3d4d1] bg-white text-[#c0392b] hover:bg-[#fff4f3]"
+          aria-label={`Eliminar producto ${number}`}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6l-1 14H6L5 6" />
+            <path d="M10 11v6" />
+            <path d="M14 11v6" />
+            <path d="M9 6V4h6v2" />
+          </svg>
+        </button>
+      </div>
+      <div className="space-y-3">
+        <div>
+          <label
+            htmlFor={inputId}
+            className="text-[11px] font-bold uppercase tracking-wide text-[#607078]"
+            style={{ fontFamily: "'Inter', sans-serif" }}
+          >
+            Producto
+          </label>
+          <AutocompleteProducto
+            id={inputId}
+            name={inputName}
+            ariaLabel={inputAriaLabel ?? `Producto ${number}`}
+            value={value}
+            onChange={onChange}
+            onSelect={onSelect}
+            catalogos={catalogos}
+            placeholder="Escribe para buscar..."
+          />
+        </div>
+        {children}
+      </div>
     </div>
   );
 }
@@ -1707,183 +1792,132 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                     </div>
                   ) : (
                     productos.map((p, i) => (
-                      <div
+                      <ReceptionProductCard
                         key={p.lineId ?? `line-${i}`}
-                        data-testid="reception-product-card"
-                        className="bg-[#fbfcfc] border border-[#dce4e7] rounded-2xl p-4 sm:p-5 shadow-sm"
+                        number={i + 1}
+                        inputId={`programming-product-${p.lineId ?? i}-mobile`}
+                        inputName={`products[${p.lineId ?? i}][name]`}
+                        value={p.nombre}
+                        onChange={(value) => actualizarProducto(i, "nombre", value)}
+                        onSelect={(producto) => {
+                          actualizarProducto(i, "nombre", producto.nombre);
+                          actualizarProducto(i, "productId", producto.id);
+                          actualizarProducto(i, "codigo", producto.sku);
+                          actualizarProducto(i, "unidad", producto.unidad || "cajas");
+                          // Catalog selection confirms the product match;
+                          // conversion availability is a separate concern.
+                          actualizarProducto(i, "conversionMatch", true);
+                          const conversion = catalogoConversionesDefault.find(
+                            (c) => c.producto === producto.nombre,
+                          );
+                          if (conversion) {
+                            actualizarProducto(i, "cajasPorTarima", conversion.cajasPorTarima);
+                          }
+                        }}
+                        catalogos={catalogos.productos}
+                        onRemove={() => eliminarProducto(i)}
                       >
-                        <div className="flex items-start justify-between gap-2 mb-3">
-                          <span
-                            className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
-                            style={{ fontFamily: "'Inter', sans-serif" }}
-                          >
-                            Producto {i + 1}
-                          </span>
-                          <button
-                            onClick={() => eliminarProducto(i)}
-                            className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-[#f3d4d1] bg-white text-[#c0392b] hover:bg-[#fff4f3] touch-target"
-                            aria-label="Eliminar producto"
-                          >
-                            <svg
-                              width="18"
-                              height="18"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <polyline points="3 6 5 6 21 6" />
-                              <path d="M19 6l-1 14H6L5 6" />
-                              <path d="M10 11v6" />
-                              <path d="M14 11v6" />
-                              <path d="M9 6V4h6v2" />
-                            </svg>
-                          </button>
-                        </div>
-
-                        <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label
-                              htmlFor={`programming-product-${p.lineId ?? i}-mobile`}
+                              htmlFor={`programming-number-1`}
                               className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
                               style={{ fontFamily: "'Inter', sans-serif" }}
                             >
-                              Producto
+                              Cajas
                             </label>
-                            <AutocompleteProducto
-                              id={`programming-product-${p.lineId ?? i}-mobile`}
-                              name={`products[${p.lineId ?? i}][name]`}
-                              ariaLabel={`Producto ${i + 1}`}
-                              value={p.nombre}
-                              onChange={(value) => actualizarProducto(i, "nombre", value)}
-                              onSelect={(producto) => {
-                                actualizarProducto(i, "nombre", producto.nombre);
-                                actualizarProducto(i, "productId", producto.id);
-                                actualizarProducto(i, "codigo", producto.sku);
-                                actualizarProducto(i, "unidad", producto.unidad || "cajas");
-                                // Catalog selection confirms the product match;
-                                // conversion availability is a separate concern.
-                                actualizarProducto(i, "conversionMatch", true);
-                                const conversion = catalogoConversionesDefault.find(
-                                  (c) => c.producto === producto.nombre,
-                                );
-                                if (conversion) {
-                                  actualizarProducto(
-                                    i,
-                                    "cajasPorTarima",
-                                    conversion.cajasPorTarima,
-                                  );
-                                }
-                              }}
-                              catalogos={catalogos.productos}
-                              placeholder="Escribe para buscar..."
+                            <input
+                              id={`programming-number-1`}
+                              name={`programmingNumber1`}
+                              aria-label={`Valor numérico 1`}
+                              type="number"
+                              value={p.cantidad}
+                              onFocus={selectZeroInput}
+                              onChange={(e) =>
+                                actualizarProducto(i, "cantidad", parseInt(e.target.value) || 0)
+                              }
+                              className="bg-white border border-[#dce4e7] h-11 px-3 rounded-lg w-full text-[#172126] text-[13px] outline-none focus:border-[#3276a8]"
+                              style={{ fontFamily: "'Inter', sans-serif" }}
+                              inputMode="numeric"
                             />
                           </div>
-
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label
-                                htmlFor={`programming-number-1`}
-                                className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
-                                style={{ fontFamily: "'Inter', sans-serif" }}
-                              >
-                                Cajas
-                              </label>
-                              <input
-                                id={`programming-number-1`}
-                                name={`programmingNumber1`}
-                                aria-label={`Valor numérico 1`}
-                                type="number"
-                                value={p.cantidad}
-                                onFocus={selectZeroInput}
-                                onChange={(e) =>
-                                  actualizarProducto(i, "cantidad", parseInt(e.target.value) || 0)
-                                }
-                                className="bg-white border border-[#dce4e7] h-11 px-3 rounded-lg w-full text-[#172126] text-[13px] outline-none focus:border-[#3276a8]"
-                                style={{ fontFamily: "'Inter', sans-serif" }}
-                                inputMode="numeric"
-                              />
-                            </div>
-                            <div>
-                              <label
-                                htmlFor={`programming-number-2`}
-                                className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
-                                style={{ fontFamily: "'Inter', sans-serif" }}
-                              >
-                                Cajas/Tarima
-                              </label>
-                              <input
-                                id={`programming-number-2`}
-                                name={`programmingNumber2`}
-                                aria-label={`Valor numérico 2`}
-                                type="number"
-                                value={p.cajasPorTarima}
-                                onFocus={selectZeroInput}
-                                onChange={(e) =>
-                                  actualizarProducto(
-                                    i,
-                                    "cajasPorTarima",
-                                    parseInt(e.target.value) || 0,
-                                  )
-                                }
-                                className="bg-white border border-[#dce4e7] h-11 px-3 rounded-lg w-full text-[#172126] text-[13px] outline-none focus:border-[#3276a8]"
-                                style={{ fontFamily: "'Inter', sans-serif" }}
-                                inputMode="numeric"
-                              />
-                            </div>
+                          <div>
+                            <label
+                              htmlFor={`programming-number-2`}
+                              className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
+                              style={{ fontFamily: "'Inter', sans-serif" }}
+                            >
+                              Cajas/Tarima
+                            </label>
+                            <input
+                              id={`programming-number-2`}
+                              name={`programmingNumber2`}
+                              aria-label={`Valor numérico 2`}
+                              type="number"
+                              value={p.cajasPorTarima}
+                              onFocus={selectZeroInput}
+                              onChange={(e) =>
+                                actualizarProducto(
+                                  i,
+                                  "cajasPorTarima",
+                                  parseInt(e.target.value) || 0,
+                                )
+                              }
+                              className="bg-white border border-[#dce4e7] h-11 px-3 rounded-lg w-full text-[#172126] text-[13px] outline-none focus:border-[#3276a8]"
+                              style={{ fontFamily: "'Inter', sans-serif" }}
+                              inputMode="numeric"
+                            />
                           </div>
+                        </div>
 
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="min-w-0">
-                              <label
-                                className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
-                                style={{ fontFamily: "'Inter', sans-serif" }}
-                              >
-                                Tarimas
-                              </label>
-                              <div className="bg-[#f0f4f5] border border-[#dce4e7] h-11 px-3 rounded-lg w-full flex items-center">
-                                <span
-                                  className="font-black text-[#16343f] text-[15px]"
-                                  style={{ fontFamily: "'Inter', sans-serif" }}
-                                >
-                                  {p.tarimas}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="min-w-0">
-                              <label
-                                className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
-                                style={{ fontFamily: "'Inter', sans-serif" }}
-                              >
-                                Match
-                              </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="min-w-0">
+                            <label
+                              className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
+                              style={{ fontFamily: "'Inter', sans-serif" }}
+                            >
+                              Tarimas
+                            </label>
+                            <div className="bg-[#f0f4f5] border border-[#dce4e7] h-11 px-3 rounded-lg w-full flex items-center">
                               <span
-                                className={`mt-1 inline-flex min-h-11 items-center rounded-xl px-3 py-2 text-xs font-bold ${
-                                  p.conversionMatch
-                                    ? "bg-[#e2f5ec] text-[#16845b]"
-                                    : "bg-[#fdecea] text-[#c0392b]"
-                                }`}
+                                className="font-black text-[#16343f] text-[15px]"
                                 style={{ fontFamily: "'Inter', sans-serif" }}
                               >
-                                {p.conversionMatch ? "✓ Match" : "✗ Manual"}
+                                {p.tarimas}
                               </span>
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => confirmarProducto(i)}
-                            className={`flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold touch-target ${
-                              p.productConfirmed
-                                ? "bg-[#e2f5ec] text-[#16845b]"
-                                : "bg-[#16343f] text-white hover:bg-[#1e4456]"
-                            }`}
-                          >
-                            {p.productConfirmed ? "✓ Producto confirmado" : "Confirmar producto"}
-                          </button>
+                          <div className="min-w-0">
+                            <label
+                              className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
+                              style={{ fontFamily: "'Inter', sans-serif" }}
+                            >
+                              Match
+                            </label>
+                            <span
+                              className={`mt-1 inline-flex min-h-11 items-center rounded-xl px-3 py-2 text-xs font-bold ${
+                                p.conversionMatch
+                                  ? "bg-[#e2f5ec] text-[#16845b]"
+                                  : "bg-[#fdecea] text-[#c0392b]"
+                              }`}
+                              style={{ fontFamily: "'Inter', sans-serif" }}
+                            >
+                              {p.conversionMatch ? "✓ Match" : "✗ Manual"}
+                            </span>
+                          </div>
                         </div>
-                      </div>
+                        <button
+                          type="button"
+                          onClick={() => confirmarProducto(i)}
+                          className={`flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold touch-target ${
+                            p.productConfirmed
+                              ? "bg-[#e2f5ec] text-[#16845b]"
+                              : "bg-[#16343f] text-white hover:bg-[#1e4456]"
+                          }`}
+                        >
+                          {p.productConfirmed ? "✓ Producto confirmado" : "Confirmar producto"}
+                        </button>
+                      </ReceptionProductCard>
                     ))
                   )}
                 </div>
@@ -2311,173 +2345,126 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
               </div>
             ) : (
               productos.map((p, i) => (
-                <div
+                <ReceptionProductCard
                   key={p.lineId ?? `line-${i}`}
-                  data-testid="reception-product-card"
-                  className="bg-[#fbfcfc] border border-[#dce4e7] rounded-2xl p-4 sm:p-5 shadow-sm"
+                  number={i + 1}
+                  inputId={`programming-review-product-${p.lineId ?? i}-mobile`}
+                  inputName={`reviewProducts[${p.lineId ?? i}][name]`}
+                  value={p.nombre}
+                  onChange={(value) => actualizarProducto(i, "nombre", value)}
+                  onSelect={(producto) => {
+                    actualizarProducto(i, "nombre", producto.nombre);
+                    actualizarProducto(i, "productId", producto.id);
+                    actualizarProducto(i, "codigo", producto.sku);
+                    actualizarProducto(i, "unidad", producto.unidad || "cajas");
+                    actualizarProducto(i, "conversionMatch", true);
+                    const conversion = catalogoConversionesDefault.find(
+                      (c) => c.producto === producto.nombre,
+                    );
+                    if (conversion) {
+                      actualizarProducto(i, "cajasPorTarima", conversion.cajasPorTarima);
+                    }
+                  }}
+                  catalogos={catalogos.productos}
+                  onRemove={() => eliminarProducto(i)}
                 >
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <span
-                      className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
-                      style={{ fontFamily: "'Inter', sans-serif" }}
-                    >
-                      Producto {i + 1}
-                    </span>
-                    <button
-                      onClick={() => eliminarProducto(i)}
-                      className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-[#f3d4d1] bg-white text-[#c0392b] hover:bg-[#fff4f3] touch-target"
-                      aria-label="Eliminar producto"
-                    >
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6l-1 14H6L5 6" />
-                        <path d="M10 11v6" />
-                        <path d="M14 11v6" />
-                        <path d="M9 6V4h6v2" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label
-                        htmlFor={`programming-review-product-${p.lineId ?? i}-mobile`}
+                        htmlFor={`programming-number-5`}
                         className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
                         style={{ fontFamily: "'Inter', sans-serif" }}
                       >
-                        Producto
+                        Cajas
                       </label>
-                      <AutocompleteProducto
-                        id={`programming-review-product-${p.lineId ?? i}-mobile`}
-                        name={`reviewProducts[${p.lineId ?? i}][name]`}
-                        ariaLabel={`Producto ${i + 1}`}
-                        value={p.nombre}
-                        onChange={(value) => actualizarProducto(i, "nombre", value)}
-                        onSelect={(producto) => {
-                          actualizarProducto(i, "nombre", producto.nombre);
-                          actualizarProducto(i, "productId", producto.id);
-                          actualizarProducto(i, "codigo", producto.sku);
-                          actualizarProducto(i, "unidad", producto.unidad || "cajas");
-                          actualizarProducto(i, "conversionMatch", true);
-                          const conversion = catalogoConversionesDefault.find(
-                            (c) => c.producto === producto.nombre,
-                          );
-                          if (conversion) {
-                            actualizarProducto(i, "cajasPorTarima", conversion.cajasPorTarima);
-                          }
-                        }}
-                        catalogos={catalogos.productos}
-                        placeholder="Escribe para buscar..."
+                      <input
+                        id={`programming-number-5`}
+                        name={`programmingNumber5`}
+                        aria-label={`Valor numérico 5`}
+                        type="number"
+                        value={p.cantidad}
+                        onFocus={selectZeroInput}
+                        onChange={(e) =>
+                          actualizarProducto(i, "cantidad", parseInt(e.target.value) || 0)
+                        }
+                        className="bg-white border border-[#dce4e7] h-11 px-3 rounded-lg w-full text-[#172126] text-[13px] outline-none focus:border-[#3276a8]"
+                        style={{ fontFamily: "'Inter', sans-serif" }}
+                        inputMode="numeric"
                       />
                     </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label
-                          htmlFor={`programming-number-5`}
-                          className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
-                          style={{ fontFamily: "'Inter', sans-serif" }}
-                        >
-                          Cajas
-                        </label>
-                        <input
-                          id={`programming-number-5`}
-                          name={`programmingNumber5`}
-                          aria-label={`Valor numérico 5`}
-                          type="number"
-                          value={p.cantidad}
-                          onFocus={selectZeroInput}
-                          onChange={(e) =>
-                            actualizarProducto(i, "cantidad", parseInt(e.target.value) || 0)
-                          }
-                          className="bg-white border border-[#dce4e7] h-11 px-3 rounded-lg w-full text-[#172126] text-[13px] outline-none focus:border-[#3276a8]"
-                          style={{ fontFamily: "'Inter', sans-serif" }}
-                          inputMode="numeric"
-                        />
-                      </div>
-                      <div>
-                        <label
-                          htmlFor={`programming-number-6`}
-                          className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
-                          style={{ fontFamily: "'Inter', sans-serif" }}
-                        >
-                          Cajas/Tarima
-                        </label>
-                        <input
-                          id={`programming-number-6`}
-                          name={`programmingNumber6`}
-                          aria-label={`Valor numérico 6`}
-                          type="number"
-                          value={p.cajasPorTarima}
-                          onFocus={selectZeroInput}
-                          onChange={(e) =>
-                            actualizarProducto(i, "cajasPorTarima", parseInt(e.target.value) || 0)
-                          }
-                          className="bg-white border border-[#dce4e7] h-11 px-3 rounded-lg w-full text-[#172126] text-[13px] outline-none focus:border-[#3276a8]"
-                          style={{ fontFamily: "'Inter', sans-serif" }}
-                          inputMode="numeric"
-                        />
-                      </div>
+                    <div>
+                      <label
+                        htmlFor={`programming-number-6`}
+                        className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
+                        style={{ fontFamily: "'Inter', sans-serif" }}
+                      >
+                        Cajas/Tarima
+                      </label>
+                      <input
+                        id={`programming-number-6`}
+                        name={`programmingNumber6`}
+                        aria-label={`Valor numérico 6`}
+                        type="number"
+                        value={p.cajasPorTarima}
+                        onFocus={selectZeroInput}
+                        onChange={(e) =>
+                          actualizarProducto(i, "cajasPorTarima", parseInt(e.target.value) || 0)
+                        }
+                        className="bg-white border border-[#dce4e7] h-11 px-3 rounded-lg w-full text-[#172126] text-[13px] outline-none focus:border-[#3276a8]"
+                        style={{ fontFamily: "'Inter', sans-serif" }}
+                        inputMode="numeric"
+                      />
                     </div>
+                  </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="min-w-0">
-                        <label
-                          className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
-                          style={{ fontFamily: "'Inter', sans-serif" }}
-                        >
-                          Tarimas
-                        </label>
-                        <div className="bg-[#f0f4f5] border border-[#dce4e7] h-11 px-3 rounded-lg w-full flex items-center">
-                          <span
-                            className="font-black text-[#16343f] text-[15px]"
-                            style={{ fontFamily: "'Inter', sans-serif" }}
-                          >
-                            {p.tarimas}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="min-w-0">
-                        <label
-                          className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
-                          style={{ fontFamily: "'Inter', sans-serif" }}
-                        >
-                          Match
-                        </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="min-w-0">
+                      <label
+                        className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
+                        style={{ fontFamily: "'Inter', sans-serif" }}
+                      >
+                        Tarimas
+                      </label>
+                      <div className="bg-[#f0f4f5] border border-[#dce4e7] h-11 px-3 rounded-lg w-full flex items-center">
                         <span
-                          className={`mt-1 inline-flex min-h-11 items-center rounded-xl px-3 py-2 text-xs font-bold ${
-                            p.conversionMatch
-                              ? "bg-[#e2f5ec] text-[#16845b]"
-                              : "bg-[#fdecea] text-[#c0392b]"
-                          }`}
+                          className="font-black text-[#16343f] text-[15px]"
                           style={{ fontFamily: "'Inter', sans-serif" }}
                         >
-                          {p.conversionMatch ? "✓ Match" : "✗ Manual"}
+                          {p.tarimas}
                         </span>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => confirmarProducto(i)}
-                      className={`flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold touch-target ${
-                        p.productConfirmed
-                          ? "bg-[#e2f5ec] text-[#16845b]"
-                          : "bg-[#16343f] text-white hover:bg-[#1e4456]"
-                      }`}
-                    >
-                      {p.productConfirmed ? "✓ Producto confirmado" : "Confirmar producto"}
-                    </button>
+                    <div className="min-w-0">
+                      <label
+                        className="text-[11px] font-bold text-[#607078] uppercase tracking-wide"
+                        style={{ fontFamily: "'Inter', sans-serif" }}
+                      >
+                        Match
+                      </label>
+                      <span
+                        className={`mt-1 inline-flex min-h-11 items-center rounded-xl px-3 py-2 text-xs font-bold ${
+                          p.conversionMatch
+                            ? "bg-[#e2f5ec] text-[#16845b]"
+                            : "bg-[#fdecea] text-[#c0392b]"
+                        }`}
+                        style={{ fontFamily: "'Inter', sans-serif" }}
+                      >
+                        {p.conversionMatch ? "✓ Match" : "✗ Manual"}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                  <button
+                    type="button"
+                    onClick={() => confirmarProducto(i)}
+                    className={`flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold touch-target ${
+                      p.productConfirmed
+                        ? "bg-[#e2f5ec] text-[#16845b]"
+                        : "bg-[#16343f] text-white hover:bg-[#1e4456]"
+                    }`}
+                  >
+                    {p.productConfirmed ? "✓ Producto confirmado" : "Confirmar producto"}
+                  </button>
+                </ReceptionProductCard>
               ))
             )}
           </div>

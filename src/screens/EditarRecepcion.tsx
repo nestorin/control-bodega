@@ -9,7 +9,7 @@ import { db } from "@/lib/firebase";
 import { useAuthorization } from "@/hooks/useAuthorization";
 import { QRCodeSVG } from "qrcode.react";
 import type { Producto, Proveedor } from "./Configuracion";
-import { AutocompleteProducto } from "./ProgramacionRecepcion";
+import { ReceptionProductCard } from "./ProgramacionRecepcion";
 
 const ORG_ID = "org_exepa_001";
 
@@ -385,101 +385,90 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
             )}
           </div>
           {productLines.length ? (
-            <div className="divide-y divide-[#edf1f3] rounded-xl border border-[#edf1f3]">
-              {productLines.map((line) => (
-                <div
-                  key={`${line.lineIndex}`}
-                  className="grid min-w-0 gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-                >
-                  <div className="flex min-w-0 flex-col gap-1">
-                    {editable ? (
-                      <AutocompleteProducto
-                        id={`edit-product-${line.lineIndex}`}
-                        ariaLabel={`Producto línea ${line.lineIndex + 1}`}
-                        value={line.productName}
-                        onChange={(value) =>
-                          setProductLines((prev) =>
-                            prev.map((l) =>
-                              l.lineIndex === line.lineIndex
-                                ? { ...l, productName: value, productId: "" }
-                                : l,
-                            ),
-                          )
-                        }
-                        onSelect={(product) =>
-                          setProductLines((prev) =>
-                            prev.map((l) =>
-                              l.lineIndex === line.lineIndex
-                                ? {
-                                    ...l,
-                                    productName: product.nombre,
-                                    productId: product.id,
-                                    unit: product.unidad,
-                                  }
-                                : l,
-                            ),
-                          )
-                        }
-                        catalogos={products}
-                        placeholder="Nombre del producto"
-                      />
-                    ) : (
-                      <span className="font-semibold text-[#172126]">{line.productName}</span>
-                    )}
-                    <span className="text-sm text-[#607078]">
-                      Línea {line.lineIndex + 1} · {line.pallets} tarimas
-                    </span>
-                  </div>
-                  <div className="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3">
-                    {editable ? (
-                      <>
-                        <label className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center">
-                          <span className="text-xs text-[#607078]">Cant:</span>
-                          <input
-                            type="number"
-                            min="1"
-                            value={line.quantity}
-                            onChange={(e) =>
-                              handleProductQuantityChange(
-                                line.lineIndex,
-                                parseInt(e.target.value) || 1,
-                              )
-                            }
-                            className="min-h-11 w-full rounded-lg border border-[#dce4e7] px-2 text-right text-[#172126] sm:w-20"
-                          />
-                        </label>
-                        <label className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center">
-                          <span className="text-xs text-[#607078]">Und:</span>
-                          <select
-                            value={line.unit}
-                            onChange={(e) =>
-                              handleProductUnitChange(line.lineIndex, e.target.value)
-                            }
-                            className="min-h-11 w-full min-w-0 rounded-lg border border-[#dce4e7] px-2 text-[#172126] sm:w-auto"
-                          >
-                            <option value="cajas">Cajas</option>
-                            <option value="piezas">Piezas</option>
-                            <option value="unidades">Unidades</option>
-                            <option value="pallets">Pallets</option>
-                          </select>
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveProductLine(line.lineIndex)}
-                          className="col-span-2 min-h-11 justify-self-end rounded-lg px-3 text-sm text-red-600 hover:bg-red-50 hover:text-red-800 sm:col-span-1"
-                          aria-label="Eliminar línea de producto"
+            <div className="grid gap-3 md:grid-cols-2">
+              {productLines.map((line) =>
+                editable ? (
+                  <ReceptionProductCard
+                    key={line.lineIndex}
+                    number={line.lineIndex + 1}
+                    inputId={`edit-product-${line.lineIndex}`}
+                    inputAriaLabel={`Producto línea ${line.lineIndex + 1}`}
+                    value={line.productName}
+                    onChange={(value) =>
+                      setProductLines((prev) =>
+                        prev.map((current) =>
+                          current.lineIndex === line.lineIndex
+                            ? { ...current, productName: value, productId: "" }
+                            : current,
+                        ),
+                      )
+                    }
+                    onSelect={(product) =>
+                      setProductLines((prev) =>
+                        prev.map((current) =>
+                          current.lineIndex === line.lineIndex
+                            ? {
+                                ...current,
+                                productName: product.nombre,
+                                productId: product.id,
+                                unit: product.unidad,
+                              }
+                            : current,
+                        ),
+                      )
+                    }
+                    catalogos={products}
+                    onRemove={() => handleRemoveProductLine(line.lineIndex)}
+                  >
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="grid min-w-0 gap-1 text-xs font-bold uppercase tracking-wide text-[#607078]">
+                        Cantidad
+                        <input
+                          type="number"
+                          min="1"
+                          value={line.quantity}
+                          onChange={(event) =>
+                            handleProductQuantityChange(
+                              line.lineIndex,
+                              parseInt(event.target.value) || 1,
+                            )
+                          }
+                          className="min-h-11 w-full min-w-0 rounded-lg border border-[#dce4e7] bg-white px-3 text-[13px] text-[#172126]"
+                          inputMode="numeric"
+                        />
+                      </label>
+                      <label className="grid min-w-0 gap-1 text-xs font-bold uppercase tracking-wide text-[#607078]">
+                        Unidad
+                        <select
+                          value={line.unit}
+                          onChange={(event) =>
+                            handleProductUnitChange(line.lineIndex, event.target.value)
+                          }
+                          className="min-h-11 w-full min-w-0 rounded-lg border border-[#dce4e7] bg-white px-3 text-[13px] text-[#172126]"
                         >
-                          Eliminar
-                        </button>
-                      </>
-                    ) : (
-                      <span className="text-sm text-[#607078]">
-                        {line.quantity} {line.unit} · {line.pallets} tarimas
-                      </span>
-                    )}
+                          <option value="cajas">Cajas</option>
+                          <option value="piezas">Piezas</option>
+                          <option value="unidades">Unidades</option>
+                          <option value="pallets">Pallets</option>
+                        </select>
+                      </label>
+                    </div>
+                    <p className="text-sm text-[#607078]">
+                      Línea {line.lineIndex + 1} · {line.pallets} tarimas
+                    </p>
+                  </ReceptionProductCard>
+                ) : (
+                  <div
+                    key={line.lineIndex}
+                    className="min-w-0 rounded-2xl border border-[#dce4e7] bg-[#fbfcfc] p-4 shadow-sm sm:p-5"
+                  >
+                    <p className="break-words font-semibold text-[#172126]">{line.productName}</p>
+                    <p className="mt-1 text-sm text-[#607078]">
+                      {line.quantity} {line.unit} · {line.pallets} tarimas
+                    </p>
                   </div>
-                </div>
-              ))}
+                ),
+              )}
             </div>
           ) : (
             <p className="rounded-xl bg-[#f4f7f8] p-4 text-sm text-[#607078]">

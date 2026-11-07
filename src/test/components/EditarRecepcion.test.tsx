@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { getReception, editReception, getSupplier } = vi.hoisted(() => ({
@@ -121,6 +121,13 @@ describe("EditarRecepcion", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "REC-1001" })).toBeInTheDocument();
+    const productCard = screen.getByTestId("reception-product-card");
+    expect(
+      within(productCard).getByRole("textbox", { name: "Producto línea 1" }),
+    ).toBeInTheDocument();
+    expect(
+      within(productCard).getByRole("button", { name: "Eliminar producto 1" }),
+    ).toBeInTheDocument();
     expect(screen.getByDisplayValue("Producto real")).toBeInTheDocument();
     expect(screen.getByText("2 tarimas", { exact: false })).toBeInTheDocument();
     expect(screen.getByTitle("Código QR TQR-reception-1-001")).toBeInTheDocument();
