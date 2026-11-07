@@ -4,6 +4,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   updateProfile,
   type User,
@@ -49,6 +50,12 @@ export interface UserProfile {
 }
 
 export type AccessStatus = "UNAUTHENTICATED" | "ACTIVE" | "INACTIVE" | "ERROR";
+
+export function shouldRetryGoogleWithRedirect(code: string): boolean {
+  return (
+    code === "auth/popup-blocked" || code === "auth/operation-not-supported-in-this-environment"
+  );
+}
 
 // Open sign-up: every authenticated account gets an immediately usable
 // profile. The writer cannot pick role, status or warehouse scope - they are
@@ -298,7 +305,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithGoogle = async () => {
     if (!auth) throw new Error("Firebase is not configured.");
-    await signInWithPopup(auth, googleProvider);
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      const code =
+        typeof error === "object" && error !== null && "code" in error
+          ? String(error.code)
+          : "unknown";
+      console.error("[Auth] Google popup sign-in failed", {
+        code,
+        message: error instanceof Error ? error.message : "Unknown authentication error",
+      });
+      if (!shouldRetryGoogleWithRedirect(code)) {
+        throw error;
+      }
+      console.warn("[Auth] Retrying Google sign-in with redirect", { code });
+      await signInWithRedirect(auth, googleProvider);
+    }
   };
 
   const logout = async () => {

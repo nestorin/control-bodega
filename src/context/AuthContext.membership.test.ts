@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { canAccessWarehouseForProfile, isValidMembership, type UserProfile } from "./AuthContext";
+import {
+  canAccessWarehouseForProfile,
+  isValidMembership,
+  shouldRetryGoogleWithRedirect,
+  type UserProfile,
+} from "./AuthContext";
 import { rolesMatch } from "@/schemas/membership";
 
 const activeMember: UserProfile = {
@@ -11,6 +16,14 @@ const activeMember: UserProfile = {
 };
 
 describe("organization membership authorization", () => {
+  it("uses redirect only for popup restrictions, not user cancellation or configuration errors", () => {
+    expect(shouldRetryGoogleWithRedirect("auth/popup-blocked")).toBe(true);
+    expect(shouldRetryGoogleWithRedirect("auth/operation-not-supported-in-this-environment")).toBe(
+      true,
+    );
+    expect(shouldRetryGoogleWithRedirect("auth/popup-closed-by-user")).toBe(false);
+    expect(shouldRetryGoogleWithRedirect("auth/unauthorized-domain")).toBe(false);
+  });
   it("accepts an active membership from the canonical organization path", () => {
     expect(isValidMembership(activeMember, "user-1")).toBe(true);
     expect(canAccessWarehouseForProfile("ACTIVE", activeMember, "wh_tehuacan_1")).toBe(true);

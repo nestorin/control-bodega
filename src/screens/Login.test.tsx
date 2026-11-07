@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "firebase/auth";
+import { getRedirectResult } from "firebase/auth";
 import { useAuth, type UserProfile } from "@/context/AuthContext";
 import Login from "./Login";
 
@@ -11,6 +12,12 @@ const navigate = vi.fn();
 vi.mock("@/context/AuthContext", () => ({
   useAuth: vi.fn(),
 }));
+
+vi.mock("@/lib/firebase", () => ({ auth: {} }));
+vi.mock("firebase/auth", async () => {
+  const actual = await vi.importActual<typeof import("firebase/auth")>("firebase/auth");
+  return { ...actual, getRedirectResult: vi.fn() };
+});
 
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual("react-router-dom");
@@ -39,6 +46,7 @@ describe("Login enrollment", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getRedirectResult).mockResolvedValue(null);
     authState = {
       user: null,
       profile: null,
@@ -120,5 +128,37 @@ describe("Login enrollment", () => {
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("/", { replace: true }));
     expect(navigate).toHaveBeenCalledTimes(1);
+  });
+
+  it("routes an active user home after returning from a Google redirect", async () => {
+    setAuthState({
+      ...authState,
+      user: activeUser,
+      profile: activeProfile,
+      accessStatus: "ACTIVE",
+    });
+
+    render(<Login />);
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/", { replace: true }));
+    expect(getRedirectResult).toHaveBeenCalledOnce();
+  });
+
+  it("shows a redirect error without exposing the raw Firebase message", async () => {
+    vi.mocked(getRedirectResult).mockRejectedValue({
+      code: "auth/unauthorized-domain",
+      message: "private Firebase diagnostic",
+    });
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    render(<Login />);
+
+    expect(await screen.findByText(/Este dominio no está autorizado/)).toBeInTheDocument();
+    expect(screen.queryByText("private Firebase diagnostic")).not.toBeInTheDocument();
+    expect(log).toHaveBeenCalledWith(
+      "[Auth] Google redirect sign-in failed",
+      expect.objectContaining({ code: "auth/unauthorized-domain" }),
+    );
+    log.mockRestore();
   });
 });

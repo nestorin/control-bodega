@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getRedirectResult } from "firebase/auth";
 import { useAuth } from "@/context/AuthContext";
 import { isFeatureEnabled } from "@/config/featureFlags";
+import { auth } from "@/lib/firebase";
 
 const assetPathPrefix = "/assets";
 const imgLogo = `${assetPathPrefix}/4cca0.svg`;
@@ -32,6 +34,10 @@ function authenticationErrorMessage(error: unknown): string {
       return "El navegador bloqueó la ventana de Google. Permite las ventanas emergentes e inténtalo otra vez.";
     case "auth/popup-closed-by-user":
       return "Se canceló el inicio de sesión con Google.";
+    case "auth/operation-not-supported-in-this-environment":
+      return "Este navegador no permite iniciar sesión con Google. Prueba con otro navegador.";
+    case "auth/cancelled-popup-request":
+      return "Se inició otra solicitud de acceso. Inténtalo de nuevo.";
     case "auth/network-request-failed":
     case "unavailable":
       return "No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.";
@@ -64,12 +70,35 @@ export default function Login() {
   const [awaitingMembership, setAwaitingMembership] = useState(false);
 
   useEffect(() => {
-    if (!awaitingMembership || authLoading || !user) return;
+    if (!auth) return;
+    let active = true;
+    getRedirectResult(auth).catch((redirectError: unknown) => {
+      if (!active) return;
+      const code =
+        typeof redirectError === "object" && redirectError !== null && "code" in redirectError
+          ? String(redirectError.code)
+          : "unknown";
+      console.error("[Auth] Google redirect sign-in failed", {
+        code,
+        message:
+          redirectError instanceof Error ? redirectError.message : "Unknown authentication error",
+      });
+      setError(authenticationErrorMessage(redirectError));
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (authLoading || !user) return;
 
     if (accessStatus === "ACTIVE" && profile) {
       navigate("/", { replace: true });
       return;
     }
+
+    if (!awaitingMembership) return;
 
     if (accessStatus === "ERROR") {
       setError(authError?.message ?? "No se pudo verificar tu acceso al almacén.");
