@@ -9,6 +9,7 @@ import {
   buildEvidenceShareMessage,
 } from "@/services/evidenceShare";
 import { uploadEvidencePair } from "@/services/evidenceUpload";
+import { evidenceDocumentPath, validateEvidenceDocument } from "@/services/evidenceDocument";
 
 const imgArrowRight = "/assets/55de6.svg";
 const ORG_ID = "org_exepa_001";
@@ -201,6 +202,7 @@ function PhotoUploadBox({
 export default function CapturaEvidencia({ onContinue, currentReception, receptionId }: Props) {
   const [photos, setPhotos] = useState<[string | null, string | null]>([null, null]);
   const [photoFiles, setPhotoFiles] = useState<[File | null, File | null]>([null, null]);
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [form, setForm] = useState<EvidenceForm>({
     proveedor: currentReception?.proveedor || "",
     item: currentReception?.productos?.[0]?.nombre || "",
@@ -284,6 +286,11 @@ export default function CapturaEvidencia({ onContinue, currentReception, recepti
         const evidencePhotos = {
           trailer: `organizations/${ORG_ID}/warehouses/${warehouseId}/receptions/${receptionId}/evidence/trailer.${extension(trailerFile)}`,
           product: `organizations/${ORG_ID}/warehouses/${warehouseId}/receptions/${receptionId}/evidence/product.${extension(productFile)}`,
+          ...(documentFile
+            ? {
+                documentation: evidenceDocumentPath(ORG_ID, warehouseId, receptionId, documentFile),
+              }
+            : {}),
         };
         await uploadEvidencePair(
           [
@@ -301,6 +308,19 @@ export default function CapturaEvidencia({ onContinue, currentReception, recepti
             () => deleteObject(ref(evidenceStorage, evidencePhotos.product)),
           ],
         );
+        if (documentFile && evidencePhotos.documentation) {
+          try {
+            await uploadBytes(ref(evidenceStorage, evidencePhotos.documentation), documentFile, {
+              contentType: documentFile.type,
+            });
+          } catch (error) {
+            await Promise.allSettled([
+              deleteObject(ref(evidenceStorage, evidencePhotos.trailer)),
+              deleteObject(ref(evidenceStorage, evidencePhotos.product)),
+            ]);
+            throw error;
+          }
+        }
         try {
           // Persist only protected Storage paths. Download-token URLs and blob URLs
           // would make the evidence inaccessible or publicly shareable.
@@ -313,6 +333,9 @@ export default function CapturaEvidencia({ onContinue, currentReception, recepti
           await Promise.allSettled([
             deleteObject(ref(evidenceStorage, evidencePhotos.trailer)),
             deleteObject(ref(evidenceStorage, evidencePhotos.product)),
+            ...(evidencePhotos.documentation
+              ? [deleteObject(ref(evidenceStorage, evidencePhotos.documentation))]
+              : []),
           ]);
           throw error;
         }
@@ -327,6 +350,15 @@ export default function CapturaEvidencia({ onContinue, currentReception, recepti
 
   async function handleSave(): Promise<boolean> {
     setSaveNotice(false);
+    if (documentFile) {
+      const documentError = validateEvidenceDocument(documentFile);
+      if (documentError) {
+        setSaved(false);
+        setNoticeKind("error");
+        setNotices([documentError]);
+        return false;
+      }
+    }
 
     // Dual-write: save to Firestore if enabled
     if (useFirestore) {
@@ -459,6 +491,40 @@ export default function CapturaEvidencia({ onContinue, currentReception, recepti
         </div>
 
         {/* Divider */}
+        <div className="border-t border-[#dce4e7] w-full" />
+
+        <div className="w-full space-y-2">
+          <label htmlFor="evidence-document" className="block text-[12px] font-bold text-[#607078]">
+            Orden de compra o factura (opcional)
+          </label>
+          <input
+            id="evidence-document"
+            type="file"
+            accept="application/pdf,image/jpeg,image/png,image/webp"
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              const validationError = file ? validateEvidenceDocument(file) : null;
+              if (validationError) {
+                setDocumentFile(null);
+                setNoticeKind("error");
+                setNotices([validationError]);
+                event.target.value = "";
+                return;
+              }
+              setDocumentFile(file);
+              setSaved(false);
+              setNotices([]);
+            }}
+            className="block w-full min-w-0 rounded-lg border border-[#dce4e7] bg-white p-2 text-sm text-[#172126] file:mr-3 file:rounded-md file:border-0 file:bg-[#e7f0f2] file:px-3 file:py-2 file:font-semibold file:text-[#3276a8]"
+          />
+          <p className="text-xs text-[#607078]">PDF, JPG, PNG o WebP · máximo 10 MB.</p>
+          {documentFile && (
+            <p className="break-all text-xs font-semibold text-[#16845b]">
+              Documento seleccionado: {documentFile.name}
+            </p>
+          )}
+        </div>
+
         <div className="border-t border-[#dce4e7] w-full" />
 
         {/* Form */}

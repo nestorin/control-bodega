@@ -95,4 +95,32 @@ describe("Storage security rules (emulator)", () => {
     );
     await assertFails(deleteObject(ref(storage, evidencePath)));
   });
+
+  it("allows a scoped PDF document but not PDFs in photo slots", async () => {
+    const storage = testEnv.authenticatedContext("warehouse-user").storage();
+    const documentPath = evidencePath.replace("trailer.jpg", "documentation.pdf");
+    await assertSucceeds(
+      uploadBytes(ref(storage, documentPath), new Uint8Array([1]), {
+        contentType: "application/pdf",
+      }),
+    );
+    await assertFails(
+      uploadBytes(
+        ref(storage, evidencePath.replace("trailer.jpg", "trailer.pdf")),
+        new Uint8Array([1]),
+        {
+          contentType: "application/pdf",
+        },
+      ),
+    );
+    await assertFails(
+      uploadBytes(
+        ref(storage, documentPath.replace(warehouseId, "wh_tehuacan_2")),
+        new Uint8Array([1]),
+        {
+          contentType: "application/pdf",
+        },
+      ),
+    );
+  });
 });

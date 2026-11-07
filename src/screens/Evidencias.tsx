@@ -73,6 +73,7 @@ export const evidenciasDataLocal = [
 
 // Export for use in EvidenciaDetalle
 export type EvidenciaData = (typeof evidenciasDataLocal)[0] & {
+  documento?: string | null;
   receptionId?: string;
   evidenceId?: string;
   purchaseOrderNumber?: string;
@@ -102,6 +103,7 @@ export function mapReceptionEvidence(reception: any): EvidenciaData {
     receptionId: reception.id,
     fotoTrailer: reception.evidencePhotos?.trailer || null,
     fotoProducto: reception.evidencePhotos?.product || null,
+    documento: reception.evidencePhotos?.documentation || null,
     proveedor: reception.supplierName || reception.supplierCode || "Sin proveedor",
     proveedorLogistico: reception.logisticsProvider || "Sin dato",
     item: reception.productName || "Sin producto",

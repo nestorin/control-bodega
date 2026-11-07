@@ -12,6 +12,7 @@ export interface EvidenciaData {
   id: string;
   fotoTrailer: string | null;
   fotoProducto: string | null;
+  documento?: string | null;
   proveedor: string;
   proveedorLogistico: string;
   item: string;
@@ -290,6 +291,28 @@ export default function EvidenciaDetalle({ evidencia: ev, onBack, onDelete }: Pr
     }
   }
 
+  async function downloadDocument() {
+    if (!storage || !draft.documento || !draft.receptionId) return;
+    setDownloadError(null);
+    try {
+      const path = draft.documento;
+      if (
+        !/^organizations\/org_exepa_001\/warehouses\/[^/]+\/receptions\/[^/]+\/evidence\/documentation\.(pdf|jpg|png|webp)$/.test(
+          path,
+        ) ||
+        !path.includes(`/receptions/${draft.receptionId}/`)
+      ) {
+        throw new Error("Invalid evidence document path");
+      }
+      const blob = await getBlob(ref(storage, path));
+      const extension = path.split(".").pop() || "pdf";
+      downloadBlob(blob, `Documento-${draft.receptionId}.${extension}`);
+    } catch (error) {
+      console.error("Evidence document download failed:", error);
+      setDownloadError("No se pudo descargar la orden de compra o factura.");
+    }
+  }
+
   return (
     <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 p-4 lg:p-7 size-full overflow-y-auto">
       {/* Left column — photos */}
@@ -345,6 +368,19 @@ export default function EvidenciaDetalle({ evidencia: ev, onBack, onDelete }: Pr
               onFile={(url) => setDraft((d) => ({ ...d, fotoProducto: url }))}
             />
           </div>
+
+          {draft.documento && (
+            <div className="rounded-xl border border-[#dce4e7] bg-[#f4f7f8] p-3">
+              <p className="text-xs font-bold text-[#607078]">Orden de compra o factura</p>
+              <button
+                type="button"
+                onClick={() => void downloadDocument()}
+                className="mt-2 min-h-11 rounded-lg bg-white px-3 text-sm font-semibold text-[#3276a8] underline"
+              >
+                Descargar documento
+              </button>
+            </div>
+          )}
 
           {!editing && (
             <div className="bg-[#e7f0f2] border border-[#3276a8] rounded-[12px] px-4 py-3 w-full">

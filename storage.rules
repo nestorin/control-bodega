@@ -44,13 +44,22 @@ service firebase.storage {
         request.resource.contentType.matches('image/(jpeg|png|webp)');
     }
 
+    function validDocumentUpload() {
+      return request.resource.size <= 10 * 1024 * 1024 &&
+        request.resource.contentType == 'application/pdf';
+    }
+
     // Canonical path. The warehouse segment is checked against the reception document.
     match /organizations/{orgId}/warehouses/{warehouseId}/receptions/{receptionId}/evidence/{fileName} {
       allow read: if receptionIsInScope(orgId, warehouseId, receptionId) &&
-        fileName.matches('^(invoice-preview|trailer|product|documentation)\\.(jpg|jpeg|png|webp)$');
+        (fileName.matches('^(invoice-preview|trailer|product|documentation)\\.(jpg|jpeg|png|webp)$') ||
+         fileName == 'documentation.pdf');
       allow create, update: if receptionIsInScope(orgId, warehouseId, receptionId) &&
         hasRole(orgId, ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'AUXILIAR_ALMACENISTA', 'ALMACENISTA', 'SUPERVISOR', 'OPERATOR']) &&
         fileName.matches('^(invoice-preview|trailer|product|documentation)\\.(jpg|jpeg|png|webp)$') && validEvidenceUpload();
+      allow create, update: if receptionIsInScope(orgId, warehouseId, receptionId) &&
+        hasRole(orgId, ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'AUXILIAR_ALMACENISTA', 'ALMACENISTA', 'SUPERVISOR', 'OPERATOR']) &&
+        fileName == 'documentation.pdf' && validDocumentUpload();
       allow delete: if receptionIsInScope(orgId, warehouseId, receptionId) &&
         hasRole(orgId, ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'SUPERVISOR']);
     }
