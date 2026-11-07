@@ -1,7 +1,7 @@
 # Runbook de Rollback — Control de Bodega v1.4
 
 **Última actualización:** 2026-11-07
-**Versión estable actual:** `v1.4.0-audit-complete` (320 unit tests + 44 e2e passing)
+**Versión estable actual:** `v1.4.0-pre-god-refactor` (323 unit + 44 e2e + 38 rules passing)
 
 ---
 
@@ -144,10 +144,10 @@ gcloud firestore import gs://exepa-almacen-backups/firestore/20261107-030000 \
 
 ## 📋 Historial de Tags Estables
 
-| Tag                       | Fecha      | Descripción                                                   |
-| ------------------------- | ---------- | ------------------------------------------------------------- |
-| `v1.4.0-audit-complete`   | 2026-11-07 | Post-auditoría: 320 unit + 44 e2e pass, todos fixes aplicados |
-| `v1.4.0-pre-god-refactor` | Pendiente  | Antes de iniciar refactor God Component                       |
+| Tag                       | Fecha      | Descripción                                                    |
+| ------------------------- | ---------- | -------------------------------------------------------------- |
+| `v1.4.0-audit-complete`   | 2026-11-07 | Post-auditoría: 320 unit + 44 e2e pass, todos fixes aplicados  |
+| `v1.4.0-pre-god-refactor` | 2026-11-07 | `69a3543`: fixes + fix cambio de rol + job `rules-tests` en CI |
 
 ---
 
@@ -168,4 +168,5 @@ código, no recepciones ni tarimas.
 ---
 
 **Última prueba de rollback:** 2026-11-07 (tag `v1.4.0-audit-complete` verificado)
-**Próxima revisión:** Antes de iniciar refactor God Component
+**Tag de retorno vigente:** `v1.4.0-pre-god-refactor` → `69a3543` (verificado en GitHub)
+**Próxima revisión:** Al iniciar el refactor del God Component
