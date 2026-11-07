@@ -333,7 +333,7 @@ export default function CapturaTarima({
         throw new Error(
           isMobile
             ? "No se encontró una cámara disponible en este dispositivo."
-            : "No se detectó ninguna cámara en este equipo. Podés ingresar el código QR manualmente usando el botón 'Entrada manual' abajo."
+            : "No se detectó ninguna cámara en este equipo. Podés ingresar el código QR manualmente usando el botón 'Entrada manual' abajo.",
         );
       }
 

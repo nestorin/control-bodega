@@ -10,14 +10,14 @@
 
 ## Delivery Strategy
 
-| Parameter | Value |
-|-----------|-------|
-| **Auto-chain** | `true` (per `openspec/config.yaml` `strict_tdd: true`) |
-| **Chain strategy** | `feature-branch-chain` (for rollback control) |
-| **Estimated changed lines** | ~1,500 (new files + modifications) |
-| **400-line budget risk** | **High** → chained PRs required |
-| **Rollback tag** | `v1.4.0-audit-complete` (320 unit + 44 e2e passing) |
-| **Feature flag** | `VITE_USE_NEW_RECEPTION_FLOW=false` (instant, no redeploy) |
+| Parameter                   | Value                                                      |
+| --------------------------- | ---------------------------------------------------------- |
+| **Auto-chain**              | `true` (per `openspec/config.yaml` `strict_tdd: true`)     |
+| **Chain strategy**          | `feature-branch-chain` (for rollback control)              |
+| **Estimated changed lines** | ~1,500 (new files + modifications)                         |
+| **400-line budget risk**    | **High** → chained PRs required                            |
+| **Rollback tag**            | `v1.4.0-audit-complete` (320 unit + 44 e2e passing)        |
+| **Feature flag**            | `VITE_USE_NEW_RECEPTION_FLOW=false` (instant, no redeploy) |
 
 ---
 
@@ -27,20 +27,22 @@
 
 ### Work Units
 
-| ID | Task | Files | Est. Lines | Test Strategy |
-|----|------|-------|------------|---------------|
-| 1.1 | Create `src/types/index.ts` with shared types | `src/types/index.ts` (new) | ~80 | TypeScript compilation |
-| 1.2 | Create `src/config/constants.ts` with constants | `src/config/constants.ts` (new) | ~50 | TypeScript compilation |
-| 1.3 | Create `src/config/navigation.ts` with nav config | `src/config/navigation.ts` (new) | ~60 | TypeScript compilation |
-| 1.4 | Export types from `src/types/index.ts` barrel | `src/types/index.ts` | — | TypeScript compilation |
+| ID  | Task                                              | Files                            | Est. Lines | Test Strategy          |
+| --- | ------------------------------------------------- | -------------------------------- | ---------- | ---------------------- |
+| 1.1 | Create `src/types/index.ts` with shared types     | `src/types/index.ts` (new)       | ~80        | TypeScript compilation |
+| 1.2 | Create `src/config/constants.ts` with constants   | `src/config/constants.ts` (new)  | ~50        | TypeScript compilation |
+| 1.3 | Create `src/config/navigation.ts` with nav config | `src/config/navigation.ts` (new) | ~60        | TypeScript compilation |
+| 1.4 | Export types from `src/types/index.ts` barrel     | `src/types/index.ts`             | —          | TypeScript compilation |
 
 ### Acceptance Criteria
+
 - [ ] `npm run typecheck` passes
 - [ ] All types: `Screen`, `NavItem`, `HeaderConfig`, `ReceptionSessionPhase`, `ReceptionSessionData`, `ReceptionData`, `EvidenciaItem`, `Tarima`, `MatchedProduct`, `ConversionProps`, `ConversionTableRow`
 - [ ] Constants: `TARIMA_TOTAL=4`, regex patterns, asset paths, storage keys
 - [ ] Navigation: `screenOrder`, `navItems`, `headerConfig`, `renderNavIcon`
 
 ### Definition of Done
+
 All 3 files created, exports working, strict TypeScript passes.
 
 ---
@@ -51,21 +53,23 @@ All 3 files created, exports working, strict TypeScript passes.
 
 ### Work Units
 
-| ID | Task | Files | Est. Lines | Test Strategy |
-|----|------|-------|------------|---------------|
-| 2.1 | Create `src/context/ReceptionContext.tsx` | `src/context/ReceptionContext.tsx` (new) | ~180 | Unit: reducer transitions; Integration: provider + hook |
-| 2.2 | Create `src/context/CatalogosContext.tsx` | `src/context/CatalogosContext.tsx` (new) | ~160 | Unit: load/refresh reducers; Integration: Firestore sync |
-| 2.3 | Create `src/context/InventoryContext.tsx` | `src/context/InventoryContext.tsx` (new) | ~140 | Unit: CRUD reducers; Integration: Firestore persistence |
-| 2.4 | Create `src/context/UIContext.tsx` | `src/context/UIContext.tsx` (new) | ~90 | Unit: mobile/sidebar reducers; Integration: resize listener |
-| 2.5 | Add context barrel export | `src/context/index.ts` (new) | ~20 | TypeScript compilation |
+| ID  | Task                                      | Files                                    | Est. Lines | Test Strategy                                               |
+| --- | ----------------------------------------- | ---------------------------------------- | ---------- | ----------------------------------------------------------- |
+| 2.1 | Create `src/context/ReceptionContext.tsx` | `src/context/ReceptionContext.tsx` (new) | ~180       | Unit: reducer transitions; Integration: provider + hook     |
+| 2.2 | Create `src/context/CatalogosContext.tsx` | `src/context/CatalogosContext.tsx` (new) | ~160       | Unit: load/refresh reducers; Integration: Firestore sync    |
+| 2.3 | Create `src/context/InventoryContext.tsx` | `src/context/InventoryContext.tsx` (new) | ~140       | Unit: CRUD reducers; Integration: Firestore persistence     |
+| 2.4 | Create `src/context/UIContext.tsx`        | `src/context/UIContext.tsx` (new)        | ~90        | Unit: mobile/sidebar reducers; Integration: resize listener |
+| 2.5 | Add context barrel export                 | `src/context/index.ts` (new)             | ~20        | TypeScript compilation                                      |
 
 ### Acceptance Criteria per Context
+
 - **ReceptionContext**: State (`currentReception`, `sessionState`, `editId`, `editReceptionData`, `scannedQrCode`, `selectedEvidencia`, `tarimaActual`), Actions (`setCurrentReception`, `transition`, `navigate`, `editReception`, `cancelEdit`, `setScannedQrCode`, `setSelectedEvidencia`, `setTarimaActual`), Invalid transitions rejected
 - **CatalogosContext**: State (`catalogoProductos`, `catalogoProveedores`, `catalogoConversiones`, `catalogoAlmacenes`, `catalogosLoading`, `catalogosError`), Actions (`loadCatalogos`, `refreshCatalogos`), Getters for each catalog
 - **InventoryContext**: State (`inventario`, `almacenActivo`), Actions (`inicializarInventarioAlmacen`, `handleActivarAlmacen`, `aumentarInventario`, `reducirInventario`), Negative inventory prevention
 - **UIContext**: State (`isMobile`, `sidebarOpen`), Actions (`setSidebarOpen`), Derived `header` config, Zero business logic
 
 ### Definition of Done
+
 All 4 contexts created, reducers tested, providers compose without errors, `npm run typecheck` passes.
 
 ---
@@ -76,19 +80,21 @@ All 4 contexts created, reducers tested, providers compose without errors, `npm 
 
 ### Work Units
 
-| ID | Task | Files | Est. Lines | Test Strategy |
-|----|------|-------|------------|---------------|
-| 3.1 | Create `src/hooks/useReceptionFlow.ts` | `src/hooks/useReceptionFlow.ts` (new) | ~120 | Unit: renderHook + Vitest (validation, transitions) |
-| 3.2 | Create `src/hooks/useCatalogos.ts` | `src/hooks/useCatalogos.ts` (new) | ~80 | Unit: renderHook (load, refresh, getters) |
-| 3.3 | Create `src/hooks/useInventory.ts` | `src/hooks/useInventory.ts` (new) | ~70 | Unit: renderHook (CRUD, validation) |
-| 3.4 | Add hooks barrel export | `src/hooks/index.ts` (update) | ~15 | TypeScript compilation |
+| ID  | Task                                   | Files                                 | Est. Lines | Test Strategy                                       |
+| --- | -------------------------------------- | ------------------------------------- | ---------- | --------------------------------------------------- |
+| 3.1 | Create `src/hooks/useReceptionFlow.ts` | `src/hooks/useReceptionFlow.ts` (new) | ~120       | Unit: renderHook + Vitest (validation, transitions) |
+| 3.2 | Create `src/hooks/useCatalogos.ts`     | `src/hooks/useCatalogos.ts` (new)     | ~80        | Unit: renderHook (load, refresh, getters)           |
+| 3.3 | Create `src/hooks/useInventory.ts`     | `src/hooks/useInventory.ts` (new)     | ~70        | Unit: renderHook (CRUD, validation)                 |
+| 3.4 | Add hooks barrel export                | `src/hooks/index.ts` (update)         | ~15        | TypeScript compilation                              |
 
 ### Acceptance Criteria per Hook
+
 - **useReceptionFlow**: `startNewReception()`, `continueToEvidence()`, `continueToPallets()`, `completeReception()`, `editReception()`, `viewTarimaDetalle()`, `cancelReception()` — all delegate to ReceptionContext, validation before navigation
 - **useCatalogos**: `loadCatalogos()`, `refreshCatalogos()`, `getProducto()`, `getProveedor()`, `getConversiones()`, `getAlmacen()`, `getAlmacenActivo()` — expose CatalogosContext getters
 - **useInventory**: `inicializarInventario()`, `activarAlmacen()`, `aumentarInventario()`, `reducirInventario()` — expose InventoryContext actions, negative stock prevention
 
 ### Definition of Done
+
 All 3 hooks created, unit tests ≥80% coverage on new hooks, `npm run test:run` passes, `npm run typecheck` passes.
 
 ---
@@ -99,16 +105,17 @@ All 3 hooks created, unit tests ≥80% coverage on new hooks, `npm run test:run`
 
 ### Work Units
 
-| ID | Task | Files | Est. Lines | Test Strategy |
-|----|------|-------|------------|---------------|
-| 4.1 | Create `src/components/layout/NavIcon.tsx` | `src/components/layout/NavIcon.tsx` (new) | ~35 | Visual: Storybook/Playwright responsive |
-| 4.2 | Create `src/components/layout/Sidebar.tsx` | `src/components/layout/Sidebar.tsx` (new) | ~80 | Visual: Playwright desktop nav |
-| 4.3 | Create `src/components/layout/Header.tsx` | `src/components/layout/Header.tsx` (new) | ~70 | Visual: Playwright header config per screen |
-| 4.4 | Create `src/components/layout/BottomNav.tsx` | `src/components/layout/BottomNav.tsx` (new) | ~55 | Visual: Playwright mobile nav |
-| 4.5 | Create `src/components/layout/Layout.tsx` | `src/components/layout/Layout.tsx` (new) | ~45 | Integration: Layout + providers + routes |
-| 4.6 | Add layout barrel export | `src/components/layout/index.ts` (new) | ~15 | TypeScript compilation |
+| ID  | Task                                         | Files                                       | Est. Lines | Test Strategy                               |
+| --- | -------------------------------------------- | ------------------------------------------- | ---------- | ------------------------------------------- |
+| 4.1 | Create `src/components/layout/NavIcon.tsx`   | `src/components/layout/NavIcon.tsx` (new)   | ~35        | Visual: Storybook/Playwright responsive     |
+| 4.2 | Create `src/components/layout/Sidebar.tsx`   | `src/components/layout/Sidebar.tsx` (new)   | ~80        | Visual: Playwright desktop nav              |
+| 4.3 | Create `src/components/layout/Header.tsx`    | `src/components/layout/Header.tsx` (new)    | ~70        | Visual: Playwright header config per screen |
+| 4.4 | Create `src/components/layout/BottomNav.tsx` | `src/components/layout/BottomNav.tsx` (new) | ~55        | Visual: Playwright mobile nav               |
+| 4.5 | Create `src/components/layout/Layout.tsx`    | `src/components/layout/Layout.tsx` (new)    | ~45        | Integration: Layout + providers + routes    |
+| 4.6 | Add layout barrel export                     | `src/components/layout/index.ts` (new)      | ~15        | TypeScript compilation                      |
 
 ### Acceptance Criteria
+
 - All components wrapped in `React.memo`
 - Sidebar: desktop only, navigation items from `navItems` config
 - Header: derives config from UIContext `header` (title, back button, actions)
@@ -118,6 +125,7 @@ All 3 hooks created, unit tests ≥80% coverage on new hooks, `npm run test:run`
 - No business logic in any layout component
 
 ### Definition of Done
+
 All 5 components created, visual regression via Playwright responsive tests (mobile/desktop), `npm run typecheck` passes.
 
 ---
@@ -128,12 +136,13 @@ All 5 components created, visual regression via Playwright responsive tests (mob
 
 ### Work Units
 
-| ID | Task | Files | Est. Lines | Test Strategy |
-|----|------|-------|------------|---------------|
-| 5.1 | Create `src/services/domain/conversionCalculator.ts` | `src/services/domain/conversionCalculator.ts` (new) | ~120 | Unit: Vitest table-driven (edge cases) |
-| 5.2 | Add domain services barrel export | `src/services/domain/index.ts` (new) | ~10 | TypeScript compilation |
+| ID  | Task                                                 | Files                                               | Est. Lines | Test Strategy                          |
+| --- | ---------------------------------------------------- | --------------------------------------------------- | ---------- | -------------------------------------- |
+| 5.1 | Create `src/services/domain/conversionCalculator.ts` | `src/services/domain/conversionCalculator.ts` (new) | ~120       | Unit: Vitest table-driven (edge cases) |
+| 5.2 | Add domain services barrel export                    | `src/services/domain/index.ts` (new)                | ~10        | TypeScript compilation                 |
 
 ### Acceptance Criteria
+
 - `calculateConversionesYStickers(matchedProducts, conversionProps): ConversionTableRow[]` — handles missing conversions, multiple products
 - `calculateTotalTarimas(conversionesTabla): number` — sums pallet quantities, returns 0 for empty
 - `distributeCajasPerTarima(conversion, tarimas): number[]` — even distribution (diff ≤1), handles boxes<pallets, exact division
@@ -142,6 +151,7 @@ All 5 components created, visual regression via Playwright responsive tests (mob
 - **Table-driven tests** for `distributeCajasPerTarima`: exact division, remainder, boxes<pallets, single pallet, zero boxes
 
 ### Definition of Done
+
 Service created, unit tests ≥90% coverage, all edge cases covered, `npm run test:run` passes, `npm run typecheck` passes.
 
 ---
@@ -152,18 +162,19 @@ Service created, unit tests ≥90% coverage, all edge cases covered, `npm run te
 
 ### Work Units
 
-| ID | Task | Files | Est. Lines | Test Strategy |
-|----|------|-------|------------|---------------|
-| 6.1 | Create `src/hooks/useScanner.ts` | `src/hooks/useScanner.ts` (new) | ~90 | Unit: renderHook (lifecycle, AbortController) |
-| 6.2 | Refactor `src/screens/CapturaTarima.tsx` | `src/screens/CapturaTarima.tsx` (modify) | ~150 delta | Integration: screen + useScanner + ReceptionContext |
-| 6.3 | Update `src/screens/EscanearQR.tsx` to use `useScanner` | `src/screens/EscanearQR.tsx` (modify) | ~40 delta | Integration: screen + useScanner |
-| 6.4 | Fix race condition: atomic save pattern | `src/screens/CapturaTarima.tsx` | — | E2E: Playwright (scanner, retry, recovery) |
+| ID  | Task                                                    | Files                                    | Est. Lines | Test Strategy                                       |
+| --- | ------------------------------------------------------- | ---------------------------------------- | ---------- | --------------------------------------------------- |
+| 6.1 | Create `src/hooks/useScanner.ts`                        | `src/hooks/useScanner.ts` (new)          | ~90        | Unit: renderHook (lifecycle, AbortController)       |
+| 6.2 | Refactor `src/screens/CapturaTarima.tsx`                | `src/screens/CapturaTarima.tsx` (modify) | ~150 delta | Integration: screen + useScanner + ReceptionContext |
+| 6.3 | Update `src/screens/EscanearQR.tsx` to use `useScanner` | `src/screens/EscanearQR.tsx` (modify)    | ~40 delta  | Integration: screen + useScanner                    |
+| 6.4 | Fix race condition: atomic save pattern                 | `src/screens/CapturaTarima.tsx`          | —          | E2E: Playwright (scanner, retry, recovery)          |
 
 ### Acceptance Criteria
+
 - **useScanner hook**: Returns `{ qrReaderRef, isScanning, startScanning, stopScanning, onScanSuccess, scanError }`
 - **Typed qrReaderRef**: `React.RefObject<HTMLVideoElement>` (or `@zxing/browser` `BrowserQRCodeReader`), zero `any`
 - **Scanner lifecycle**: Manual start/stop, auto-cleanup on unmount, camera permission handling
-- **Race condition fix**: 
+- **Race condition fix**:
   1. localStorage updated first (immediate backup)
   2. Firestore write follows
   3. On Firestore success → clear localStorage backup
@@ -173,6 +184,7 @@ Service created, unit tests ≥90% coverage, all edge cases covered, `npm run te
 - EscanearQR uses same hook
 
 ### Definition of Done
+
 Hook created, both screens refactored, race condition fixed, E2E tests for CapturaTarima pass (scanner, retry, recovery), `npm run typecheck` passes.
 
 ---
@@ -183,15 +195,16 @@ Hook created, both screens refactored, race condition fixed, E2E tests for Captu
 
 ### Work Units
 
-| ID | Task | Files | Est. Lines | Test Strategy |
-|----|------|-------|------------|---------------|
-| 7.1 | Refactor `src/App.tsx` to minimal providers + routes | `src/App.tsx` (modify) | -1,350 delta | E2E: full 44-test suite |
-| 7.2 | Verify provider nesting order | `src/App.tsx` | — | Visual: Playwright all routes |
-| 7.3 | Add feature flag guard | `src/App.tsx` | — | Manual: `VITE_USE_NEW_RECEPTION_FLOW=false` |
-| 7.4 | Migrate all screens to consume contexts via hooks | `src/screens/*.tsx` (modify, ~12 files) | ~400 delta | E2E: 44 tests + visual regression |
-| 7.5 | Remove legacy `AppLayout` and inline state | `src/App.tsx` (cleanup) | — | TypeScript compilation |
+| ID  | Task                                                 | Files                                   | Est. Lines   | Test Strategy                               |
+| --- | ---------------------------------------------------- | --------------------------------------- | ------------ | ------------------------------------------- |
+| 7.1 | Refactor `src/App.tsx` to minimal providers + routes | `src/App.tsx` (modify)                  | -1,350 delta | E2E: full 44-test suite                     |
+| 7.2 | Verify provider nesting order                        | `src/App.tsx`                           | —            | Visual: Playwright all routes               |
+| 7.3 | Add feature flag guard                               | `src/App.tsx`                           | —            | Manual: `VITE_USE_NEW_RECEPTION_FLOW=false` |
+| 7.4 | Migrate all screens to consume contexts via hooks    | `src/screens/*.tsx` (modify, ~12 files) | ~400 delta   | E2E: 44 tests + visual regression           |
+| 7.5 | Remove legacy `AppLayout` and inline state           | `src/App.tsx` (cleanup)                 | —            | TypeScript compilation                      |
 
 ### Acceptance Criteria
+
 - **App.tsx < 200 lines** (imports, providers, routes, Layout)
 - Provider order: `BrowserRouter` → `AuthProvider` → `ReceptionProvider` → `CatalogosProvider` → `InventoryProvider` → `UIProvider` → `Layout` → `Routes`
 - All routes defined (public + protected reception + catalog/inventory)
@@ -202,27 +215,28 @@ Hook created, both screens refactored, race condition fixed, E2E tests for Captu
 - No prop drilling remains
 
 ### Definition of Done
+
 App.tsx < 200 lines, all screens migrated, `npm run typecheck` passes, `npm run test:run` passes (≥320 tests, ≥80% coverage on new code), `npm run test:e2e` passes (44 tests), `npm run build` succeeds (no chunk warnings), zero `any` in new files.
 
 ---
 
 ## Screen Migration Checklist (Phase 7.4)
 
-| Screen | Hooks to Consume | Contexts |
-|--------|------------------|----------|
-| `RecepcionesScreen` | `useReceptionFlow`, `useCatalogos` | Reception, Catalogos |
-| `ProgramacionRecepcionScreen` | `useReceptionFlow` | Reception |
-| `NuevaRecepcionStep1Screen` | `useReceptionFlow`, `useCatalogos` | Reception, Catalogos |
-| `CapturaEvidenciaScreen` | `useReceptionFlow` | Reception |
-| `CapturaTarimaScreen` | `useReceptionFlow`, `useScanner` | Reception |
-| `TarimaDetalleScreen` | `useReceptionFlow`, `useInventory` | Reception, Inventory |
-| `CompletadaScreen` | `useReceptionFlow` | Reception |
-| `EditarRecepcionScreen` | `useReceptionFlow`, `useCatalogos` | Reception, Catalogos |
-| `CatalogosScreen` | `useCatalogos` | Catalogos |
-| `InventarioScreen` | `useInventory`, `useCatalogos` | Inventory, Catalogos |
-| `EmbarquesScreen` | `useReceptionFlow` | Reception |
-| `LotesCaducidadesScreen` | `useCatalogos` | Catalogos |
-| `ConfiguracionScreen` | `UIContext` | UI |
+| Screen                        | Hooks to Consume                   | Contexts             |
+| ----------------------------- | ---------------------------------- | -------------------- |
+| `RecepcionesScreen`           | `useReceptionFlow`, `useCatalogos` | Reception, Catalogos |
+| `ProgramacionRecepcionScreen` | `useReceptionFlow`                 | Reception            |
+| `NuevaRecepcionStep1Screen`   | `useReceptionFlow`, `useCatalogos` | Reception, Catalogos |
+| `CapturaEvidenciaScreen`      | `useReceptionFlow`                 | Reception            |
+| `CapturaTarimaScreen`         | `useReceptionFlow`, `useScanner`   | Reception            |
+| `TarimaDetalleScreen`         | `useReceptionFlow`, `useInventory` | Reception, Inventory |
+| `CompletadaScreen`            | `useReceptionFlow`                 | Reception            |
+| `EditarRecepcionScreen`       | `useReceptionFlow`, `useCatalogos` | Reception, Catalogos |
+| `CatalogosScreen`             | `useCatalogos`                     | Catalogos            |
+| `InventarioScreen`            | `useInventory`, `useCatalogos`     | Inventory, Catalogos |
+| `EmbarquesScreen`             | `useReceptionFlow`                 | Reception            |
+| `LotesCaducidadesScreen`      | `useCatalogos`                     | Catalogos            |
+| `ConfiguracionScreen`         | `UIContext`                        | UI                   |
 
 ---
 
@@ -230,15 +244,15 @@ App.tsx < 200 lines, all screens migrated, `npm run typecheck` passes, `npm run 
 
 ### PR Breakdown (Feature Branch Chain)
 
-| PR | Phase(s) | Files Changed | Est. Lines | Review Load | Risk |
-|----|----------|---------------|------------|-------------|------|
-| **PR #1** | Phase 1 | 3 new files | ~200 | Low | Low |
-| **PR #2** | Phase 2 | 5 new files | ~590 | **High** | Medium |
-| **PR #3** | Phase 3 | 4 new files | ~285 | Medium | Low |
-| **PR #4** | Phase 5 | 2 new files | ~130 | Low | Low |
-| **PR #5** | Phase 6 | 3 files (1 new, 2 mod) | ~280 | **High** | **High** |
-| **PR #6** | Phase 4 | 6 new files | ~300 | Medium | Low |
-| **PR #7** | Phase 7 | 13 files (1 mod, 12 mod) | ~400+ | **Very High** | **High** |
+| PR        | Phase(s) | Files Changed            | Est. Lines | Review Load   | Risk     |
+| --------- | -------- | ------------------------ | ---------- | ------------- | -------- |
+| **PR #1** | Phase 1  | 3 new files              | ~200       | Low           | Low      |
+| **PR #2** | Phase 2  | 5 new files              | ~590       | **High**      | Medium   |
+| **PR #3** | Phase 3  | 4 new files              | ~285       | Medium        | Low      |
+| **PR #4** | Phase 5  | 2 new files              | ~130       | Low           | Low      |
+| **PR #5** | Phase 6  | 3 files (1 new, 2 mod)   | ~280       | **High**      | **High** |
+| **PR #6** | Phase 4  | 6 new files              | ~300       | Medium        | Low      |
+| **PR #7** | Phase 7  | 13 files (1 mod, 12 mod) | ~400+      | **Very High** | **High** |
 
 ### Chained PR Strategy
 
@@ -275,15 +289,15 @@ gh pr create --base refactor/phase-4-layout --title "refactor: Phase 7 - App.tsx
 
 ### Review Workload Summary
 
-| Metric | Value |
-|--------|-------|
-| **Total PRs** | 7 (chained) |
-| **Max lines/PR** | ~590 (Phase 2) |
-| **High-risk PRs** | Phase 2 (contexts), Phase 6 (scanner/race), Phase 7 (migration) |
-| **Estimated review time** | 2–3 hours per high-risk PR, 1 hour per low-risk PR |
-| **Total review burden** | ~12–15 hours across 7 PRs |
-| **Rollback points** | After each PR (feature branch chain) |
-| **CI gates per PR** | `typecheck`, `test:run`, `test:e2e` (subset), `build` |
+| Metric                    | Value                                                           |
+| ------------------------- | --------------------------------------------------------------- |
+| **Total PRs**             | 7 (chained)                                                     |
+| **Max lines/PR**          | ~590 (Phase 2)                                                  |
+| **High-risk PRs**         | Phase 2 (contexts), Phase 6 (scanner/race), Phase 7 (migration) |
+| **Estimated review time** | 2–3 hours per high-risk PR, 1 hour per low-risk PR              |
+| **Total review burden**   | ~12–15 hours across 7 PRs                                       |
+| **Rollback points**       | After each PR (feature branch chain)                            |
+| **CI gates per PR**       | `typecheck`, `test:run`, `test:e2e` (subset), `build`           |
 
 ### Recommended Review Order
 
@@ -301,12 +315,12 @@ gh pr create --base refactor/phase-4-layout --title "refactor: Phase 7 - App.tsx
 
 ```yaml
 # Required checks before merge (enforced by branch protection)
-- npm run typecheck          # Strict TypeScript
-- npm run lint               # oxfmt + ESLint
-- npm run test:run           # Vitest (unit + integration)
-- npm run test:e2e           # Playwright (targeted subset for PRs 1-6, full for PR 7)
-- npm run build              # Vite production build
-- coverage threshold         # ≥80% on new files (hooks, services, contexts)
+- npm run typecheck # Strict TypeScript
+- npm run lint # oxfmt + ESLint
+- npm run test:run # Vitest (unit + integration)
+- npm run test:e2e # Playwright (targeted subset for PRs 1-6, full for PR 7)
+- npm run build # Vite production build
+- coverage threshold # ≥80% on new files (hooks, services, contexts)
 ```
 
 ---

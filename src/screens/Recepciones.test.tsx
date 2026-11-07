@@ -49,30 +49,20 @@ function mapReceptionForCollection(r: any) {
       r.status === "CONFIRMED"
         ? "Completada"
         : r.status === "IN_PROGRESS"
-        ? "En proceso"
-        : r.status === "CANCELLED"
-        ? "Con incidencia"
-        : "Borrador",
-    canResume:
-      r.status === "DRAFT" && r.plannedPallets?.some((p: any) => p.status === "PLANNED"),
+          ? "En proceso"
+          : r.status === "CANCELLED"
+            ? "Con incidencia"
+            : "Borrador",
+    canResume: r.status === "DRAFT" && r.plannedPallets?.some((p: any) => p.status === "PLANNED"),
     color:
-      r.status === "CONFIRMED"
-        ? "#16845b"
-        : r.status === "IN_PROGRESS"
-        ? "#3276a8"
-        : "#c54b45",
-    bg:
-      r.status === "CONFIRMED"
-        ? "#e2f5ec"
-        : r.status === "IN_PROGRESS"
-        ? "#e7f0f2"
-        : "#fce9e7",
+      r.status === "CONFIRMED" ? "#16845b" : r.status === "IN_PROGRESS" ? "#3276a8" : "#c54b45",
+    bg: r.status === "CONFIRMED" ? "#e2f5ec" : r.status === "IN_PROGRESS" ? "#e7f0f2" : "#fce9e7",
     img:
       r.status === "CONFIRMED"
         ? "/assets/08d70.svg"
         : r.status === "IN_PROGRESS"
-        ? "/assets/08d70.svg"
-        : "/assets/9d6fd.svg",
+          ? "/assets/08d70.svg"
+          : "/assets/9d6fd.svg",
   };
 }
 

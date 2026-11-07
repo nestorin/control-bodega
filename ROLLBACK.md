@@ -8,6 +8,7 @@
 ## 🚨 Rollback de Código (Git)
 
 ### Opción A: Tag estable (recomendado)
+
 ```bash
 # 1. Verificar tags disponibles
 git tag -l "v1.4.*" --sort=-v:refname
@@ -20,6 +21,7 @@ git push -f origin main
 ```
 
 ### Opción B: Commit específico
+
 ```bash
 # Ver historial reciente
 git log --oneline -20
@@ -32,6 +34,7 @@ git push -f origin main
 ```
 
 ### Opción C: Revertir último merge (si fue PR)
+
 ```bash
 # En GitHub UI: PR → "Revert" → crea PR de revert
 # O desde CLI:
@@ -44,6 +47,7 @@ git push origin main
 ## 🔥 Rollback de Firestore (Base de Datos)
 
 ### Listar backups disponibles
+
 ```bash
 gsutil ls gs://exepa-almacen-backups/firestore/
 # Ejemplo salida:
@@ -52,6 +56,7 @@ gsutil ls gs://exepa-almacen-backups/firestore/
 ```
 
 ### Restaurar backup completo
+
 ```bash
 # ADVERTENCIA: Sobreescribe TODA la base de datos actual
 gcloud firestore import gs://exepa-almacen-backups/firestore/20261107-030000 \
@@ -59,6 +64,7 @@ gcloud firestore import gs://exepa-almacen-backups/firestore/20261107-030000 \
 ```
 
 ### Restaurar solo una colección (ej: receptions)
+
 ```bash
 # Exportar solo la colección afectada del backup
 gcloud firestore import gs://exepa-almacen-backups/firestore/20261107-030000 \
@@ -71,11 +77,13 @@ gcloud firestore import gs://exepa-almacen-backups/firestore/20261107-030000 \
 ## ⚙️ Rollback de Configuración / Secrets
 
 ### GitHub Secrets (Variables de build)
+
 1. Ir a: **Settings → Secrets and variables → Actions**
 2. Restaurar valores anteriores desde historial del repo o backup manual
 3. Secrets críticos: `VITE_FIREBASE_*`, `VITE_RECAPTCHA_SITE_KEY`, `FIREBASE_SERVICE_ACCOUNT`
 
 ### Firebase App Check / reCAPTCHA
+
 ```bash
 # Si hay problema con App Check enforcement:
 # 1. Firebase Console → App Check → Desactivar "Enforce"
@@ -83,6 +91,7 @@ gcloud firestore import gs://exepa-almacen-backups/firestore/20261107-030000 \
 ```
 
 ### Feature Flags (Rollback instantáneo sin deploy)
+
 ```bash
 # Desactivar feature problemática en Vercel/Firebase Hosting:
 # VITE_USE_NEW_RECEPTION_FLOW=false
@@ -107,21 +116,21 @@ gcloud firestore import gs://exepa-almacen-backups/firestore/20261107-030000 \
 
 ## 📞 Contactos de Emergencia
 
-| Rol | Contacto | Escala |
-|-----|----------|--------|
-| **Dev Lead** | Nestor | Código, CI/CD, Git |
-| **Firebase Admin** | Nestor | Firestore, Auth, Functions |
-| **Infra/DevOps** | Nestor | CI/CD, Secrets, DNS |
-| **Soporte Firebase** | support.google.com/firebase | Quota, outages, billing |
+| Rol                  | Contacto                    | Escala                     |
+| -------------------- | --------------------------- | -------------------------- |
+| **Dev Lead**         | Nestor                      | Código, CI/CD, Git         |
+| **Firebase Admin**   | Nestor                      | Firestore, Auth, Functions |
+| **Infra/DevOps**     | Nestor                      | CI/CD, Secrets, DNS        |
+| **Soporte Firebase** | support.google.com/firebase | Quota, outages, billing    |
 
 ---
 
 ## 📋 Historial de Tags Estables
 
-| Tag | Fecha | Descripción |
-|-----|-------|-------------|
-| `v1.4.0-audit-complete` | 2026-11-07 | Post-auditoría: 320 unit + 44 e2e pass, todos fixes aplicados |
-| `v1.4.0-pre-god-refactor` | Pendiente | Antes de iniciar refactor God Component |
+| Tag                       | Fecha      | Descripción                                                   |
+| ------------------------- | ---------- | ------------------------------------------------------------- |
+| `v1.4.0-audit-complete`   | 2026-11-07 | Post-auditoría: 320 unit + 44 e2e pass, todos fixes aplicados |
+| `v1.4.0-pre-god-refactor` | Pendiente  | Antes de iniciar refactor God Component                       |
 
 ---
 

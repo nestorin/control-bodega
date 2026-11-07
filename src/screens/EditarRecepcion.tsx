@@ -122,28 +122,26 @@ export default function EditarRecepcion({ recId, suppliers, onBack, onSave }: Pr
   }, [canQuery, recId, services, suppliers]);
 
   const editable = reception ? isEditableDraft(reception) : false;
-  const totalPallets = reception?.plannedPallets?.length ?? productLines.reduce((sum, l) => sum + l.pallets, 0);
+  const totalPallets =
+    reception?.plannedPallets?.length ?? productLines.reduce((sum, l) => sum + l.pallets, 0);
 
   function handleProductQuantityChange(lineIndex: number, quantity: number) {
     setProductLines((prev) =>
       prev.map((line) =>
-        line.lineIndex === lineIndex ? { ...line, quantity: Math.max(1, quantity) } : line
-      )
+        line.lineIndex === lineIndex ? { ...line, quantity: Math.max(1, quantity) } : line,
+      ),
     );
   }
 
   function handleProductUnitChange(lineIndex: number, unit: string) {
     setProductLines((prev) =>
-      prev.map((line) =>
-        line.lineIndex === lineIndex ? { ...line, unit } : line
-      )
+      prev.map((line) => (line.lineIndex === lineIndex ? { ...line, unit } : line)),
     );
   }
 
   function handleAddProductLine() {
-    const nextLineIndex = productLines.length > 0
-      ? Math.max(...productLines.map(l => l.lineIndex)) + 1
-      : 0;
+    const nextLineIndex =
+      productLines.length > 0 ? Math.max(...productLines.map((l) => l.lineIndex)) + 1 : 0;
     setProductLines((prev) => [
       ...prev,
       {
@@ -219,7 +217,7 @@ export default function EditarRecepcion({ recId, suppliers, onBack, onSave }: Pr
         supplierCode: supplierRecord.code,
         supplierName: supplierRecord.name,
         logisticsProvider: logisticsProvider.trim(),
-        productName: productLines.map(l => l.productName).join(", "),
+        productName: productLines.map((l) => l.productName).join(", "),
         palletCount: plannedPallets.length,
         plannedPallets,
         status: "DRAFT",
@@ -398,8 +396,8 @@ export default function EditarRecepcion({ recId, suppliers, onBack, onSave }: Pr
                             prev.map((l) =>
                               l.lineIndex === line.lineIndex
                                 ? { ...l, productName: e.target.value, productId: e.target.value }
-                                : l
-                            )
+                                : l,
+                            ),
                           )
                         }
                         placeholder="Nombre del producto"
@@ -421,7 +419,12 @@ export default function EditarRecepcion({ recId, suppliers, onBack, onSave }: Pr
                             type="number"
                             min="1"
                             value={line.quantity}
-                            onChange={(e) => handleProductQuantityChange(line.lineIndex, parseInt(e.target.value) || 1)}
+                            onChange={(e) =>
+                              handleProductQuantityChange(
+                                line.lineIndex,
+                                parseInt(e.target.value) || 1,
+                              )
+                            }
                             className="w-20 min-h-11 rounded-lg border border-[#dce4e7] px-2 text-[#172126] text-right"
                           />
                         </div>
@@ -429,7 +432,9 @@ export default function EditarRecepcion({ recId, suppliers, onBack, onSave }: Pr
                           <span className="text-xs text-[#607078]">Und:</span>
                           <select
                             value={line.unit}
-                            onChange={(e) => handleProductUnitChange(line.lineIndex, e.target.value)}
+                            onChange={(e) =>
+                              handleProductUnitChange(line.lineIndex, e.target.value)
+                            }
                             className="min-h-11 rounded-lg border border-[#dce4e7] px-2 text-[#172126]"
                           >
                             <option value="cajas">Cajas</option>

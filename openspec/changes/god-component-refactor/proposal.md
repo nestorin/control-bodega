@@ -7,6 +7,7 @@ Extract the **God Component** (`src/App.tsx`, 1557 lines) into a clean, layered 
 ## Scope
 
 ### In Scope
+
 - Extract 4 contexts: `ReceptionContext`, `CatalogosContext`, `InventoryContext`, `UIContext`
 - Extract 3 hooks: `useReceptionFlow`, `useCatalogos`, `useInventory`
 - Create 5 layout components: `Layout`, `Sidebar`, `Header`, `BottomNav`, `NavIcon`
@@ -16,6 +17,7 @@ Extract the **God Component** (`src/App.tsx`, 1557 lines) into a clean, layered 
 - Migrate all screens to consume contexts via hooks
 
 ### Out of Scope
+
 - Business logic changes (existing behavior preserved)
 - New features or UI redesign
 - Firebase schema changes
@@ -25,6 +27,7 @@ Extract the **God Component** (`src/App.tsx`, 1557 lines) into a clean, layered 
 ## Capabilities
 
 ### New Capabilities
+
 - `reception-context`: Global reception state + navigation coordination
 - `catalogos-context`: Catalogs loading/sync with Firestore
 - `inventory-context`: Per-warehouse inventory CRUD
@@ -33,12 +36,14 @@ Extract the **God Component** (`src/App.tsx`, 1557 lines) into a clean, layered 
 - `conversion-calculator`: Pure domain logic for conversions/stickers
 
 ### Modified Capabilities
+
 - `app-routing`: App.tsx reduced to routing + providers only
 - `captura-tarima`: QR scanner extracted, typed, race condition fixed
 
 ## Approach
 
 Follow the 7-phase plan from `REFACTOR_PLAN.md`:
+
 1. **Types/Constants** (shared foundation)
 2. **Contexts** (global state: Reception, Catalogos, Inventory, UI)
 3. **Hooks** (business logic: ReceptionFlow, Catalogos, Inventory)
@@ -51,28 +56,28 @@ Each phase creates testable, isolated units. Screens migrate incrementally to co
 
 ## Affected Areas
 
-| Area | Impact | Description |
-|------|--------|-------------|
-| `src/App.tsx` | **Modified** | Reduced from 1557 to <200 lines; only routing + providers |
-| `src/contexts/` | **New** | 4 context files: Reception, Catalogos, Inventory, UI |
-| `src/hooks/` | **New** | 3 hooks: useReceptionFlow, useCatalogos, useInventory |
-| `src/components/layout/` | **New** | 5 components: Layout, Sidebar, Header, BottomNav, NavIcon |
-| `src/services/domain/conversionCalculator.ts` | **New** | Pure conversion/sticker logic |
-| `src/screens/CapturaTarima.tsx` | **Modified** | Extract useScanner, type qrReaderRef, fix race condition |
-| `src/screens/*.tsx` | **Modified** | All screens consume contexts via hooks instead of props |
-| `src/config/constants.ts` | **New** | Shared constants (TARIMA_TOTAL, regex, assets, storage keys) |
-| `src/config/navigation.ts` | **New** | Screen/NavItem types, headerConfig, renderNavIcon |
-| `src/types/index.ts` | **New** | Shared types: Screen, NavItem, HeaderConfig, etc. |
+| Area                                          | Impact       | Description                                                  |
+| --------------------------------------------- | ------------ | ------------------------------------------------------------ |
+| `src/App.tsx`                                 | **Modified** | Reduced from 1557 to <200 lines; only routing + providers    |
+| `src/contexts/`                               | **New**      | 4 context files: Reception, Catalogos, Inventory, UI         |
+| `src/hooks/`                                  | **New**      | 3 hooks: useReceptionFlow, useCatalogos, useInventory        |
+| `src/components/layout/`                      | **New**      | 5 components: Layout, Sidebar, Header, BottomNav, NavIcon    |
+| `src/services/domain/conversionCalculator.ts` | **New**      | Pure conversion/sticker logic                                |
+| `src/screens/CapturaTarima.tsx`               | **Modified** | Extract useScanner, type qrReaderRef, fix race condition     |
+| `src/screens/*.tsx`                           | **Modified** | All screens consume contexts via hooks instead of props      |
+| `src/config/constants.ts`                     | **New**      | Shared constants (TARIMA_TOTAL, regex, assets, storage keys) |
+| `src/config/navigation.ts`                    | **New**      | Screen/NavItem types, headerConfig, renderNavIcon            |
+| `src/types/index.ts`                          | **New**      | Shared types: Screen, NavItem, HeaderConfig, etc.            |
 
 ## Risks
 
-| Risk | Likelihood | Mitigation |
-|------|------------|------------|
-| Breaking existing navigation | High | E2E tests (44 passing) run after each phase; feature flag for rollback |
-| Props drilling during migration | Medium | Migrate screens one-by-one; dual read from props + context during transition |
-| Inconsistent state between contexts | Medium | Single `ReceptionContext` as parent coordinator; child contexts read-only |
-| Performance regressions (re-renders) | Medium | `React.memo` on layout parts; `useMemo`/`useCallback` in providers; split contexts by domain |
-| Type regressions | Low | Strict TypeScript; `npm run typecheck` in CI; no `any` in new files |
+| Risk                                 | Likelihood | Mitigation                                                                                   |
+| ------------------------------------ | ---------- | -------------------------------------------------------------------------------------------- |
+| Breaking existing navigation         | High       | E2E tests (44 passing) run after each phase; feature flag for rollback                       |
+| Props drilling during migration      | Medium     | Migrate screens one-by-one; dual read from props + context during transition                 |
+| Inconsistent state between contexts  | Medium     | Single `ReceptionContext` as parent coordinator; child contexts read-only                    |
+| Performance regressions (re-renders) | Medium     | `React.memo` on layout parts; `useMemo`/`useCallback` in providers; split contexts by domain |
+| Type regressions                     | Low        | Strict TypeScript; `npm run typecheck` in CI; no `any` in new files                          |
 
 ## Rollback Plan
 

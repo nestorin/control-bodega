@@ -1,6 +1,7 @@
 # Backup Automático Firestore — Configuración
 
 ## 🎯 Objetivo
+
 Backup diario automático de Firestore a las 03:00 UTC (00:00 ART) en bucket `exepa-almacen-backups`.
 
 ---
@@ -195,6 +196,7 @@ gcloud alpha monitoring policies create --policy-from-file=backup-alert-policy.y
 ```
 
 `backup-alert-policy.yaml`:
+
 ```yaml
 displayName: "Firestore Daily Backup Failure"
 conditions:
@@ -207,7 +209,7 @@ conditions:
       aggregations:
         - alignmentPeriod: "300s"
           perSeriesAligner: "ALIGN_COUNT"
-notificationChannels: []  # Agregar email/slack
+notificationChannels: [] # Agregar email/slack
 ```
 
 ---
@@ -227,4 +229,4 @@ notificationChannels: []  # Agregar email/slack
 2. [ ] Verificar primer backup automático mañana 03:00 UTC
 3. [ ] Configurar alerta de fallo en Cloud Monitoring
 4. [ ] Documentar en `ROLLBACK.md` la ubicación de backups
-3. [ ] Probar restore en proyecto de staging (validar integridad)
+5. [ ] Probar restore en proyecto de staging (validar integridad)

@@ -166,7 +166,7 @@ export const googleProvider = new GoogleAuthProvider();
 
 // Set language code to Spanish to avoid Firefox translation popup
 if (auth) {
-  auth.languageCode = 'es';
+  auth.languageCode = "es";
 }
 
 // Network detection for offline queue
