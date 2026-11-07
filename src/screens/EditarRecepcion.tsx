@@ -8,13 +8,15 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuthorization } from "@/hooks/useAuthorization";
 import { QRCodeSVG } from "qrcode.react";
-import type { Proveedor } from "./Configuracion";
+import type { Producto, Proveedor } from "./Configuracion";
+import { AutocompleteProducto } from "./ProgramacionRecepcion";
 
 const ORG_ID = "org_exepa_001";
 
 interface Props {
   recId: string;
   suppliers: Proveedor[];
+  products: Producto[];
   onBack: () => void;
   onSave: () => void;
 }
@@ -49,7 +51,7 @@ function receptionErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "No se pudo cargar la recepción.";
 }
 
-export default function EditarRecepcion({ recId, suppliers, onBack, onSave }: Props) {
+export default function EditarRecepcion({ recId, suppliers, products, onBack, onSave }: Props) {
   const { user, canQuery } = useAuthorization();
   const services = useMemo(() => (db ? createFirestoreServices(db, ORG_ID) : null), []);
   const [reception, setReception] = useState<ReceptionDoc | null>(null);
@@ -172,10 +174,13 @@ export default function EditarRecepcion({ recId, suppliers, onBack, onSave }: Pr
 
       const supplierRecord = await services.suppliers.getById(supplierId);
       if (!supplierRecord) throw new Error("No se encontró el proveedor en el catálogo.");
+      if (productLines.some((line) => !line.productId || !line.productName.trim())) {
+        throw new Error("Seleccioná cada producto del catálogo antes de guardar.");
+      }
 
       // Build lines from productLines
       const lines = productLines.map((line) => ({
-        productId: line.productId || line.productName, // fallback for new lines
+        productId: line.productId,
         quantity: line.quantity,
         unit: line.unit,
         lot: undefined,
@@ -188,7 +193,7 @@ export default function EditarRecepcion({ recId, suppliers, onBack, onSave }: Pr
       >();
       for (const line of productLines) {
         const existing = groupedLines.get(line.lineIndex) ?? {
-          productId: line.productId || line.productName,
+          productId: line.productId,
           quantity: 0,
           unit: line.unit,
           palletsCreated: 0,
@@ -200,7 +205,7 @@ export default function EditarRecepcion({ recId, suppliers, onBack, onSave }: Pr
       const plannedPallets: PlannedReceptionPalletDraft[] = productLines.map((line) => ({
         palletNumber: line.pallets,
         lineIndex: line.lineIndex,
-        productId: line.productId || line.productName,
+        productId: line.productId,
         productName: line.productName,
         quantity: line.quantity,
         unit: line.unit,
@@ -388,20 +393,35 @@ export default function EditarRecepcion({ recId, suppliers, onBack, onSave }: Pr
                 >
                   <div className="flex flex-col gap-1 min-w-[200px] flex-1">
                     {editable ? (
-                      <input
-                        type="text"
+                      <AutocompleteProducto
+                        id={`edit-product-${line.lineIndex}`}
+                        ariaLabel={`Producto línea ${line.lineIndex + 1}`}
                         value={line.productName}
-                        onChange={(e) =>
+                        onChange={(value) =>
                           setProductLines((prev) =>
                             prev.map((l) =>
                               l.lineIndex === line.lineIndex
-                                ? { ...l, productName: e.target.value, productId: e.target.value }
+                                ? { ...l, productName: value, productId: "" }
                                 : l,
                             ),
                           )
                         }
+                        onSelect={(product) =>
+                          setProductLines((prev) =>
+                            prev.map((l) =>
+                              l.lineIndex === line.lineIndex
+                                ? {
+                                    ...l,
+                                    productName: product.nombre,
+                                    productId: product.id,
+                                    unit: product.unidad,
+                                  }
+                                : l,
+                            ),
+                          )
+                        }
+                        catalogos={products}
                         placeholder="Nombre del producto"
-                        className="min-h-11 rounded-lg border border-[#dce4e7] px-3 text-[#172126] font-semibold"
                       />
                     ) : (
                       <span className="font-semibold text-[#172126]">{line.productName}</span>
@@ -438,6 +458,7 @@ export default function EditarRecepcion({ recId, suppliers, onBack, onSave }: Pr
                             className="min-h-11 rounded-lg border border-[#dce4e7] px-2 text-[#172126]"
                           >
                             <option value="cajas">Cajas</option>
+                            <option value="piezas">Piezas</option>
                             <option value="unidades">Unidades</option>
                             <option value="pallets">Pallets</option>
                           </select>

@@ -81,6 +81,25 @@ const suppliers = [
   },
 ];
 
+const products = [
+  {
+    id: "product-1",
+    nombre: "Producto real",
+    sku: "REAL-01",
+    categoria: "",
+    unidad: "cajas" as const,
+    activo: true,
+  },
+  {
+    id: "product-2",
+    nombre: "Producto nuevo",
+    sku: "NEW-02",
+    categoria: "",
+    unidad: "piezas" as const,
+    activo: true,
+  },
+];
+
 describe("EditarRecepcion", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -95,6 +114,7 @@ describe("EditarRecepcion", () => {
       <EditarRecepcion
         recId="reception-1"
         suppliers={suppliers}
+        products={products}
         onBack={vi.fn()}
         onSave={onSave}
       />,
@@ -136,6 +156,7 @@ describe("EditarRecepcion", () => {
       <EditarRecepcion
         recId="reception-1"
         suppliers={suppliers}
+        products={products}
         onBack={vi.fn()}
         onSave={vi.fn()}
       />,
@@ -145,6 +166,56 @@ describe("EditarRecepcion", () => {
     expect(screen.getByText("15 cajas · 2 tarimas")).toBeInTheDocument();
     expect(screen.getByText(/solo se permiten cambios en borradores/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Guardar cambios" })).not.toBeInTheDocument();
+    expect(editReception).not.toHaveBeenCalled();
+  });
+
+  it("selects a preloaded catalog product and persists its canonical ID and unit", async () => {
+    render(
+      <EditarRecepcion
+        recId="reception-1"
+        suppliers={suppliers}
+        products={products}
+        onBack={vi.fn()}
+        onSave={vi.fn()}
+      />,
+    );
+
+    const input = await screen.findByRole("textbox", { name: "Producto línea 1" });
+    fireEvent.change(input, { target: { value: "NEW-02" } });
+    fireEvent.click(await screen.findByRole("button", { name: /Producto nuevo/ }));
+    expect(input).toHaveValue("Producto nuevo");
+    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    await waitFor(() => expect(editReception).toHaveBeenCalledOnce());
+    expect(editReception.mock.calls[0][1].plannedPallets[0]).toMatchObject({
+      productId: "product-2",
+      productName: "Producto nuevo",
+      unit: "piezas",
+    });
+    expect(editReception.mock.calls[0][2][0]).toMatchObject({
+      productId: "product-2",
+      unit: "piezas",
+    });
+  });
+
+  it("does not save arbitrary product text without a catalog selection", async () => {
+    render(
+      <EditarRecepcion
+        recId="reception-1"
+        suppliers={suppliers}
+        products={products}
+        onBack={vi.fn()}
+        onSave={vi.fn()}
+      />,
+    );
+
+    const input = await screen.findByRole("textbox", { name: "Producto línea 1" });
+    fireEvent.change(input, { target: { value: "Producto inexistente" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Seleccioná cada producto del catálogo antes de guardar.",
+    );
     expect(editReception).not.toHaveBeenCalled();
   });
 });

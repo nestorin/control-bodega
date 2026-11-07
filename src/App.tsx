@@ -1454,6 +1454,7 @@ function AppLayout() {
             <EditarRecepcion
               recId={editId}
               suppliers={catalogoProveedores}
+              products={catalogoProductos}
               onBack={() => {
                 navigate("recepciones", "recepciones");
               }}
