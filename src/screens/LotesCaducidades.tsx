@@ -10,6 +10,7 @@ import {
   parseInventoryImport,
   type InventoryImportPreview,
 } from "@/services/inventoryImport";
+import { aggregateMonthlyExpiries, expiryYears, MONTH_LABELS_ES } from "@/services/monthlyExpiry";
 
 const ORG_ID = "org_exepa_001";
 
@@ -46,7 +47,7 @@ function formatMonthKey(ts: any): MesKey {
 function parseMonthKey(key: MesKey): Date | null {
   const [mes, year] = key.split("-");
   const mesNum = Object.entries(MESES_LABELS).find(([, v]) => v === mes)?.[0];
-  if (!mesNum) return null;
+  if (mesNum === undefined) return null;
   return new Date(2000 + parseInt(year), parseInt(mesNum), 1);
 }
 
@@ -82,6 +83,8 @@ export default function LotesCaducidades() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<"lots" | "monthly">("lots");
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<"all" | "ok" | "proximo" | "vencido">("all");
   const [filterMonth, setFilterMonth] = useState<MesKey>("all");
   const [sortField, setSortField] = useState<SortField>("expiryDate");
@@ -177,6 +180,19 @@ export default function LotesCaducidades() {
     const db = parseMonthKey(b)?.getTime() ?? 0;
     return da - db;
   });
+  const availableYears = expiryYears(lotes);
+  const currentYear = new Date().getFullYear();
+  const activeYear =
+    selectedYear !== null && availableYears.includes(selectedYear)
+      ? selectedYear
+      : availableYears.includes(currentYear)
+        ? currentYear
+        : (availableYears[0] ?? currentYear);
+  const monthlyRows = aggregateMonthlyExpiries(filteredLotes, activeYear);
+  const monthlyTotals = MONTH_LABELS_ES.map((_, month) =>
+    monthlyRows.reduce((sum, row) => sum + row.months[month], 0),
+  );
+  const annualTotal = monthlyRows.reduce((sum, row) => sum + row.total, 0);
 
   const handleEdit = (lote: LoteRow) => {
     setEditingId(lote.id);
@@ -498,6 +514,31 @@ export default function LotesCaducidades() {
 
       {/* Toolbar */}
       <div className="bg-white border-b border-[#dce4e7] px-4 md:px-6 py-3 flex flex-col md:flex-row md:items-center gap-3">
+        <div
+          className="flex rounded-lg border border-[#dce4e7] bg-[#f4f7f8] p-1"
+          role="group"
+          aria-label="Vista de inventario"
+        >
+          <button
+            type="button"
+            onClick={() => setView("lots")}
+            aria-pressed={view === "lots"}
+            className={`rounded-md px-3 py-2 text-xs font-bold ${view === "lots" ? "bg-[#16343f] text-white" : "text-[#607078]"}`}
+          >
+            Por lote
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setFilterMonth("all");
+              setView("monthly");
+            }}
+            aria-pressed={view === "monthly"}
+            className={`rounded-md px-3 py-2 text-xs font-bold ${view === "monthly" ? "bg-[#16343f] text-white" : "text-[#607078]"}`}
+          >
+            Por mes
+          </button>
+        </div>
         <div className="relative flex-1 max-w-xs">
           <svg
             className="absolute left-3 top-1/2 -translate-y-1/2 text-[#607078]"
@@ -533,20 +574,35 @@ export default function LotesCaducidades() {
             <option value="proximo">⚠ Próximo (≤30d)</option>
             <option value="vencido">✗ Vencido</option>
           </select>
-          <select
-            aria-label="Filtrar por mes"
-            value={filterMonth}
-            onChange={(e) => setFilterMonth(e.target.value)}
-            className="px-3 py-2 bg-[#f4f7f8] border border-[#dce4e7] rounded-[10px] text-[12px] focus:border-[#f2b84b] focus:outline-none focus:ring-1 focus:ring-[#f2b84b]"
-            style={{ fontFamily: "'Inter',sans-serif" }}
-          >
-            <option value="all">Todos los meses</option>
-            {monthsAvailable.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
+          {view === "lots" ? (
+            <select
+              aria-label="Filtrar por mes"
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+              className="px-3 py-2 bg-[#f4f7f8] border border-[#dce4e7] rounded-[10px] text-[12px] focus:border-[#f2b84b] focus:outline-none focus:ring-1 focus:ring-[#f2b84b]"
+              style={{ fontFamily: "'Inter',sans-serif" }}
+            >
+              <option value="all">Todos los meses</option>
+              {monthsAvailable.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select
+              aria-label="Año de caducidad"
+              value={activeYear}
+              onChange={(event) => setSelectedYear(Number(event.target.value))}
+              className="px-3 py-2 bg-[#f4f7f8] border border-[#dce4e7] rounded-[10px] text-[12px] focus:border-[#f2b84b] focus:outline-none"
+            >
+              {(availableYears.length ? availableYears : [currentYear]).map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -603,6 +659,94 @@ export default function LotesCaducidades() {
               Reintentar
             </button>
           </div>
+        ) : view === "monthly" ? (
+          <section
+            className="min-w-0 rounded-[16px] bg-white shadow-[0px_4px_12px_rgba(22,52,63,0.07)]"
+            aria-label={`Caducidades mensuales ${activeYear}`}
+          >
+            <div className="border-b border-[#dce4e7] px-4 py-3">
+              <h2 className="font-bold text-[#16343f]">Caducidades por producto · {activeYear}</h2>
+              <p className="text-xs text-[#607078]">
+                Cajas por mes de caducidad. Deslizá la tabla para ver todos los meses.
+              </p>
+            </div>
+            <div className="max-w-full overflow-x-auto overscroll-x-contain">
+              <table className="min-w-[960px] w-full text-right text-sm">
+                <thead className="bg-[#f8fafb] text-[11px] font-bold uppercase text-[#607078]">
+                  <tr>
+                    <th
+                      scope="col"
+                      className="sticky left-0 z-10 min-w-48 bg-[#f8fafb] px-4 py-3 text-left"
+                    >
+                      Producto
+                    </th>
+                    {MONTH_LABELS_ES.map((month) => (
+                      <th key={month} scope="col" className="min-w-14 px-2 py-3">
+                        {month}
+                      </th>
+                    ))}
+                    <th scope="col" className="min-w-20 px-4 py-3 text-[#16343f]">
+                      TOTAL
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlyRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={14} className="px-4 py-8 text-center text-[#607078]">
+                        No hay caducidades para este año y filtros.
+                      </td>
+                    </tr>
+                  ) : (
+                    monthlyRows.map((row) => (
+                      <tr
+                        key={row.productId || row.productName}
+                        className="border-t border-[#edf1f3]"
+                      >
+                        <th
+                          scope="row"
+                          className="sticky left-0 z-10 bg-white px-4 py-3 text-left font-semibold text-[#16343f]"
+                        >
+                          {row.productName}
+                        </th>
+                        {row.months.map((quantity, index) => (
+                          <td
+                            key={MONTH_LABELS_ES[index]}
+                            className="px-2 py-3 tabular-nums text-[#36434a]"
+                          >
+                            {quantity ? quantity.toLocaleString("es-MX") : "—"}
+                          </td>
+                        ))}
+                        <td className="px-4 py-3 font-bold tabular-nums text-[#16343f]">
+                          {row.total.toLocaleString("es-MX")}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                {monthlyRows.length > 0 && (
+                  <tfoot className="border-t-2 border-[#dce4e7] bg-[#e7f0f2] font-bold text-[#16343f]">
+                    <tr>
+                      <th
+                        scope="row"
+                        className="sticky left-0 z-10 bg-[#e7f0f2] px-4 py-3 text-left"
+                      >
+                        TOTAL
+                      </th>
+                      {monthlyTotals.map((total, index) => (
+                        <td key={MONTH_LABELS_ES[index]} className="px-2 py-3 tabular-nums">
+                          {total.toLocaleString("es-MX")}
+                        </td>
+                      ))}
+                      <td className="px-4 py-3 tabular-nums">
+                        {annualTotal.toLocaleString("es-MX")}
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </section>
         ) : filteredLotes.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-center gap-3 text-[#607078]">
             <img src={imgCalendar} alt="" className="size-16 opacity-30" />
