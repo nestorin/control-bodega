@@ -10,6 +10,44 @@ vi.mock("firebase/functions", () => ({
 describe("Reception write services", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("loads admin-only lifecycle options through the backend", async () => {
+    const options = {
+      canDelete: false,
+      canCancel: true,
+      canRestore: false,
+      canHide: true,
+      canShow: false,
+    };
+    const callable = vi.fn().mockResolvedValue({ data: options });
+    vi.mocked(httpsCallable).mockReturnValue(callable as never);
+
+    const result = await new ReceptionService({} as never, "org_exepa_001").mutationOptions(
+      "draft-1",
+    );
+
+    expect(httpsCallable).toHaveBeenCalledWith(undefined, "reception_mutation_options");
+    expect(callable).toHaveBeenCalledWith({ receptionId: "draft-1" });
+    expect(result).toEqual(options);
+  });
+
+  it("mutates a reception only through the authorized callable", async () => {
+    const callable = vi.fn().mockResolvedValue({ data: { idempotent: false } });
+    vi.mocked(httpsCallable).mockReturnValue(callable as never);
+
+    await new ReceptionService({} as never, "org_exepa_001").mutateReception(
+      "draft-1",
+      "CANCEL",
+      "op-cancel-1",
+    );
+
+    expect(httpsCallable).toHaveBeenCalledWith(undefined, "mutate_reception");
+    expect(callable).toHaveBeenCalledWith({
+      receptionId: "draft-1",
+      action: "CANCEL",
+      operationId: "op-cancel-1",
+    });
+  });
+
   it("saves evidence through the authorized callable", async () => {
     const callable = vi.fn().mockResolvedValue({ data: { idempotent: false } });
     vi.mocked(httpsCallable).mockReturnValue(callable as never);

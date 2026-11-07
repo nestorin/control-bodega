@@ -150,7 +150,7 @@ service cloud.firestore {
           && request.resource.data.userId == request.auth.uid
           && request.resource.data.organizationId == orgId
           && request.resource.data.status == 'ACTIVE'
-          && request.resource.data.role == 'GERENTE_ALMACEN'
+          && request.resource.data.role == 'ALMACENISTA'
           && (!('warehouseId' in request.resource.data) ||
               request.resource.data.warehouseId == null)
           && request.resource.data.warehouseIds is list
@@ -229,7 +229,8 @@ service cloud.firestore {
               'id', 'organizationId', 'warehouseId', 'purchaseOrderId',
               'supplierId', 'status', 'operationId', 'receivedAt',
               'actorUserId', 'evidencePhotos', 'invoicePreviewPath',
-              'invoicePreviewUrl', 'draftExpiresAt', 'createdAt', 'updatedAt'
+              'invoicePreviewUrl', 'draftExpiresAt', 'createdAt', 'updatedAt',
+              'cancelledFromStatus', 'cancelledAt', 'cancelledBy', 'hiddenAt', 'hiddenBy'
             ]) &&
             data.id == receptionId &&
             data.organizationId == orgId &&
@@ -259,7 +260,12 @@ service cloud.firestore {
             (!('invoicePreviewPath' in data) ||
               (data.invoicePreviewPath is string && data.invoicePreviewPath.size() <= 512)) &&
             (!('invoicePreviewUrl' in data) ||
-              (data.invoicePreviewUrl is string && data.invoicePreviewUrl.size() <= 2048));
+              (data.invoicePreviewUrl is string && data.invoicePreviewUrl.size() <= 2048)) &&
+            (!('cancelledFromStatus' in data) || data.cancelledFromStatus == 'DRAFT') &&
+            (!('cancelledAt' in data) || data.cancelledAt is timestamp) &&
+            (!('cancelledBy' in data) || (data.cancelledBy is string && data.cancelledBy.size() <= 128)) &&
+            (!('hiddenAt' in data) || data.hiddenAt is timestamp) &&
+            (!('hiddenBy' in data) || (data.hiddenBy is string && data.hiddenBy.size() <= 128));
         }
 
         function isValidDraftPreviewUpdate() {
@@ -301,13 +307,11 @@ service cloud.firestore {
                hasOnlyChanged(['status', 'updatedAt'])) ||
               (resource.data.status == 'IN_PROGRESS' && request.resource.data.status == 'CONFIRMED' &&
                hasOnlyChanged(['status', 'receivedAt', 'updatedAt'])))
-            ) ||
-            // Supervisors/Admins can cancel
-            (isSupervisorOrAdmin(orgId) && request.resource.data.status == 'CANCELLED' &&
-             hasOnlyChanged(['status', 'updatedAt']))
+            )
           );
 
-        allow delete: if isOrgAdmin(orgId);
+        // Cancellation, hiding and deletion require audited backend commands.
+        allow delete: if false;
 
         // ---- SUB-COLLECTION: LINES ----
         match /lines/{lineId} {

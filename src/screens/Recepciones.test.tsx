@@ -6,8 +6,17 @@ const firestoreScenario = vi.hoisted(() => ({
   receptions: [] as any[],
   reception: null as any,
   pallets: [] as any[],
+  admin: false,
+  mutationOptions: {
+    canDelete: false,
+    canCancel: false,
+    canRestore: false,
+    canHide: false,
+    canShow: false,
+  },
 }));
 const downloadTarimaQrBatch = vi.hoisted(() => vi.fn());
+const mutateReception = vi.hoisted(() => vi.fn(async () => undefined));
 
 vi.mock("@/config/featureFlags", () => ({
   isFeatureEnabled: () => firestoreScenario.enabled,
@@ -20,6 +29,8 @@ vi.mock("@/services/firestore", () => ({
     receptions: {
       getByWarehouse: vi.fn(async () => firestoreScenario.receptions),
       getById: vi.fn(async () => firestoreScenario.reception),
+      mutationOptions: vi.fn(async () => firestoreScenario.mutationOptions),
+      mutateReception,
     },
     pallets: { getByReception: vi.fn(async () => firestoreScenario.pallets) },
   }),
@@ -31,6 +42,7 @@ vi.mock("@/hooks/useAuthorization", () => ({
   useAuthorization: () => ({
     canQuery: firestoreScenario.enabled,
     canAccessWarehouse: () => firestoreScenario.enabled,
+    hasAnyRole: () => firestoreScenario.admin,
   }),
   isPermissionDenied: () => false,
 }));
@@ -214,5 +226,70 @@ describe("Recepciones presentation", () => {
     firestoreScenario.receptions = [];
     firestoreScenario.reception = null;
     firestoreScenario.pallets = [];
+  });
+
+  it("hides cancelled and hidden receptions by default but exposes them through filters", async () => {
+    firestoreScenario.enabled = true;
+    firestoreScenario.receptions = [
+      { id: "active", status: "DRAFT", folio: "REC-A" },
+      { id: "cancelled", status: "CANCELLED", folio: "REC-C" },
+      { id: "hidden", status: "DRAFT", hiddenAt: {}, folio: "REC-H" },
+    ];
+    render(<Recepciones onSelectTarima={vi.fn()} onEdit={vi.fn()} />);
+
+    expect(await screen.findByText("REC-A")).toBeInTheDocument();
+    expect(screen.queryByText("REC-C")).not.toBeInTheDocument();
+    expect(screen.queryByText("REC-H")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "Cancelada" } });
+    expect(screen.getByText("REC-C")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "Oculta" } });
+    expect(screen.getByText("REC-H")).toBeInTheDocument();
+
+    firestoreScenario.enabled = false;
+    firestoreScenario.receptions = [];
+  });
+
+  it("offers server-approved admin actions and waits for mutation success", async () => {
+    firestoreScenario.enabled = true;
+    firestoreScenario.admin = true;
+    firestoreScenario.mutationOptions = {
+      canDelete: false,
+      canCancel: true,
+      canRestore: false,
+      canHide: true,
+      canShow: false,
+    };
+    firestoreScenario.receptions = [{ id: "draft", status: "DRAFT", folio: "REC-D" }];
+    render(<Recepciones onSelectTarima={vi.fn()} onEdit={vi.fn()} />);
+
+    await screen.findByText("REC-D");
+    fireEvent.click(screen.getByTitle("Opciones"));
+    expect(await screen.findByRole("button", { name: "Cancelar borrador" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Eliminar borrador" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar borrador" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sí, cancelar borrador" }));
+    await waitFor(() =>
+      expect(mutateReception).toHaveBeenCalledWith("draft", "CANCEL", expect.any(String)),
+    );
+
+    firestoreScenario.admin = false;
+    firestoreScenario.enabled = false;
+    firestoreScenario.receptions = [];
+    mutateReception.mockClear();
+  });
+
+  it("does not expose lifecycle mutations to a non-admin member", async () => {
+    firestoreScenario.enabled = true;
+    firestoreScenario.admin = false;
+    firestoreScenario.receptions = [{ id: "draft", status: "DRAFT", folio: "REC-D" }];
+    render(<Recepciones onSelectTarima={vi.fn()} onEdit={vi.fn()} />);
+
+    await screen.findByText("REC-D");
+    fireEvent.click(screen.getByTitle("Opciones"));
+    expect(screen.queryByRole("button", { name: "Cancelar borrador" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Eliminar borrador" })).not.toBeInTheDocument();
+
+    firestoreScenario.enabled = false;
+    firestoreScenario.receptions = [];
   });
 });

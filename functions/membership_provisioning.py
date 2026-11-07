@@ -25,7 +25,7 @@ def provision_new_user_membership(database, uid: str) -> str:
     membership = {
         "userId": uid,
         "organizationId": ORG_ID,
-        "role": "GERENTE_ALMACEN",
+        "role": "ALMACENISTA",
         "status": "ACTIVE",
         "warehouseId": None,
         "warehouseIds": DEFAULT_WAREHOUSE_IDS,
@@ -44,7 +44,7 @@ def provision_membership_before_auth_user_created(event: identity_fn.AuthBlockin
     """Provision before Auth creates the account, for password and social signups.
 
     This implements the requested open-signup policy: every newly created
-    account receives manager access to both warehouses. Firebase Auth blocking
+    account receives warehouse-worker access to both warehouses. Firebase Auth blocking
     functions require the project to use Identity Platform.
     """
     provision_new_user_membership(firestore.client(), event.data.uid)

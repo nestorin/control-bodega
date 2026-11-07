@@ -211,6 +211,33 @@ export class ReceptionService extends BaseService<ReceptionDoc> {
     return "reception";
   }
 
+  async mutationOptions(receptionId: string): Promise<{
+    canDelete: boolean;
+    canCancel: boolean;
+    canRestore: boolean;
+    canHide: boolean;
+    canShow: boolean;
+  }> {
+    const callable = httpsCallable(getFunctions(), "reception_mutation_options");
+    const result = await callable({ receptionId });
+    return result.data as {
+      canDelete: boolean;
+      canCancel: boolean;
+      canRestore: boolean;
+      canHide: boolean;
+      canShow: boolean;
+    };
+  }
+
+  async mutateReception(
+    receptionId: string,
+    action: "DELETE_DRAFT" | "CANCEL" | "RESTORE" | "HIDE" | "SHOW",
+    operationId: string,
+  ): Promise<void> {
+    const callable = httpsCallable(getFunctions(), "mutate_reception");
+    await callable({ receptionId, action, operationId });
+  }
+
   async getByOperationId(operationId: string): Promise<ReceptionDoc | null> {
     const result = await this.getAll({
       where: [["operationId", "==", operationId]],

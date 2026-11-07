@@ -14,7 +14,7 @@ from datetime import date, datetime, time, timezone
 
 from firebase_functions import https_fn
 from firebase_functions.options import CorsOptions
-from firebase_admin import firestore
+from firebase_admin import firestore, storage
 
 from rbac import (
     ORG_ID, _actor, _canonical_warehouse_id, _error, _validate_operation_id,
@@ -45,6 +45,7 @@ MAX_TRANSACTION_WRITES = 500
 CREATE_RECEPTION_FIXED_WRITES = 3  # reception, audit event, operation record
 MAX_PLANNED_PALLETS = 999
 MAX_EVIDENCE_URL = 4096
+EVIDENCE_BUCKET = "exepa-almacen-safe.firebasestorage.app"
 
 
 def _data(req):
@@ -358,6 +359,9 @@ def create_reception(req: https_fn.CallableRequest):
         previous = _transaction_snapshot(transaction, operation_ref)
         if previous is not None and previous.exists:
             return _operation_result(previous, "create_reception", digest)
+        tombstone = _transaction_snapshot(transaction, root.collection("reception_tombstones").document(reception_id))
+        if tombstone is not None and tombstone.exists:
+            raise _error("Deleted reception id cannot be reused")
         existing = _transaction_snapshot(transaction, reception_ref)
         if existing is not None and existing.exists:
             current = existing.to_dict() or {}
@@ -762,3 +766,165 @@ def save_evidence(req: https_fn.CallableRequest):
 @https_fn.on_call(cors=CORS_OPTS)
 def confirm_reception(req: https_fn.CallableRequest):
     return _update_reception(req, "confirm")
+
+
+def _admin_reception_actor(req, db):
+    actor = _actor(req, db)
+    if actor.get("role") not in {"ADMIN", "SUPER_ADMIN"}:
+        raise https_fn.HttpsError("permission-denied", "Admin role required")
+    return actor
+
+
+def _reception_has_evidence(reception):
+    photos = reception.get("evidencePhotos")
+    return bool(
+        (isinstance(photos, dict) and any(photos.values()))
+        or reception.get("invoicePreviewPath")
+        or reception.get("invoicePreviewUrl")
+    )
+
+
+def _storage_evidence_exists(reception_id, warehouse_id):
+    """Fail closed when the configured bucket cannot be inspected."""
+    try:
+        bucket = storage.bucket(EVIDENCE_BUCKET)
+        prefix = f"organizations/{ORG_ID}/warehouses/{warehouse_id}/receptions/{reception_id}/evidence/"
+        if next(iter(bucket.list_blobs(prefix=prefix, max_results=1)), None) is not None:
+            return True
+        return bucket.get_blob(f"receptions/{reception_id}/invoice-preview.jpg") is not None
+    except Exception as exc:
+        raise https_fn.HttpsError("unavailable", "Evidence storage could not be verified") from exc
+
+
+def _reception_dependencies(read, root, reception_ref, reception):
+    """Read all known server-owned references before a destructive transaction."""
+    planned = reception.get("plannedPallets") or []
+    capture_started = any(
+        pallet.get("status") != "PLANNED" or pallet.get("activated")
+        or pallet.get("lot") or pallet.get("expiryDate")
+        for pallet in planned if isinstance(pallet, dict)
+    )
+    if capture_started or _reception_has_evidence(reception):
+        return True
+    if list(read(reception_ref.collection("pallets").limit(1))):
+        return True
+    for collection_name in ("inventory_movements", "shipments", "embarques", "lotes_caducidades"):
+        query = root.collection(collection_name).where("receptionId", "==", reception_ref.id).limit(1)
+        if list(read(query)):
+            return True
+    return False
+
+
+@https_fn.on_call(cors=CORS_OPTS)
+def reception_mutation_options(req: https_fn.CallableRequest):
+    """Return admin-only actions; absence of proof never grants hard delete."""
+    reception_id = _string(_data(req).get("receptionId"), "receptionId", 160)
+    db = firestore.client()
+    _admin_reception_actor(req, db)
+    root = db.collection("organizations").document(ORG_ID)
+    reception_ref = root.collection("receptions").document(reception_id)
+    snapshot = reception_ref.get()
+    if not snapshot.exists:
+        raise https_fn.HttpsError("not-found", "Reception not found")
+    reception = snapshot.to_dict() or {}
+    if reception.get("organizationId") != ORG_ID:
+        raise _error("Reception organization is invalid")
+    is_draft = reception.get("status") == "DRAFT"
+    can_delete = False
+    if is_draft and not _reception_dependencies(lambda query: query.get(), root, reception_ref, reception):
+        can_delete = not _storage_evidence_exists(reception_id, reception.get("warehouseId"))
+    return {
+        "canDelete": can_delete,
+        "canCancel": is_draft,
+        "canRestore": reception.get("status") == "CANCELLED" and reception.get("cancelledFromStatus") == "DRAFT",
+        "canHide": reception.get("hiddenAt") is None,
+        "canShow": reception.get("hiddenAt") is not None,
+    }
+
+
+@https_fn.on_call(cors=CORS_OPTS)
+def mutate_reception(req: https_fn.CallableRequest):
+    """Admin-only, idempotent cancel/restore/hide/show or safe draft deletion."""
+    data = _data(req)
+    reception_id = _string(data.get("receptionId"), "receptionId", 160)
+    operation_id = _validate_operation_id(data.get("operationId"))
+    action = data.get("action")
+    if action not in {"DELETE_DRAFT", "CANCEL", "RESTORE", "HIDE", "SHOW"}:
+        raise https_fn.HttpsError("invalid-argument", "Reception action is invalid")
+    digest = _digest({"receptionId": reception_id, "action": action})
+    db = firestore.client()
+    actor = _admin_reception_actor(req, db)
+    operation_ref, root = _refs(db, operation_id)
+    reception_ref = root.collection("receptions").document(reception_id)
+    # Storage cannot participate in a Firestore transaction. A failed check
+    # blocks deletion; transaction rechecks every Firestore dependency below.
+    if action == "DELETE_DRAFT":
+        preflight = reception_ref.get()
+        if preflight.exists and _storage_evidence_exists(reception_id, (preflight.to_dict() or {}).get("warehouseId")):
+            raise _error("Reception evidence prevents deletion")
+
+    @firestore.transactional
+    def txn(transaction):
+        previous = _transaction_snapshot(transaction, operation_ref)
+        if previous is not None and previous.exists:
+            return _operation_result(previous, "mutate_reception", digest)
+        snapshot = _transaction_snapshot(transaction, reception_ref)
+        if snapshot is None or not snapshot.exists:
+            raise https_fn.HttpsError("not-found", "Reception not found")
+        reception = snapshot.to_dict() or {}
+        if reception.get("organizationId") != ORG_ID:
+            raise _error("Reception organization is invalid")
+        status = reception.get("status")
+        if action in {"DELETE_DRAFT", "CANCEL"} and status != "DRAFT":
+            raise _error("Only DRAFT receptions can be deleted or cancelled")
+        if action == "RESTORE" and (status != "CANCELLED" or reception.get("cancelledFromStatus") != "DRAFT"):
+            raise _error("Only cancelled drafts can be restored")
+        if action == "HIDE" and reception.get("hiddenAt") is not None:
+            raise _error("Reception is already hidden")
+        if action == "SHOW" and reception.get("hiddenAt") is None:
+            raise _error("Reception is not hidden")
+
+        lines = []
+        if action == "DELETE_DRAFT":
+            if _reception_dependencies(lambda query: transaction.get(query), root, reception_ref, reception):
+                raise _error("Reception has dependent records; cancel it instead")
+            lines = list(transaction.get(reception_ref.collection("lines")))
+            if len(lines) + 3 > MAX_TRANSACTION_WRITES:
+                raise _error("Reception has too many lines to delete atomically")
+
+        now = firestore.SERVER_TIMESTAMP
+        if action == "DELETE_DRAFT":
+            for line in lines:
+                transaction.delete(line.reference)
+            transaction.delete(reception_ref)
+            transaction.set(root.collection("reception_tombstones").document(reception_id), {
+                "organizationId": ORG_ID, "receptionId": reception_id,
+                "warehouseId": reception.get("warehouseId"), "actorUserId": actor["userId"],
+                "operationId": operation_id, "deletedAt": now,
+            })
+        else:
+            updates = {"updatedAt": now, "version": reception.get("version", 0) + 1}
+            if action == "CANCEL":
+                updates.update({"status": "CANCELLED", "cancelledFromStatus": "DRAFT",
+                    "cancelledAt": now, "cancelledBy": actor["userId"]})
+            elif action == "RESTORE":
+                updates.update({"status": "DRAFT", "cancelledFromStatus": firestore.DELETE_FIELD,
+                    "cancelledAt": firestore.DELETE_FIELD, "cancelledBy": firestore.DELETE_FIELD})
+            elif action == "HIDE":
+                updates.update({"hiddenAt": now, "hiddenBy": actor["userId"]})
+            else:
+                updates.update({"hiddenAt": firestore.DELETE_FIELD, "hiddenBy": firestore.DELETE_FIELD})
+            transaction.update(reception_ref, updates)
+
+        transaction.set(root.collection("audit_events").document(), {
+            "organizationId": ORG_ID, "warehouseId": reception.get("warehouseId"),
+            "entityType": "reception", "entityId": reception_id, "action": action,
+            "actorUserId": actor["userId"], "operationId": operation_id,
+            "occurredAt": now, "schemaVersion": 1,
+        })
+        result = {"receptionId": reception_id, "action": action, "idempotent": False}
+        transaction.set(operation_ref, {"kind": "mutate_reception", "payloadDigest": digest,
+            "result": result, "actorUserId": actor["userId"], "createdAt": now})
+        return result
+
+    return txn(db.transaction())

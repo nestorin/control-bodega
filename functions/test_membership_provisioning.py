@@ -7,7 +7,7 @@ from membership_provisioning import provision_new_user_membership
 
 
 class MembershipProvisioningTest(unittest.TestCase):
-    def test_creates_active_manager_membership_for_both_warehouses(self):
+    def test_creates_active_warehouse_worker_membership_for_both_warehouses(self):
         document = Mock()
         database = Mock()
         database.document.return_value = document
@@ -20,7 +20,7 @@ class MembershipProvisioningTest(unittest.TestCase):
         membership = document.create.call_args.args[0]
         self.assertEqual(membership["userId"], "new-user")
         self.assertEqual(membership["organizationId"], "org_exepa_001")
-        self.assertEqual(membership["role"], "GERENTE_ALMACEN")
+        self.assertEqual(membership["role"], "ALMACENISTA")
         self.assertEqual(membership["status"], "ACTIVE")
         self.assertIsNone(membership["warehouseId"])
         self.assertEqual(membership["warehouseIds"], ["wh_tehuacan_1", "wh_tehuacan_2"])

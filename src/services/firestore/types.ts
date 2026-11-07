@@ -147,6 +147,8 @@ export interface ReceptionDoc extends BaseDoc {
   palletCount?: number;
   plannedPallets?: PlannedReceptionPallet[];
   status: "DRAFT" | "IN_PROGRESS" | "CONFIRMED" | "CANCELLED";
+  hiddenAt?: Timestamp;
+  cancelledFromStatus?: "DRAFT";
   operationId: string;
   receivedAt?: Timestamp;
   actorUserId: string;

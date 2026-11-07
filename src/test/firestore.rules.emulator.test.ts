@@ -599,7 +599,7 @@ describe("Firestore security rules (emulator)", () => {
     const provisionedProfile = (uid: string, overrides: Record<string, unknown> = {}) => ({
       userId: uid,
       organizationId: orgId,
-      role: "GERENTE_ALMACEN",
+      role: "ALMACENISTA",
       status: "ACTIVE",
       warehouseIds: [wh1, wh2],
       displayName: "Nuevo Usuario",
@@ -634,8 +634,14 @@ describe("Firestore security rules (emulator)", () => {
       );
     });
 
-    rulesTest("denies self-elevation to admin or super admin", async () => {
+    rulesTest("denies self-elevation to manager, admin, or super admin", async () => {
       const db = testEnv!.authenticatedContext("new-user-3").firestore();
+      await assertFails(
+        setDoc(
+          doc(db, userPath("new-user-3")),
+          provisionedProfile("new-user-3", { role: "GERENTE_ALMACEN" }),
+        ),
+      );
       await assertFails(
         setDoc(
           doc(db, userPath("new-user-3")),

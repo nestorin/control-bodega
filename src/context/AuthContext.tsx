@@ -54,7 +54,7 @@ export type AccessStatus = "UNAUTHENTICATED" | "ACTIVE" | "INACTIVE" | "ERROR";
 // profile. The writer cannot pick role, status or warehouse scope - they are
 // fixed here and independently enforced by firestore.rules, so a self-serve
 // signup can never become ADMIN.
-const PROVISIONED_ROLE: MembershipRole = "GERENTE_ALMACEN";
+const PROVISIONED_ROLE: MembershipRole = "ALMACENISTA";
 const PROVISIONED_WAREHOUSES = [...Object.values(WAREHOUSE_IDS)];
 
 export function isValidMembership(value: unknown, uid: string): value is UserProfile {

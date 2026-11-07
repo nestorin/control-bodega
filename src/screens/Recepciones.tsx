@@ -1,10 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { where } from "firebase/firestore";
 import { isFeatureEnabled } from "@/config/featureFlags";
-import { useCollection } from "@/hooks/useFirestore";
 import { db } from "@/lib/firebase";
 import { createFirestoreServices } from "@/services/firestore";
-import { useOfflineQueue } from "@/hooks/useFirestore";
 import type { ReceptionDoc } from "@/services/firestore/types";
 import { WAREHOUSE_IDS } from "@/config/warehouses";
 import { useAuthorization, isPermissionDenied } from "@/hooks/useAuthorization";
@@ -18,7 +15,6 @@ const imgIndicador = "/assets/08d70.svg";
 const imgIndicadorRed = "/assets/9d6fd.svg";
 
 const ORG_ID = "org_exepa_001";
-const NORTH_RECEPTION_CONSTRAINTS = [where("warehouseId", "==", WAREHOUSE_IDS.NORTH)];
 
 interface ReceptionView {
   id: string;
@@ -33,6 +29,49 @@ interface ReceptionView {
   bg: string;
   img: string;
   canResume?: boolean;
+  rawStatus?: ReceptionDoc["status"];
+  hidden?: boolean;
+}
+
+type ReceptionMutation = "DELETE_DRAFT" | "CANCEL" | "RESTORE" | "HIDE" | "SHOW";
+type ReceptionMutationOptions = Awaited<
+  ReturnType<ReturnType<typeof createFirestoreServices>["receptions"]["mutationOptions"]>
+>;
+
+const MUTATION_LABELS: Record<ReceptionMutation, string> = {
+  DELETE_DRAFT: "Eliminar borrador",
+  CANCEL: "Cancelar borrador",
+  RESTORE: "Restaurar borrador",
+  HIDE: "Ocultar",
+  SHOW: "Mostrar",
+};
+
+function toReceptionView(reception: ReceptionDoc): ReceptionView {
+  const mapped = mapReceptionListItem(reception);
+  const status = reception.status;
+  return {
+    id: mapped.id,
+    displayId: mapped.displayId,
+    proveedor: mapped.supplier,
+    producto: mapped.product,
+    tarimas: mapped.palletCount,
+    fecha: mapped.date,
+    canResume: mapped.canResume,
+    rawStatus: status,
+    hidden: !!reception.hiddenAt,
+    estado:
+      status === "CONFIRMED"
+        ? "Completada"
+        : status === "IN_PROGRESS"
+          ? "En proceso"
+          : status === "CANCELLED"
+            ? "Cancelada"
+            : "Borrador",
+    incidencias: 0,
+    color: status === "CONFIRMED" ? "#16845b" : status === "IN_PROGRESS" ? "#3276a8" : "#c54b45",
+    bg: status === "CONFIRMED" ? "#e2f5ec" : status === "IN_PROGRESS" ? "#e7f0f2" : "#fce9e7",
+    img: status === "CONFIRMED" || status === "IN_PROGRESS" ? imgIndicador : imgIndicadorRed,
+  };
 }
 
 // Fallback local data for when feature flag is OFF
@@ -199,13 +238,21 @@ function RowMenu({
   onEdit,
   onPrint,
   onDownload,
-  onDelete,
+  canManage,
+  options,
+  optionsLoading,
+  onOpen,
+  onMutation,
 }: {
   canEdit: boolean;
   onEdit: () => void;
   onPrint: () => void;
   onDownload: () => void;
-  onDelete: () => void;
+  canManage: boolean;
+  options?: ReceptionMutationOptions;
+  optionsLoading: boolean;
+  onOpen: () => void;
+  onMutation: (action: ReceptionMutation) => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -245,20 +292,36 @@ function RowMenu({
         onDownload();
       },
     },
-    {
-      ...menuItems[3],
-      action: () => {
-        setOpen(false);
-        onDelete();
-      },
-    },
+    ...(canManage && options
+      ? (
+          [
+            ["HIDE", options.canHide],
+            ["SHOW", options.canShow],
+            ["CANCEL", options.canCancel],
+            ["RESTORE", options.canRestore],
+            ["DELETE_DRAFT", options.canDelete],
+          ] as const
+        )
+          .filter(([, allowed]) => allowed)
+          .map(([action]) => ({
+            ...menuItems[3],
+            label: MUTATION_LABELS[action],
+            action: () => {
+              setOpen(false);
+              onMutation(action);
+            },
+          }))
+      : []),
   ];
 
   return (
     <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
       <TouchTarget
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (!open && canManage) onOpen();
+          setOpen((v) => !v);
+        }}
         className="!min-h-8 !min-w-8 size-8 rounded-lg hover:bg-[#edf1f3] transition-colors text-[#607078]"
         title="Opciones"
       >
@@ -271,6 +334,7 @@ function RowMenu({
 
       {open && (
         <div className="absolute right-0 top-10 z-50 bg-white border border-[#dce4e7] rounded-[14px] shadow-[0px_12px_28px_rgba(22,52,63,0.14)] overflow-hidden min-w-[160px]">
+          {canManage && optionsLoading && <p className="px-4 py-2 text-xs">Cargando acciones…</p>}
           {items.map((item, i) => (
             <button
               key={item.label}
@@ -300,10 +364,14 @@ function RowMenu({
 
 function DeleteModal({
   id,
+  action,
+  busy,
   onConfirm,
   onCancel,
 }: {
   id: string;
+  action: ReceptionMutation;
+  busy: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -347,7 +415,7 @@ function DeleteModal({
               margin: 0,
             }}
           >
-            ¿Borrar recepción?
+            ¿{MUTATION_LABELS[action].toLowerCase()}?
           </p>
           <p
             className="text-[#607078] text-[14px] text-center"
@@ -358,13 +426,16 @@ function DeleteModal({
               lineHeight: 1.5,
             }}
           >
-            Se eliminará <strong style={{ color: "#172126" }}>{id}</strong> y todas sus tarimas
-            asociadas. Esta acción no se puede deshacer.
+            {action === "DELETE_DRAFT"
+              ? "Se eliminará definitivamente el borrador"
+              : `Se aplicará ${MUTATION_LABELS[action].toLowerCase()} a`}{" "}
+            <strong style={{ color: "#172126" }}>{id}</strong>.
           </p>
         </div>
         <div className="flex gap-3 w-full">
           <button
             onClick={onCancel}
+            disabled={busy}
             className="flex-1 h-12 rounded-[12px] border border-[#dce4e7] bg-white hover:bg-[#f8fafb] transition-colors"
             style={{
               fontFamily: "'Inter', sans-serif",
@@ -378,6 +449,7 @@ function DeleteModal({
           </button>
           <button
             onClick={onConfirm}
+            disabled={busy}
             className="flex-1 h-12 rounded-[12px] border-none hover:opacity-90 transition-opacity"
             style={{
               fontFamily: "'Inter', sans-serif",
@@ -388,7 +460,7 @@ function DeleteModal({
               cursor: "pointer",
             }}
           >
-            Sí, borrar
+            {busy ? "Guardando…" : `Sí, ${MUTATION_LABELS[action].toLowerCase()}`}
           </button>
         </div>
       </div>
@@ -405,21 +477,27 @@ export default function Recepciones({
   onEdit: (id: string) => void;
   onResume?: (id: string) => void;
 }) {
-  const { canQuery, canAccessWarehouse } = useAuthorization();
+  const { canQuery, canAccessWarehouse, hasAnyRole } = useAuthorization();
   const useFirestore = isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery;
   const canQueryNorthWarehouse = useFirestore && canAccessWarehouse(WAREHOUSE_IDS.NORTH);
+  const canManage = useFirestore && hasAnyRole(["ADMIN", "SUPER_ADMIN"]);
 
   // Firestore services
   const [fsServices, setFsServices] = useState(() =>
     useFirestore && db ? createFirestoreServices(db, ORG_ID) : null,
   );
 
-  // Offline queue
-  const { enqueue, isOnline } = useOfflineQueue(db, ORG_ID);
-
   // Local state (fallback)
   const [listaLocal, setListaLocal] = useState<ReceptionView[]>(recepcionesLocal);
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [mutationTarget, setMutationTarget] = useState<{
+    id: string;
+    action: ReceptionMutation;
+  } | null>(null);
+  const [mutationBusy, setMutationBusy] = useState(false);
+  const [optionsBusy, setOptionsBusy] = useState<string | null>(null);
+  const [mutationOptions, setMutationOptions] = useState<Record<string, ReceptionMutationOptions>>(
+    {},
+  );
   const [loadingFs, setLoadingFs] = useState(false);
   const [errorFs, setErrorFs] = useState<string | null>(null);
   const [qrActionError, setQrActionError] = useState<string | null>(null);
@@ -431,53 +509,8 @@ export default function Recepciones({
   // Estados de filtro
   const [searchText, setSearchText] = useState("");
   const [filterEstado, setFilterEstado] = useState<
-    "todos" | "Completada" | "En proceso" | "Con incidencia" | "Borrador"
+    "todos" | "Completada" | "En proceso" | "Con incidencia" | "Borrador" | "Cancelada" | "Oculta"
   >("todos");
-
-  // Firestore hook
-  const {
-    data: recepcionesFirestore,
-    loading,
-    error,
-    refresh,
-  } = useCollection<ReceptionView>(db, `organizations/${ORG_ID}/receptions`, {
-    // Rules authorize reception reads by warehouse. An unscoped collection
-    // listener is rejected even for an active member.
-    constraints: NORTH_RECEPTION_CONSTRAINTS,
-    enabled: canQueryNorthWarehouse,
-    mapFn: (doc) => {
-      const d = doc.data();
-      const mapped = mapReceptionListItem({ id: doc.id, ...d } as any);
-      return {
-        id: mapped.id,
-        displayId: mapped.displayId,
-        proveedor: mapped.supplier,
-        producto: mapped.product,
-        tarimas: mapped.palletCount,
-        fecha: mapped.date,
-        canResume: mapped.canResume,
-        estado:
-          d.status === "CONFIRMED"
-            ? "Completada"
-            : d.status === "IN_PROGRESS"
-              ? "En proceso"
-              : d.status === "CANCELLED"
-                ? "Con incidencia"
-                : "Borrador",
-        incidencias: 0,
-        color:
-          d.status === "CONFIRMED" ? "#16845b" : d.status === "IN_PROGRESS" ? "#3276a8" : "#c54b45",
-        bg:
-          d.status === "CONFIRMED" ? "#e2f5ec" : d.status === "IN_PROGRESS" ? "#e7f0f2" : "#fce9e7",
-        img:
-          d.status === "CONFIRMED"
-            ? imgIndicador
-            : d.status === "IN_PROGRESS"
-              ? imgIndicador
-              : imgIndicadorRed,
-      };
-    },
-  });
 
   // Load Firestore data when feature flag is enabled
   useEffect(() => {
@@ -489,47 +522,7 @@ export default function Recepciones({
     fsServices.receptions
       .getByWarehouse(WAREHOUSE_IDS.NORTH)
       .then((receptions: any[]) => {
-        const converted = receptions.map((r: any) => ({
-          ...(() => {
-            const mapped = mapReceptionListItem(r);
-            return {
-              id: mapped.id,
-              displayId: mapped.displayId,
-              proveedor: mapped.supplier,
-              producto: mapped.product,
-              tarimas: mapped.palletCount,
-              fecha: mapped.date,
-              canResume: mapped.canResume,
-            };
-          })(),
-          estado:
-            r.status === "CONFIRMED"
-              ? "Completada"
-              : r.status === "IN_PROGRESS"
-                ? "En proceso"
-                : r.status === "CANCELLED"
-                  ? "Con incidencia"
-                  : "Borrador",
-          incidencias: 0,
-          color:
-            r.status === "CONFIRMED"
-              ? "#16845b"
-              : r.status === "IN_PROGRESS"
-                ? "#3276a8"
-                : "#c54b45",
-          bg:
-            r.status === "CONFIRMED"
-              ? "#e2f5ec"
-              : r.status === "IN_PROGRESS"
-                ? "#e7f0f2"
-                : "#fce9e7",
-          img:
-            r.status === "CONFIRMED"
-              ? imgIndicador
-              : r.status === "IN_PROGRESS"
-                ? imgIndicador
-                : imgIndicadorRed,
-        }));
+        const converted = receptions.map(toReceptionView);
         setListaLocal(converted);
         setLoadingFs(false);
       })
@@ -560,7 +553,12 @@ export default function Recepciones({
       (rec.displayId || rec.id).toLowerCase().includes(searchText.toLowerCase()) ||
       rec.proveedor.toLowerCase().includes(searchText.toLowerCase()) ||
       rec.producto.toLowerCase().includes(searchText.toLowerCase());
-    const matchesEstado = filterEstado === "todos" || rec.estado === filterEstado;
+    const matchesEstado =
+      filterEstado === "todos"
+        ? !rec.hidden && rec.estado !== "Cancelada"
+        : filterEstado === "Oculta"
+          ? !!rec.hidden
+          : !rec.hidden && rec.estado === filterEstado;
     return matchesSearch && matchesEstado;
   });
 
@@ -607,42 +605,54 @@ export default function Recepciones({
     }
   }
 
-  function confirmDelete() {
-    if (!deleteTarget) return;
-
-    // Delete from local
-    setListaLocal((prev) => prev.filter((r) => r.id !== deleteTarget));
-
-    // Delete from Firestore
-    if (useFirestore && fsServices) {
-      fsServices.receptions
-        .deleteReception(deleteTarget, "user", `op-${Date.now()}`)
-        .catch((err: Error) => {
-          console.error("Error deleting reception:", err);
-          setErrorFs(err.message);
-        });
+  async function loadMutationOptions(receptionId: string) {
+    if (!canManage || !fsServices) return;
+    setOptionsBusy(receptionId);
+    setErrorFs(null);
+    try {
+      const options = await fsServices.receptions.mutationOptions(receptionId);
+      setMutationOptions((previous) => ({ ...previous, [receptionId]: options }));
+    } catch (error) {
+      setErrorFs(error instanceof Error ? error.message : "No se pudieron cargar las acciones.");
+    } finally {
+      setOptionsBusy(null);
     }
+  }
 
-    // Queue for offline sync if not online
-    if (!isOnline) {
-      enqueue({
-        type: "delete",
-        collectionPath: `organizations/{orgId}/receptions`,
-        docId: deleteTarget,
-        operationId: `op-${Date.now()}-delete`,
+  async function confirmMutation() {
+    if (!mutationTarget || !canManage || !fsServices || mutationBusy) return;
+    setMutationBusy(true);
+    setErrorFs(null);
+    try {
+      await fsServices.receptions.mutateReception(
+        mutationTarget.id,
+        mutationTarget.action,
+        crypto.randomUUID(),
+      );
+      setMutationTarget(null);
+      setMutationOptions((previous) => {
+        const next = { ...previous };
+        delete next[mutationTarget.id];
+        return next;
       });
+      const receptions = await fsServices.receptions.getByWarehouse(WAREHOUSE_IDS.NORTH);
+      setListaLocal(receptions.map(toReceptionView));
+    } catch (error) {
+      setErrorFs(error instanceof Error ? error.message : "No se pudo actualizar la recepción.");
+    } finally {
+      setMutationBusy(false);
     }
-
-    setDeleteTarget(null);
   }
 
   return (
     <>
-      {deleteTarget && (
+      {mutationTarget && (
         <DeleteModal
-          id={deleteTarget}
-          onConfirm={confirmDelete}
-          onCancel={() => setDeleteTarget(null)}
+          id={mutationTarget.id}
+          action={mutationTarget.action}
+          busy={mutationBusy}
+          onConfirm={() => void confirmMutation()}
+          onCancel={() => setMutationTarget(null)}
         />
       )}
       {qrActionError && (
@@ -706,17 +716,21 @@ export default function Recepciones({
                       | "Completada"
                       | "En proceso"
                       | "Con incidencia"
-                      | "Borrador",
+                      | "Borrador"
+                      | "Cancelada"
+                      | "Oculta",
                   )
                 }
                 className="bg-transparent outline-none text-[13px] text-[#172126] appearance-none pr-8 cursor-pointer"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
               >
-                <option value="todos">Todos los estados</option>
+                <option value="todos">Activas</option>
                 <option value="Completada">Completada</option>
                 <option value="En proceso">En proceso</option>
                 <option value="Con incidencia">Con incidencia</option>
                 <option value="Borrador">Borrador</option>
+                <option value="Cancelada">Canceladas</option>
+                <option value="Oculta">Ocultas</option>
               </select>
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#607078] pointer-events-none">
                 ▼
@@ -784,47 +798,7 @@ export default function Recepciones({
                 fsServices?.receptions
                   .getByWarehouse(WAREHOUSE_IDS.NORTH)
                   .then((r: any[]) => {
-                    const converted = r.map((rec: any) => ({
-                      ...(() => {
-                        const mapped = mapReceptionListItem(rec);
-                        return {
-                          id: mapped.id,
-                          displayId: mapped.displayId,
-                          proveedor: mapped.supplier,
-                          producto: mapped.product,
-                          tarimas: mapped.palletCount,
-                          fecha: mapped.date,
-                          canResume: mapped.canResume,
-                        };
-                      })(),
-                      estado:
-                        rec.status === "CONFIRMED"
-                          ? "Completada"
-                          : rec.status === "IN_PROGRESS"
-                            ? "En proceso"
-                            : rec.status === "CANCELLED"
-                              ? "Con incidencia"
-                              : "Borrador",
-                      incidencias: 0,
-                      color:
-                        rec.status === "CONFIRMED"
-                          ? "#16845b"
-                          : rec.status === "IN_PROGRESS"
-                            ? "#3276a8"
-                            : "#c54b45",
-                      bg:
-                        rec.status === "CONFIRMED"
-                          ? "#e2f5ec"
-                          : rec.status === "IN_PROGRESS"
-                            ? "#e7f0f2"
-                            : "#fce9e7",
-                      img:
-                        rec.status === "CONFIRMED"
-                          ? imgIndicador
-                          : rec.status === "IN_PROGRESS"
-                            ? imgIndicador
-                            : imgIndicadorRed,
-                    }));
+                    const converted = r.map(toReceptionView);
                     setListaLocal(converted);
                     setLoadingFs(false);
                   })
@@ -945,7 +919,11 @@ export default function Recepciones({
                   onEdit={() => onEdit(rec.id)}
                   onPrint={() => void handleReceptionQrAction(rec.id, "print")}
                   onDownload={() => void handleReceptionQrAction(rec.id, "download")}
-                  onDelete={() => setDeleteTarget(rec.id)}
+                  canManage={canManage}
+                  options={mutationOptions[rec.id]}
+                  optionsLoading={optionsBusy === rec.id}
+                  onOpen={() => void loadMutationOptions(rec.id)}
+                  onMutation={(action) => setMutationTarget({ id: rec.id, action })}
                 />
               </div>
             </Panel>
