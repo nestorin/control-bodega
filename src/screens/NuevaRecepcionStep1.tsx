@@ -8,54 +8,54 @@
  * - useUIContext for UI state
  */
 
-import { useState, useRef, useEffect } from "react";
-import { Select, type Proveedor, type Producto } from "./Configuracion";
-import { useOcr } from "../hooks/useOcr";
-import { isFeatureEnabled } from "@/config/featureFlags";
-import { createFirestoreServices } from "@/services/firestore";
-import { db, storage } from "@/lib/firebase";
-import { uploadInvoicePreviewWithMetadata } from "@/services/invoiceEvidence";
+import { useState, useRef, useEffect } from 'react';
+import { Select, type Proveedor, type Producto } from './Configuracion';
+import { useOcr } from '../hooks/useOcr';
+import { isFeatureEnabled } from '@/config/featureFlags';
+import { createFirestoreServices } from '@/services/firestore';
+import { db, storage } from '@/lib/firebase';
+import { uploadInvoicePreviewWithMetadata } from '@/services/invoiceEvidence';
 import {
   getReceptionOcrDocumentType,
   mapOcrProductsToReceptionForm,
   mapReceptionFormToPersistence,
-} from "@/services/receptionMappers";
-import { useAuthorization } from "@/hooks/useAuthorization";
-import { WAREHOUSE_IDS } from "@/config/warehouses";
+} from '@/services/receptionMappers';
+import { useAuthorization } from '@/hooks/useAuthorization';
+import { WAREHOUSE_IDS } from '@/config/warehouses';
 import {
   ReceptionSubmission,
   type ReceptionSubmissionStatus,
-} from "@/domains/reception/receptionSubmission";
-import { Panel, TouchTarget } from "@/components/ui";
-import { OcrOrderSelector } from "@/components/OcrOrderSelector";
-import { getSelectedOcrOrder } from "@/services/domain/ocrMapper";
-import { useReceptionFlow } from "@/hooks/useReceptionFlow";
-import { useCatalogos } from "@/hooks/useCatalogos";
-import { useUIContext } from "@/context";
+} from '@/domains/reception/receptionSubmission';
+import { Panel, TouchTarget } from '@/components/ui';
+import { OcrOrderSelector } from '@/components/OcrOrderSelector';
+import { getSelectedOcrOrder } from '@/services/domain/ocrMapper';
+import { useReceptionFlow } from '@/hooks/useReceptionFlow';
+import { useCatalogos } from '@/hooks/useCatalogos';
+import { useUIContext } from '@/context';
 
-const assetPathPrefix = "/assets";
+const assetPathPrefix = '/assets';
 const imgFileUp = `${assetPathPrefix}/928ba.svg`;
 const imgArrowRight = `${assetPathPrefix}/55de6.svg`;
 
-const ORG_ID = "org_exepa_001";
+const ORG_ID = 'org_exepa_001';
 
 // Local conversion catalog (will be replaced by useCatalogos)
 const catalogoConversiones = [
-  { producto: "AGUA MINERAL 600 ML", piezasPorCaja: 24, cajasPorTarima: 10 },
-  { producto: "COCA COLA 600ML C/24", piezasPorCaja: 24, cajasPorTarima: 10 },
+  { producto: 'AGUA MINERAL 600 ML', piezasPorCaja: 24, cajasPorTarima: 10 },
+  { producto: 'COCA COLA 600ML C/24', piezasPorCaja: 24, cajasPorTarima: 10 },
   {
-    producto: "SABRITAS CLÁSICAS 45G C/30",
+    producto: 'SABRITAS CLÁSICAS 45G C/30',
     piezasPorCaja: 30,
     cajasPorTarima: 12,
   },
-  { producto: "LALA LECHE 1L C/12", piezasPorCaja: 12, cajasPorTarima: 8 },
-  { producto: "BIMBO PAN BLANCO 680G", piezasPorCaja: 10, cajasPorTarima: 15 },
+  { producto: 'LALA LECHE 1L C/12', piezasPorCaja: 12, cajasPorTarima: 8 },
+  { producto: 'BIMBO PAN BLANCO 680G', piezasPorCaja: 10, cajasPorTarima: 15 },
   {
-    producto: "GAMESA GALLETAS SALADAS 90G C/20",
+    producto: 'GAMESA GALLETAS SALADAS 90G C/20',
     piezasPorCaja: 20,
     cajasPorTarima: 10,
   },
-  { producto: "PEPSI 2L C/6", piezasPorCaja: 6, cajasPorTarima: 20 },
+  { producto: 'PEPSI 2L C/6', piezasPorCaja: 6, cajasPorTarima: 20 },
 ];
 
 const conversionProps = catalogoConversiones;
@@ -76,7 +76,7 @@ interface Props {
       unidad: string | null;
       cantidad: number;
       importe: number;
-      estadoMatch: "confirmado" | "sugerido" | "manual";
+      estadoMatch: 'confirmado' | 'sugerido' | 'manual';
     }>;
     conversionesTabla?: Array<{
       producto: string;
@@ -117,7 +117,7 @@ interface Props {
       unidad: string | null;
       cantidad: number;
       importe: number;
-      estadoMatch: "confirmado" | "sugerido" | "manual";
+      estadoMatch: 'confirmado' | 'sugerido' | 'manual';
     }>;
   };
   catalogos: {
@@ -134,7 +134,7 @@ interface Props {
     cajasPorTarima: number;
   }>;
 }
-type ReceptionFormData = Parameters<Props["onContinue"]>[0];
+type ReceptionFormData = Parameters<Props['onContinue']>[0];
 
 function NuevaRecepcionStep1Form({
   onContinue,
@@ -169,12 +169,9 @@ function NuevaRecepcionStep1Form({
   // Legacy Props Fallback (for migration period)
   // ============================================
   const currentReception = ctxCurrentReception;
-  const onBackLegacy = onBack ?? (() => navigate("home"));
+  const onBackLegacy = onBack ?? (() => navigate('home'));
   const onContinueLegacy = onContinue;
-  const catalogosLegacy = catalogos ?? {
-    proveedores: catalogoProveedores,
-    productos: catalogoProductos,
-  };
+  const catalogosLegacy = catalogos ?? { proveedores: catalogoProveedores, productos: catalogoProductos };
   const catalogosStatusLegacy = { loading: catalogosLoading, error: catalogosError };
   const conversionesLegacy = conversiones ?? catalogoConversiones;
 
@@ -186,15 +183,15 @@ function NuevaRecepcionStep1Form({
   // ============================================
   const [hasOC, setHasOC] = useState<boolean | null>(initialData?.hasOC ?? true);
   const [showNoOCNotice, setShowNoOCNotice] = useState(false);
-  const [ocFolio, setOcFolio] = useState(initialData?.ocFolio ?? "OC-24891");
-  const [tarimas, setTarimas] = useState(initialData?.tarimas ?? "20");
+  const [ocFolio, setOcFolio] = useState(initialData?.ocFolio ?? 'OC-24891');
+  const [tarimas, setTarimas] = useState(initialData?.tarimas ?? '20');
   const [proveedor, setProveedor] = useState(
     initialData?.proveedor ??
-      catalogosLegacy.proveedores.find((p) => p.tipo === "mercancia")?.nombre ??
-      "Distribuidora del Norte",
+      catalogosLegacy.proveedores.find((p) => p.tipo === 'mercancia')?.nombre ??
+      'Distribuidora del Norte',
   );
   const [proveedorLogistico, setProveedorLogistico] = useState(
-    initialData?.proveedorLogistico ?? "",
+    initialData?.proveedorLogistico ?? '',
   );
 
   const { runOcr, loading, result, error, clear, previewDataUrl } = useOcr();
@@ -206,13 +203,13 @@ function NuevaRecepcionStep1Form({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { user, canQuery } = useAuthorization();
-  const useFirestore = isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery;
+  const useFirestore = isFeatureEnabled('USE_FIRESTORE_RECEPCIONES') && !!db && canQuery;
   const [fsServices, setFsServices] = useState<ReturnType<typeof createFirestoreServices> | null>(
     null,
   );
   const [firestoreReady, setFirestoreReady] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [submissionStatus, setSubmissionStatus] = useState<ReceptionSubmissionStatus>("idle");
+  const [submissionStatus, setSubmissionStatus] = useState<ReceptionSubmissionStatus>('idle');
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const operationIdRef = useRef<string | null>(null);
   const submissionRef = useRef<ReceptionSubmission<{ id: string }> | null>(null);
@@ -228,8 +225,8 @@ function NuevaRecepcionStep1Form({
   function getOperationId() {
     if (!operationIdRef.current) {
       const randomPart = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
-        byte.toString(16).padStart(2, "0"),
-      ).join("");
+        byte.toString(16).padStart(2, '0'),
+      ).join('');
       operationIdRef.current = `REC-${Date.now()}-${randomPart}`;
     }
     return operationIdRef.current;
@@ -268,7 +265,7 @@ function NuevaRecepcionStep1Form({
   function calcularConversionesYStickers() {
     const matchedProducts = matchProducts();
     const tabla = matchedProducts
-      .filter((p) => p.estadoMatch === "confirmado" && p.productId)
+      .filter((p) => p.estadoMatch === 'confirmado' && p.productId)
       .map((p) => {
         // Buscar conversión para este producto
         const conversion = conversionProps.find(
@@ -279,7 +276,7 @@ function NuevaRecepcionStep1Form({
         const cajasPorTarima = conversion?.cajasPorTarima || 10;
 
         let cajas = p.cantidad;
-        if (p.unidad?.toLowerCase().includes("pieza")) {
+        if (p.unidad?.toLowerCase().includes('pieza')) {
           cajas = Math.ceil(p.cantidad / piezasPorCaja);
         }
 
@@ -289,9 +286,9 @@ function NuevaRecepcionStep1Form({
         return {
           producto: p.nombre,
           productId: p.productId,
-          codigo: p.codigo || "—",
+          codigo: p.codigo || '—',
           unidades: p.cantidad,
-          unidad: p.unidad || "unidades",
+          unidad: p.unidad || 'unidades',
           piezasPorCaja,
           cajasPorTarima,
           cajas,
@@ -327,10 +324,10 @@ function NuevaRecepcionStep1Form({
   }, [useFirestore]);
 
   const proveedoresMercancia = catalogosLegacy.proveedores
-    .filter((p) => p.tipo === "mercancia")
+    .filter((p) => p.tipo === 'mercancia')
     .map((p) => ({ value: p.nombre, label: p.nombre }));
   const proveedoresLogistica = catalogosLegacy.proveedores
-    .filter((p) => p.tipo === "logistica")
+    .filter((p) => p.tipo === 'logistica')
     .map((p) => ({ value: p.nombre, label: p.nombre }));
 
   function selectHasOC(value: boolean) {
@@ -360,7 +357,7 @@ function NuevaRecepcionStep1Form({
 
   async function handleContinue() {
     if (ocrOrders.length > 1 && selectedOcrOrderIndex === null) {
-      setSubmissionError("Selecciona una orden de compra antes de continuar.");
+      setSubmissionError('Selecciona una orden de compra antes de continuar.');
       return;
     }
     setSubmissionError(null);
@@ -395,11 +392,11 @@ function NuevaRecepcionStep1Form({
       setSubmissionError(null);
       const operationId = getOperationId();
       const supplierId =
-        catalogosLegacy.proveedores.find((p) => p.nombre === proveedor)?.id || "prov_norte";
+        catalogosLegacy.proveedores.find((p) => p.nombre === proveedor)?.id || 'prov_norte';
       const warehouseId = WAREHOUSE_IDS.NORTH;
       try {
         if (!user) {
-          throw new Error("Authenticated user required to create a reception");
+          throw new Error('Authenticated user required to create a reception');
         }
 
         if (!submissionRef.current) {
@@ -424,7 +421,7 @@ function NuevaRecepcionStep1Form({
           const evidenceAttempt = evidenceDataUrl
             ? async (reception: { id: string }, evidenceOperationId: string) => {
                 if (!evidenceStorage) {
-                  throw new Error("Firebase Storage is unavailable");
+                  throw new Error('Firebase Storage is unavailable');
                 }
                 await uploadInvoicePreviewWithMetadata(
                   evidenceStorage,
@@ -450,7 +447,7 @@ function NuevaRecepcionStep1Form({
         }
 
         const { reception } = await submissionRef.current.submit(() =>
-          Promise.reject(new Error("Reception submission is unavailable")),
+          Promise.reject(new Error('Reception submission is unavailable')),
         );
         continueOnce({
           ...submissionFormRef.current!,
@@ -458,11 +455,11 @@ function NuevaRecepcionStep1Form({
         });
         return;
       } catch (e) {
-        console.error("Firestore reception submission failed:", e);
+        console.error('Firestore reception submission failed:', e);
         setSubmissionError(
           submissionRef.current?.receptionId
-            ? "La recepción ya se creó, pero no se pudo guardar la evidencia. Reintentá la evidencia o continuá sin ella."
-            : "No se pudo confirmar la creación de la recepción. Reintentá; se conservará la misma clave para evitar duplicados.",
+            ? 'La recepción ya se creó, pero no se pudo guardar la evidencia. Reintentá la evidencia o continuá sin ella.'
+            : 'No se pudo confirmar la creación de la recepción. Reintentá; se conservará la misma clave para evitar duplicados.',
         );
         return;
       } finally {
@@ -498,7 +495,7 @@ function NuevaRecepcionStep1Form({
         </p>
       )}
       <div className="bg-[#dce4e7] flex flex-col h-2 items-start overflow-hidden rounded-full w-full">
-        <div className="bg-[#f2b84b] h-2 rounded-full" style={{ width: "33%" }} />
+        <div className="bg-[#f2b84b] h-2 rounded-full" style={{ width: '33%' }} />
       </div>
 
       <fieldset
@@ -525,20 +522,20 @@ function NuevaRecepcionStep1Form({
               onClick={() => selectHasOC(true)}
               className={`flex flex-col items-center overflow-hidden p-4 rounded-[14px] flex-1 min-w-0 cursor-pointer transition-colors touch-target ${
                 hasOC === true
-                  ? "bg-[#16343f]"
-                  : "bg-white border border-[#dce4e7] hover:bg-[#f8fafb]"
+                  ? 'bg-[#16343f]'
+                  : 'bg-white border border-[#dce4e7] hover:bg-[#f8fafb]'
               }`}
             >
               <p
                 className={`text-base md:text-lg whitespace-nowrap ${
-                  hasOC === true ? "text-white" : "font-bold text-[#16343f]"
+                  hasOC === true ? 'text-white' : 'font-bold text-[#16343f]'
                 }`}
                 style={{
                   fontFamily: "'Inter', sans-serif",
                   fontWeight: hasOC === true ? 400 : 700,
                 }}
               >
-                {hasOC === true ? "✓ Sí, tengo OC" : "Sí, tengo OC"}
+                {hasOC === true ? '✓ Sí, tengo OC' : 'Sí, tengo OC'}
               </p>
             </TouchTarget>
 
@@ -547,20 +544,20 @@ function NuevaRecepcionStep1Form({
               onClick={() => selectHasOC(false)}
               className={`flex flex-col items-center overflow-hidden p-4 rounded-[14px] flex-1 min-w-0 cursor-pointer transition-colors touch-target ${
                 hasOC === false
-                  ? "bg-[#16343f]"
-                  : "bg-white border border-[#dce4e7] hover:bg-[#f8fafb]"
+                  ? 'bg-[#16343f]'
+                  : 'bg-white border border-[#dce4e7] hover:bg-[#f8fafb]'
               }`}
             >
               <p
                 className={`text-base md:text-lg whitespace-nowrap ${
-                  hasOC === false ? "text-white" : "font-bold text-[#16343f]"
+                  hasOC === false ? 'text-white' : 'font-bold text-[#16343f]'
                 }`}
                 style={{
                   fontFamily: "'Inter', sans-serif",
                   fontWeight: hasOC === false ? 400 : 700,
                 }}
               >
-                {hasOC === false ? "✓ No tengo OC" : "No tengo OC"}
+                {hasOC === false ? '✓ No tengo OC' : 'No tengo OC'}
               </p>
             </TouchTarget>
           </div>
@@ -709,10 +706,10 @@ function NuevaRecepcionStep1Form({
                   style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
                 >
                   {loading
-                    ? "Procesando documento..."
+                    ? 'Procesando documento...'
                     : creating
-                      ? "Creando recepción..."
-                      : "Seleccionar factura (PDF/JPG/PNG)"}
+                    ? 'Creando recepción...'
+                    : 'Seleccionar factura (PDF/JPG/PNG)'}
                 </p>
                 <p
                   className="text-[#607078] text-[11px]"
@@ -796,13 +793,13 @@ function NuevaRecepcionStep1Form({
                       return (
                         <tr key={line.linea} className="border-t border-[#eef2f4]">
                           <td className="p-2">{line.linea}</td>
-                          <td className="p-2">{line.codigo || "—"}</td>
+                          <td className="p-2">{line.codigo || '—'}</td>
                           <td className="p-2">
-                            {matched?.estadoMatch === "confirmado"
+                            {matched?.estadoMatch === 'confirmado'
                               ? `✓ ${matched.nombre}`
                               : `⚠ ${line.nombre}`}
                           </td>
-                          <td className="p-2">{line.unidad || "—"}</td>
+                          <td className="p-2">{line.unidad || '—'}</td>
                           <td className="p-2">{line.cantidad}</td>
                           <td className="p-2">${line.precio.toFixed(2)}</td>
                           <td className="p-2">${line.importe.toFixed(2)}</td>
@@ -937,17 +934,17 @@ function NuevaRecepcionStep1Form({
             style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
           >
             {creating
-              ? submissionStatus === "uploading_evidence"
-                ? "Guardando evidencia..."
-                : "Creando recepción..."
-              : submissionStatus === "evidence_failed"
-                ? "Reintentar evidencia"
-                : submissionStatus === "create_failed"
-                  ? "Reintentar creación"
-                  : "Continuar"}
+              ? submissionStatus === 'uploading_evidence'
+                ? 'Guardando evidencia...'
+                : 'Creando recepción...'
+              : submissionStatus === 'evidence_failed'
+              ? 'Reintentar evidencia'
+              : submissionStatus === 'create_failed'
+              ? 'Reintentar creación'
+              : 'Continuar'}
           </p>
         </button>
-        {submissionStatus === "evidence_failed" && submissionRef.current && (
+        {submissionStatus === 'evidence_failed' && submissionRef.current && (
           <button
             type="button"
             disabled={creating}

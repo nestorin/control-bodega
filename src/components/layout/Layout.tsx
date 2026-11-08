@@ -5,12 +5,12 @@
  * Receives children (page content) and renders the app shell.
  */
 
-import { memo } from "react";
-import { useUIContext } from "@/context";
-import { Sidebar } from "./Sidebar";
-import { Header } from "./Header";
-import { BottomNav } from "./BottomNav";
-import type { Screen, NavItem, HeaderConfig } from "@/types";
+import { memo } from 'react';
+import { useUIContext } from '@/context';
+import { Sidebar } from './Sidebar';
+import { Header } from './Header';
+import { BottomNav } from './BottomNav';
+import type { Screen, NavItem, HeaderConfig } from '@/types';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -34,14 +34,23 @@ export const Layout = memo(function Layout({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Sidebar (desktop only) */}
-      <Sidebar currentScreen={currentScreen} activeNav={activeNav} onNavigate={onNavigate} />
+      <Sidebar
+        currentScreen={currentScreen}
+        activeNav={activeNav}
+        onNavigate={onNavigate}
+      />
 
       {/* Header */}
-      <Header headerConfig={headerConfig} onBack={onBack} />
+      <Header
+        headerConfig={headerConfig}
+        onBack={onBack}
+      />
 
       {/* Main content area */}
       <main
-        className={`pt-16 pb-20 px-4 transition-all duration-200 ${isMobile ? "pl-4" : "pl-20"}`}
+        className={`pt-16 pb-20 px-4 transition-all duration-200 ${
+          isMobile ? 'pl-4' : 'pl-20'
+        }`}
         role="main"
       >
         {children}
@@ -57,11 +66,15 @@ export const Layout = memo(function Layout({
       )}
 
       {/* Bottom navigation (mobile only) */}
-      <BottomNav currentScreen={currentScreen} activeNav={activeNav} onNavigate={onNavigate} />
+      <BottomNav
+        currentScreen={currentScreen}
+        activeNav={activeNav}
+        onNavigate={onNavigate}
+      />
     </div>
   );
 });
 
-Layout.displayName = "Layout";
+Layout.displayName = 'Layout';
 
 export default Layout;

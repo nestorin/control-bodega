@@ -6,8 +6,8 @@
  * Reusable for both CapturaTarima and EscanearQR screens (reception flow).
  */
 
-import { useState, useCallback, useRef, useEffect } from "react";
-import type { BrowserQRCodeReader } from "@zxing/browser";
+import { useState, useCallback, useRef, useEffect } from 'react';
+import type { BrowserQRCodeReader } from '@zxing/browser';
 
 // ============================================
 // Types
@@ -59,7 +59,7 @@ export function useQrScanner(): UseQrScannerReturn {
 
   // Dynamic import of @zxing/browser to avoid SSR issues
   const loadZxing = useCallback(async () => {
-    const { BrowserQRCodeReader } = await import("@zxing/browser");
+    const { BrowserQRCodeReader } = await import('@zxing/browser');
     return BrowserQRCodeReader;
   }, []);
 
@@ -71,11 +71,9 @@ export function useQrScanner(): UseQrScannerReturn {
         setScanError(null);
 
         // Check for camera permission
-        const permission = await navigator.permissions.query({ name: "camera" as PermissionName });
-        if (permission.state === "denied") {
-          throw new Error(
-            "Permiso de cámara denegado. Habilítalo en la configuración del navegador.",
-          );
+        const permission = await navigator.permissions.query({ name: 'camera' as PermissionName });
+        if (permission.state === 'denied') {
+          throw new Error('Permiso de cámara denegado. Habilítalo en la configuración del navegador.');
         }
 
         const BrowserQRCodeReader = await loadZxing();
@@ -87,7 +85,7 @@ export function useQrScanner(): UseQrScannerReturn {
         // Get video element from ref
         const videoElement = stateRef.current.videoElement;
         if (!videoElement) {
-          throw new Error("Elemento de video no encontrado");
+          throw new Error('Elemento de video no encontrado');
         }
 
         // Store state
@@ -101,49 +99,43 @@ export function useQrScanner(): UseQrScannerReturn {
         setIsScanning(true);
 
         // Start scanning with abort signal
-        await reader
-          .decodeFromVideoDevice(
-            undefined, // Use default camera
-            videoElement,
-            (result, _err) => {
-              // Check if aborted
-              if (abortController.signal.aborted) return;
+        await reader.decodeFromVideoDevice(
+          undefined, // Use default camera
+          videoElement,
+          (result, _err) => {
+            // Check if aborted
+            if (abortController.signal.aborted) return;
 
-              if (result) {
-                const text = result.getText();
-                setLastResult(text);
-                onScanSuccess(text);
-              }
-            },
-          )
-          .catch((err) => {
-            // Ignore abort errors
-            if (err.name === "AbortError" || abortController.signal.aborted) {
-              return;
+            if (result) {
+              const text = result.getText();
+              setLastResult(text);
+              onScanSuccess(text);
             }
-            // Check if it's a permission error
-            if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-              setScanError(
-                "Permiso de cámara denegado. Habilítalo en la configuración del navegador.",
-              );
-            } else if (err.name === "NotFoundError") {
-              setScanError("No se encontró cámara disponible");
-            } else if (err.name === "NotReadableError") {
-              setScanError(
-                "No se pudo acceder a la cámara. Verifica que no esté en uso por otra app.",
-              );
-            } else {
-              setScanError(`Error al escanear: ${err.message}`);
-            }
-            setIsScanning(false);
-          });
+          }
+        ).catch((err) => {
+          // Ignore abort errors
+          if (err.name === 'AbortError' || abortController.signal.aborted) {
+            return;
+          }
+          // Check if it's a permission error
+          if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            setScanError('Permiso de cámara denegado. Habilítalo en la configuración del navegador.');
+          } else if (err.name === 'NotFoundError') {
+            setScanError('No se encontró cámara disponible');
+          } else if (err.name === 'NotReadableError') {
+            setScanError('No se pudo acceder a la cámara. Verifica que no esté en uso por otra app.');
+          } else {
+            setScanError(`Error al escanear: ${err.message}`);
+          }
+          setIsScanning(false);
+        });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Error al iniciar escáner";
+        const msg = err instanceof Error ? err.message : 'Error al iniciar escáner';
         setScanError(msg);
         setIsScanning(false);
       }
     },
-    [isScanning, loadZxing],
+    [isScanning, loadZxing]
   );
 
   const stopScanning = useCallback(() => {

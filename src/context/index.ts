@@ -8,21 +8,25 @@ export {
   ReceptionProvider,
   useReceptionContext,
   type ReceptionContextValue,
-} from "./ReceptionContext";
+} from './ReceptionContext';
 
 export {
   CatalogosProvider,
   useCatalogosContext,
   type CatalogosContextValue,
-} from "./CatalogosContext";
+} from './CatalogosContext';
 
 export {
   InventoryProvider,
   useInventoryContext,
   type InventoryContextValue,
-} from "./InventoryContext";
+} from './InventoryContext';
 
-export { UIProvider, useUIContext, type UIContextValue } from "./UIContext";
+export {
+  UIProvider,
+  useUIContext,
+  type UIContextValue,
+} from './UIContext';
 
 // Re-export AuthContext (existing)
-export { AuthProvider, useAuth } from "./AuthContext";
+export { AuthProvider, useAuth } from './AuthContext';

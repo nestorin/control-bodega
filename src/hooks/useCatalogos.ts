@@ -5,9 +5,9 @@
  * Delegates to CatalogosContext.
  */
 
-import { useCallback } from "react";
-import { useCatalogosContext } from "@/context";
-import type { Producto, Proveedor, Conversion, Almacen } from "@/types";
+import { useCallback } from 'react';
+import { useCatalogosContext } from '@/context';
+import type { Producto, Proveedor, Conversion, Almacen } from '@/types';
 
 // ============================================
 // Hook Return Type

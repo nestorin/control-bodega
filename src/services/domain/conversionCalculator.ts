@@ -6,7 +6,11 @@
  * Uses types from @/types (MatchedProduct, ConversionProps, ConversionTableRow).
  */
 
-import type { MatchedProduct, ConversionProps, ConversionTableRow } from "@/types";
+import type {
+  MatchedProduct,
+  ConversionProps,
+  ConversionTableRow,
+} from '@/types';
 
 // ============================================
 // Pure Functions
@@ -21,7 +25,7 @@ import type { MatchedProduct, ConversionProps, ConversionTableRow } from "@/type
  */
 export function calculateConversionesYStickers(
   matchedProducts: MatchedProduct[],
-  conversionProps: ConversionProps,
+  conversionProps: ConversionProps
 ): ConversionTableRow[] {
   return matchedProducts
     .filter((p) => p.productId && p.originalQuantity > 0)
@@ -36,11 +40,14 @@ export function calculateConversionesYStickers(
       const tarimas = Math.ceil(originalQuantity / cajasPorTarima);
 
       // Distribute boxes across pallets
-      const boxesPerPallet = distributeCajasPerTarima({ quantity: originalQuantity }, tarimas);
+      const boxesPerPallet = distributeCajasPerTarima(
+        { quantity: originalQuantity },
+        tarimas
+      );
 
       // Create sticker entries for each pallet
       const stickers = boxesPerPallet.map((boxes, index) => ({
-        qrPayload: `${product.productId}-${index + 1}`.padStart(10, "0"),
+        qrPayload: `${product.productId}-${index + 1}`.padStart(10, '0'),
         quantity: boxes,
       }));
 
@@ -51,7 +58,7 @@ export function calculateConversionesYStickers(
         originalQuantity,
         conversions: [
           {
-            unit: "tarima",
+            unit: 'tarima',
             quantity: tarimas,
             stickers,
           },
@@ -84,7 +91,7 @@ export function calculateTotalTarimas(conversionesTabla: ConversionTableRow[]): 
  */
 export function distributeCajasPerTarima(
   conversion: { quantity: number },
-  tarimas: number,
+  tarimas: number
 ): number[] {
   if (tarimas <= 0) return [];
   if (conversion.quantity <= 0) return Array(tarimas).fill(0);
@@ -94,7 +101,9 @@ export function distributeCajasPerTarima(
   const remainder = totalBoxes % tarimas;
 
   // Distribute remainder: first 'remainder' pallets get +1 box
-  return Array.from({ length: tarimas }, (_, i) => baseBoxesPerPallet + (i < remainder ? 1 : 0));
+  return Array.from({ length: tarimas }, (_, i) =>
+    baseBoxesPerPallet + (i < remainder ? 1 : 0)
+  );
 }
 
 /**
@@ -117,10 +126,10 @@ export function calculateStickers(tarimas: number): number {
  */
 export function findConversionProps(
   productName: string,
-  catalog: Array<{ producto: string; piezasPorCaja: number; cajasPorTarima: number }>,
+  catalog: Array<{ producto: string; piezasPorCaja: number; cajasPorTarima: number }>
 ): ConversionProps {
   const match = catalog.find(
-    (c) => c.producto.trim().toUpperCase() === productName.trim().toUpperCase(),
+    (c) => c.producto.trim().toUpperCase() === productName.trim().toUpperCase()
   );
 
   return match
@@ -143,9 +152,9 @@ export function buildConversionTable(
     nombre: string;
     unidad: string | null;
     cantidad: number;
-    estadoMatch: "confirmado" | "sugerido" | "manual";
+    estadoMatch: 'confirmado' | 'sugerido' | 'manual';
   }>,
-  catalogoConversiones: Array<{ producto: string; piezasPorCaja: number; cajasPorTarima: number }>,
+  catalogoConversiones: Array<{ producto: string; piezasPorCaja: number; cajasPorTarima: number }>
 ): Array<{
   producto: string;
   productId?: string | null;
@@ -160,7 +169,7 @@ export function buildConversionTable(
   conversionMatch: boolean;
 }> {
   return productos
-    .filter((p) => p.estadoMatch === "confirmado" && p.productId)
+    .filter((p) => p.estadoMatch === 'confirmado' && p.productId)
     .map((product) => {
       const conversion = findConversionProps(product.nombre, catalogoConversiones);
       const cajas = product.cantidad; // Assuming quantity is in boxes
@@ -170,16 +179,16 @@ export function buildConversionTable(
       return {
         producto: product.nombre,
         productId: product.productId,
-        codigo: product.codigo ?? "",
+        codigo: product.codigo ?? '',
         unidades: cajas * conversion.piezasPorCaja,
-        unidad: product.unidad ?? "cajas",
+        unidad: product.unidad ?? 'cajas',
         piezasPorCaja: conversion.piezasPorCaja,
         cajasPorTarima: conversion.cajasPorTarima,
         cajas,
         tarimas,
         stickers,
         conversionMatch: catalogoConversiones.some(
-          (c) => c.producto.trim().toUpperCase() === product.nombre.trim().toUpperCase(),
+          (c) => c.producto.trim().toUpperCase() === product.nombre.trim().toUpperCase()
         ),
       };
     });

@@ -3,31 +3,31 @@
  * Handles file selection, preview, validation, commit, templates
  */
 
-import { useState, useCallback, useRef } from "react";
-import { useCsvImport } from "@/hooks/useCsvImport";
-import { useImportLog } from "@/hooks/useImportLog";
-import { ValidationPreview } from "./ValidationPreview";
-import { Badge } from "./Badge";
-import { ImportLogModal } from "./ImportLogModal";
-import { downloadCsvTemplate } from "@/utils/csvTemplates";
-import type { CatalogType, ValidationResult, ImportLog, CsvRow } from "@/types/csvImport";
+import { useState, useCallback, useRef } from 'react';
+import { useCsvImport } from '@/hooks/useCsvImport';
+import { useImportLog } from '@/hooks/useImportLog';
+import { ValidationPreview } from './ValidationPreview';
+import { Badge } from './Badge';
+import { ImportLogModal } from './ImportLogModal';
+import { downloadCsvTemplate } from '@/utils/csvTemplates';
+import type { CatalogType, ValidationResult, ImportLog, CsvRow } from '@/types/csvImport';
 
 const CATALOG_TYPES: { value: CatalogType; label: string; icon: string }[] = [
-  { value: "products", label: "Productos", icon: "📦" },
-  { value: "suppliers", label: "Proveedores", icon: "🏢" },
-  { value: "conversions", label: "Conversiones", icon: "🔄" },
-  { value: "warehouses", label: "Almacenes", icon: "🏪" },
+  { value: 'products', label: 'Productos', icon: '📦' },
+  { value: 'suppliers', label: 'Proveedores', icon: '🏢' },
+  { value: 'conversions', label: 'Conversiones', icon: '🔄' },
+  { value: 'warehouses', label: 'Almacenes', icon: '🏪' },
 ];
 
-const FILTER_TABS: { key: "all" | "valid" | "invalid"; label: string }[] = [
-  { key: "all", label: "Todas" },
-  { key: "valid", label: "Válidas" },
-  { key: "invalid", label: "Con errores" },
+const FILTER_TABS: { key: 'all' | 'valid' | 'invalid'; label: string }[] = [
+  { key: 'all', label: 'Todas' },
+  { key: 'valid', label: 'Válidas' },
+  { key: 'invalid', label: 'Con errores' },
 ];
 
 function getRowDisplayName(data: CsvRow | undefined): string {
-  if (!data) return "Sin nombre";
-  return (data as any).nombre ?? (data as any).producto ?? (data as any).sku ?? "Sin nombre";
+  if (!data) return 'Sin nombre';
+  return (data as any).nombre ?? (data as any).producto ?? (data as any).sku ?? 'Sin nombre';
 }
 
 function getRowSku(data: CsvRow | undefined): string | undefined {
@@ -49,138 +49,111 @@ export function CsvImportTab() {
     clearPreview,
     setSelectedType,
   } = useCsvImport();
-
+  
   const { logs: importLogs, isLoading: logsLoading, hasMore, loadMore } = useImportLog();
-
-  const [filterTab, setFilterTab] = useState<"all" | "valid" | "invalid">("all");
+  
+  const [filterTab, setFilterTab] = useState<'all' | 'valid' | 'invalid'>('all');
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragActiveRef = useRef(false);
-
+  
   const filteredRows = previewRows.filter((row) => {
-    if (filterTab === "all") return true;
-    if (filterTab === "valid") return row.isValid;
+    if (filterTab === 'all') return true;
+    if (filterTab === 'valid') return row.isValid;
     return !row.isValid;
   });
-
+  
   const validCount = previewRows.filter((r) => r.isValid).length;
   const invalidCount = previewRows.length - validCount;
-
+  
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     dragActiveRef.current = true;
   }, []);
-
+  
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     dragActiveRef.current = false;
   }, []);
-
-  const handleDrop = useCallback(
-    async (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      dragActiveRef.current = false;
-
-      const file = e.dataTransfer.files[0];
-      if (
-        file &&
-        (file.type === "text/csv" || file.name.endsWith(".csv") || file.name.endsWith(".tsv"))
-      ) {
-        try {
-          await parseFile(file, selectedType);
-        } catch (err) {
-          console.error("Error parsing file:", err);
-          alert(
-            "Error al procesar el archivo: " +
-              (err instanceof Error ? err.message : "Error desconocido"),
-          );
-        }
+  
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragActiveRef.current = false;
+    
+    const file = e.dataTransfer.files[0];
+    if (file && (file.type === 'text/csv' || file.name.endsWith('.csv') || file.name.endsWith('.tsv'))) {
+      try {
+        await parseFile(file, selectedType);
+      } catch (err) {
+        console.error('Error parsing file:', err);
+        alert('Error al procesar el archivo: ' + (err instanceof Error ? err.message : 'Error desconocido'));
       }
-    },
-    [parseFile, selectedType],
-  );
-
-  const handleFileChange = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        try {
-          await parseFile(file, selectedType);
-        } catch (err) {
-          console.error("Error parsing file:", err);
-          alert(
-            "Error al procesar el archivo: " +
-              (err instanceof Error ? err.message : "Error desconocido"),
-          );
-        }
-        // Reset input so same file can be selected again
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
+    }
+  }, [parseFile, selectedType]);
+  
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        await parseFile(file, selectedType);
+      } catch (err) {
+        console.error('Error parsing file:', err);
+        alert('Error al procesar el archivo: ' + (err instanceof Error ? err.message : 'Error desconocido'));
       }
-    },
-    [parseFile, selectedType],
-  );
-
+      // Reset input so same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [parseFile, selectedType]);
+  
   const handleCommit = useCallback(async () => {
     try {
       await commitImport();
       alert(`Importación completada: ${importLog?.validRows || 0} filas importadas`);
     } catch (err) {
-      console.error("Commit error:", err);
-      alert(
-        "Error en la importación: " + (err instanceof Error ? err.message : "Error desconocido"),
-      );
+      console.error('Commit error:', err);
+      alert('Error en la importación: ' + (err instanceof Error ? err.message : 'Error desconocido'));
     }
   }, [commitImport, importLog]);
-
+  
   const handleDownloadTemplate = useCallback(() => {
     downloadTemplate(selectedType);
   }, [selectedType]);
-
+  
   const handleClear = useCallback(() => {
     clearPreview();
-    setFilterTab("all");
+    setFilterTab('all');
     setExpandedRow(null);
   }, [clearPreview]);
-
+  
   const toggleRowExpand = useCallback((index: number) => {
     setExpandedRow((prev) => (prev === index ? null : index));
   }, []);
-
+  
   // Status badge for import log
-  const getStatusBadge = (status: ImportLog["status"]) => {
+  const getStatusBadge = (status: ImportLog['status']) => {
     switch (status) {
-      case "committed":
-        return <Badge label="✓ Completada" color="green" />;
-      case "failed":
-        return <Badge label="✗ Falló" color="red" />;
-      default:
-        return <Badge label="⏳ Vista previa" color="blue" />;
+      case 'committed': return <Badge label="✓ Completada" color="green" />;
+      case 'failed': return <Badge label="✗ Falló" color="red" />;
+      default: return <Badge label="⏳ Vista previa" color="blue" />;
     }
   };
-
+  
   return (
     <div className="flex flex-col gap-4 h-full overflow-auto p-4 lg:p-7">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2
-            className="font-black text-[#172126] text-[20px] sm:text-[24px]"
-            style={{ fontFamily: "'Inter',sans-serif", fontWeight: 900 }}
-          >
+          <h2 className="font-black text-[#172126] text-[20px] sm:text-[24px]" style={{ fontFamily: "'Inter',sans-serif", fontWeight: 900 }}>
             Importar Catálogo
           </h2>
-          <p
-            className="text-[#607078] text-[13px] mt-1"
-            style={{ fontFamily: "'Inter',sans-serif" }}
-          >
-            Sube un archivo CSV/TSV para importar datos en lote. Se validarán las filas antes de
-            guardar.
+          <p className="text-[#607078] text-[13px] mt-1" style={{ fontFamily: "'Inter',sans-serif" }}>
+            Sube un archivo CSV/TSV para importar datos en lote. Se validarán las filas antes de guardar.
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
@@ -202,7 +175,7 @@ export function CsvImportTab() {
           </button>
         </div>
       </div>
-
+      
       {/* Catalog Type Selector */}
       <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Tipo de catálogo">
         {CATALOG_TYPES.map((cat) => (
@@ -214,8 +187,8 @@ export function CsvImportTab() {
             aria-checked={selectedType === cat.value}
             className={`flex items-center gap-2 px-4 py-2 rounded-[10px] whitespace-nowrap text-sm transition-colors font-bold ${
               selectedType === cat.value
-                ? "bg-[#16343f] text-white"
-                : "bg-white border border-[#dce4e7] text-[#607078] hover:bg-[#f4f7f8]"
+                ? 'bg-[#16343f] text-white'
+                : 'bg-white border border-[#dce4e7] text-[#607078] hover:bg-[#f4f7f8]'
             }`}
             style={{ fontFamily: "'Inter',sans-serif", fontWeight: 700 }}
           >
@@ -224,7 +197,7 @@ export function CsvImportTab() {
           </button>
         ))}
       </div>
-
+      
       {/* File Drop Zone */}
       <div
         onDragOver={handleDragOver}
@@ -233,8 +206,8 @@ export function CsvImportTab() {
         onClick={() => fileInputRef.current?.click()}
         className={`relative flex flex-col items-center justify-center gap-3 rounded-[16px] cursor-pointer overflow-hidden transition-all ${
           dragActiveRef.current
-            ? "bg-[#e7f0f2] border-2 border-[#3276a8]"
-            : "bg-white border-2 border-dashed border-[#dce4e7]"
+            ? 'bg-[#e7f0f2] border-2 border-[#3276a8]'
+            : 'bg-white border-2 border-dashed border-[#dce4e7]'
         }`}
         style={{ minHeight: 180 }}
         role="button"
@@ -252,10 +225,7 @@ export function CsvImportTab() {
         {isParsing ? (
           <div className="flex flex-col items-center gap-3">
             <div className="w-12 h-12 border-3 border-[#3276a8] border-t-transparent rounded-full animate-spin" />
-            <p
-              className="font-bold text-[#3276a8] text-[13px]"
-              style={{ fontFamily: "'Inter',sans-serif" }}
-            >
+            <p className="font-bold text-[#3276a8] text-[13px]" style={{ fontFamily: "'Inter',sans-serif" }}>
               Procesando archivo...
             </p>
           </div>
@@ -291,22 +261,16 @@ export function CsvImportTab() {
               <line x1="16" y1="17" x2="8" y2="17" />
               <polyline points="10 9 9 9 8 9" />
             </svg>
-            <p
-              className="font-bold text-[#3276a8] text-[13px]"
-              style={{ fontFamily: "'Inter',sans-serif" }}
-            >
+            <p className="font-bold text-[#3276a8] text-[13px]" style={{ fontFamily: "'Inter',sans-serif" }}>
               Cargar archivo CSV / TSV
             </p>
-            <p
-              className="text-[#607078] text-[11px] text-center px-4"
-              style={{ fontFamily: "'Inter',sans-serif" }}
-            >
+            <p className="text-[#607078] text-[11px] text-center px-4" style={{ fontFamily: "'Inter',sans-serif" }}>
               Arrastra aquí o haz clic para seleccionar · CSV, TSV · máx 10MB
             </p>
           </div>
         )}
       </div>
-
+      
       {/* Filter Tabs */}
       {previewRows.length > 0 && (
         <div className="flex flex-wrap gap-1 bg-[#f0f4f5] rounded-[10px] p-1" role="tablist">
@@ -318,27 +282,17 @@ export function CsvImportTab() {
               aria-selected={filterTab === tab.key}
               className={`px-3 py-[6px] rounded-[8px] text-[11px] font-bold transition-colors ${
                 filterTab === tab.key
-                  ? "bg-white text-[#16343f] shadow-[0px_1px_3px_rgba(22,52,63,0.1)]"
-                  : "text-[#607078] hover:bg-white"
+                  ? 'bg-white text-[#16343f] shadow-[0px_1px_3px_rgba(22,52,63,0.1)]'
+                  : 'text-[#607078] hover:bg-white'
               }`}
               style={{ fontFamily: "'Inter',sans-serif", fontWeight: 700 }}
             >
-              {tab.label}{" "}
-              <Badge
-                label={String(
-                  tab.key === "all"
-                    ? previewRows.length
-                    : tab.key === "valid"
-                      ? validCount
-                      : invalidCount,
-                )}
-                color="gray"
-              />
+              {tab.label} <Badge label={String(tab.key === 'all' ? previewRows.length : tab.key === 'valid' ? validCount : invalidCount)} color="gray" />
             </button>
           ))}
         </div>
       )}
-
+      
       {/* Preview Table */}
       {previewRows.length > 0 && (
         <div className="bg-white rounded-[12px] border border-[#dce4e7] overflow-hidden">
@@ -346,36 +300,11 @@ export function CsvImportTab() {
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-[#f0f4f5] border-b border-[#dce4e7]">
-                  <th
-                    className="px-3 py-2 text-[10px] font-bold uppercase text-[#607078]"
-                    style={{ fontFamily: "'Inter',sans-serif" }}
-                  >
-                    #
-                  </th>
-                  <th
-                    className="px-3 py-2 text-[10px] font-bold uppercase text-[#607078]"
-                    style={{ fontFamily: "'Inter',sans-serif" }}
-                  >
-                    Estado
-                  </th>
-                  <th
-                    className="px-3 py-2 text-[10px] font-bold uppercase text-[#607078]"
-                    style={{ fontFamily: "'Inter',sans-serif" }}
-                  >
-                    Nombre / SKU
-                  </th>
-                  <th
-                    className="px-3 py-2 text-[10px] font-bold uppercase text-[#607078]"
-                    style={{ fontFamily: "'Inter',sans-serif" }}
-                  >
-                    Detalles
-                  </th>
-                  <th
-                    className="px-3 py-2 text-[10px] font-bold uppercase text-[#607078]"
-                    style={{ fontFamily: "'Inter',sans-serif" }}
-                  >
-                    Errores
-                  </th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase text-[#607078]" style={{ fontFamily: "'Inter',sans-serif" }}>#</th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase text-[#607078]" style={{ fontFamily: "'Inter',sans-serif" }}>Estado</th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase text-[#607078]" style={{ fontFamily: "'Inter',sans-serif" }}>Nombre / SKU</th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase text-[#607078]" style={{ fontFamily: "'Inter',sans-serif" }}>Detalles</th>
+                  <th className="px-3 py-2 text-[10px] font-bold uppercase text-[#607078]" style={{ fontFamily: "'Inter',sans-serif" }}>Errores</th>
                 </tr>
               </thead>
               <tbody>
@@ -385,12 +314,9 @@ export function CsvImportTab() {
                   return (
                     <tr
                       key={row.rowIndex}
-                      className={`border-b border-[#f0f4f5] last:border-0 ${!row.isValid ? "bg-[#fef8e6]" : ""} ${isExpanded ? "bg-[#fef8e6]" : ""}`}
+                      className={`border-b border-[#f0f4f5] last:border-0 ${!row.isValid ? 'bg-[#fef8e6]' : ''} ${isExpanded ? 'bg-[#fef8e6]' : ''}`}
                     >
-                      <td
-                        className="px-3 py-2 text-[12px] text-[#607078] font-mono"
-                        style={{ fontFamily: "'Inter',sans-serif" }}
-                      >
+                      <td className="px-3 py-2 text-[12px] text-[#607078] font-mono" style={{ fontFamily: "'Inter',sans-serif" }}>
                         {row.rowIndex}
                       </td>
                       <td className="px-3 py-2">
@@ -400,15 +326,10 @@ export function CsvImportTab() {
                           <Badge label="✗ Error" color="red" />
                         )}
                       </td>
-                      <td
-                        className="px-3 py-2 text-[12px] font-semibold text-[#172126] max-w-xs truncate"
-                        style={{ fontFamily: "'Inter',sans-serif" }}
-                      >
+                      <td className="px-3 py-2 text-[12px] font-semibold text-[#172126] max-w-xs truncate" style={{ fontFamily: "'Inter',sans-serif" }}>
                         {getRowDisplayName(row.data)}
                         {getRowSku(row.data) && (
-                          <span className="text-[#607078] font-normal ml-1 text-[10px]">
-                            ({getRowSku(row.data)})
-                          </span>
+                          <span className="text-[#607078] font-normal ml-1 text-[10px]">({getRowSku(row.data)})</span>
                         )}
                       </td>
                       <td className="px-3 py-2">
@@ -417,7 +338,7 @@ export function CsvImportTab() {
                           className="flex items-center gap-1 text-[#3276a8] text-[11px] font-bold hover:underline"
                           style={{ fontFamily: "'Inter',sans-serif" }}
                         >
-                          {isExpanded ? "▲" : "▼"} {isExpanded ? "Ocultar" : "Ver"}
+                          {isExpanded ? '▲' : '▼'} {isExpanded ? 'Ocultar' : 'Ver'}
                         </button>
                       </td>
                       <td className="px-3 py-2">
@@ -430,11 +351,7 @@ export function CsvImportTab() {
                 })}
                 {filteredRows.length === 0 && (
                   <tr>
-                    <td
-                      colSpan={5}
-                      className="px-3 py-8 text-center text-[13px] text-[#607078]"
-                      style={{ fontFamily: "'Inter',sans-serif" }}
-                    >
+                    <td colSpan={5} className="px-3 py-8 text-center text-[13px] text-[#607078]" style={{ fontFamily: "'Inter',sans-serif" }}>
                       No hay filas con este filtro
                     </td>
                   </tr>
@@ -442,11 +359,11 @@ export function CsvImportTab() {
               </tbody>
             </table>
           </div>
-
+          
           {/* Expanded validation details (rendered in ValidationPreview) */}
         </div>
       )}
-
+      
       {/* Commit Bar */}
       {previewRows.length > 0 && validCount > 0 && (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-white rounded-[12px] border border-[#dce4e7]">
@@ -455,10 +372,7 @@ export function CsvImportTab() {
             {isCommitting && (
               <div className="flex items-center gap-2">
                 <div className="w-5 h-5 border-2 border-[#3276a8] border-t-transparent rounded-full animate-spin" />
-                <span
-                  className="text-[#3276a8] font-bold text-[12px]"
-                  style={{ fontFamily: "'Inter',sans-serif" }}
-                >
+                <span className="text-[#3276a8] font-bold text-[12px]" style={{ fontFamily: "'Inter',sans-serif" }}>
                   Importando... {commitProgress}%
                 </span>
               </div>
@@ -479,12 +393,12 @@ export function CsvImportTab() {
               className="flex items-center gap-2 bg-[#16343f] border border-[#16343f] text-white font-bold px-4 py-[9px] rounded-[9px] hover:bg-[#1e4456] transition-colors touch-target"
               style={{ fontFamily: "'Inter',sans-serif", fontWeight: 700 }}
             >
-              {isCommitting ? "Importando..." : "Importar datos"}
+              {isCommitting ? 'Importando...' : 'Importar datos'}
             </button>
           </div>
         </div>
       )}
-
+      
       {/* Import Log Modal */}
       {showHistoryModal && (
         <ImportLogModal

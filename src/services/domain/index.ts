@@ -11,4 +11,4 @@ export {
   calculateStickers,
   findConversionProps,
   buildConversionTable,
-} from "./conversionCalculator";
+} from './conversionCalculator';

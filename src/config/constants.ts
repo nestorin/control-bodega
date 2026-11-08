@@ -10,7 +10,7 @@
 // ============================================
 
 /** Base path for static assets */
-export const ASSET_PATH_PREFIX = "/assets";
+export const ASSET_PATH_PREFIX = '/assets';
 
 /** Asset filenames (imported as URLs by Vite) */
 export const ASSETS = {
@@ -27,12 +27,12 @@ export const ASSETS = {
 // ============================================
 
 /** Canonical organization ID */
-export const ORGANIZATION_ID = "org_exepa_001";
+export const ORGANIZATION_ID = 'org_exepa_001';
 
 /** Canonical warehouse IDs */
 export const CANONICAL_WAREHOUSE_IDS = {
-  NORTH: "wh_tehuacan_1",
-  SOUTH: "wh_tehuacan_2",
+  NORTH: 'wh_tehuacan_1',
+  SOUTH: 'wh_tehuacan_2',
 } as const;
 
 // ============================================

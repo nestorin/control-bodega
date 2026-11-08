@@ -13,9 +13,9 @@ import {
   useMemo,
   useEffect,
   ReactNode,
-} from "react";
-import type { HeaderConfig, Screen } from "@/types";
-import { createHeaderConfig } from "@/config/navigation";
+} from 'react';
+import type { HeaderConfig, Screen } from '@/types';
+import { createHeaderConfig } from '@/config/navigation';
 
 // ============================================
 // State & Action Types
@@ -29,11 +29,11 @@ interface UIState {
 }
 
 type UIAction =
-  | { type: "SET_MOBILE"; payload: boolean }
-  | { type: "SET_SIDEBAR_OPEN"; payload: boolean }
-  | { type: "TOGGLE_SIDEBAR" }
-  | { type: "SET_HEADER"; payload: HeaderConfig | null }
-  | { type: "RESET_ALL" };
+  | { type: 'SET_MOBILE'; payload: boolean }
+  | { type: 'SET_SIDEBAR_OPEN'; payload: boolean }
+  | { type: 'TOGGLE_SIDEBAR' }
+  | { type: 'SET_HEADER'; payload: HeaderConfig | null }
+  | { type: 'RESET_ALL' };
 
 // ============================================
 // Initial State
@@ -51,7 +51,7 @@ const initialState: UIState = {
 
 function uiReducer(state: UIState, action: UIAction): UIState {
   switch (action.type) {
-    case "SET_MOBILE":
+    case 'SET_MOBILE':
       return {
         ...state,
         isMobile: action.payload,
@@ -59,16 +59,16 @@ function uiReducer(state: UIState, action: UIAction): UIState {
         sidebarOpen: action.payload ? false : state.sidebarOpen,
       };
 
-    case "SET_SIDEBAR_OPEN":
+    case 'SET_SIDEBAR_OPEN':
       return { ...state, sidebarOpen: action.payload };
 
-    case "TOGGLE_SIDEBAR":
+    case 'TOGGLE_SIDEBAR':
       return { ...state, sidebarOpen: !state.sidebarOpen };
 
-    case "SET_HEADER":
+    case 'SET_HEADER':
       return { ...state, header: action.payload };
 
-    case "RESET_ALL":
+    case 'RESET_ALL':
       return initialState;
 
     default:
@@ -113,44 +113,40 @@ export function UIProvider({
   useEffect(() => {
     const checkMobile = () => {
       const mobile = window.innerWidth < 769;
-      dispatch({ type: "SET_MOBILE", payload: mobile });
+      dispatch({ type: 'SET_MOBILE', payload: mobile });
     };
     checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   // Dynamic header config derivation
   useEffect(() => {
     if (currentScreen) {
-      const headerConfig = createHeaderConfig(
-        currentReception ?? null,
-        tarimaPosition,
-        tarimaTotal,
-      );
-      dispatch({ type: "SET_HEADER", payload: headerConfig[currentScreen] ?? null });
+      const headerConfig = createHeaderConfig(currentReception ?? null, tarimaPosition, tarimaTotal);
+      dispatch({ type: 'SET_HEADER', payload: headerConfig[currentScreen] ?? null });
     }
   }, [currentScreen, currentReception, tarimaPosition, tarimaTotal]);
 
   const setMobile = useCallback((isMobile: boolean) => {
-    dispatch({ type: "SET_MOBILE", payload: isMobile });
+    dispatch({ type: 'SET_MOBILE', payload: isMobile });
   }, []);
 
   const setSidebarOpen = useCallback((open: boolean) => {
-    dispatch({ type: "SET_SIDEBAR_OPEN", payload: open });
+    dispatch({ type: 'SET_SIDEBAR_OPEN', payload: open });
   }, []);
 
   const toggleSidebar = useCallback(() => {
-    dispatch({ type: "TOGGLE_SIDEBAR" });
+    dispatch({ type: 'TOGGLE_SIDEBAR' });
   }, []);
 
   const setHeader = useCallback((header: HeaderConfig | null) => {
-    dispatch({ type: "SET_HEADER", payload: header });
+    dispatch({ type: 'SET_HEADER', payload: header });
   }, []);
 
   const closeSidebarOnMobile = useCallback(() => {
     if (state.isMobile) {
-      dispatch({ type: "SET_SIDEBAR_OPEN", payload: false });
+      dispatch({ type: 'SET_SIDEBAR_OPEN', payload: false });
     }
   }, [state.isMobile]);
 
@@ -163,7 +159,7 @@ export function UIProvider({
       setHeader,
       closeSidebarOnMobile,
     }),
-    [state, setMobile, setSidebarOpen, toggleSidebar, setHeader, closeSidebarOnMobile],
+    [state, setMobile, setSidebarOpen, toggleSidebar, setHeader, closeSidebarOnMobile]
   );
 
   return <UIContext.Provider value={value}>{children}</UIContext.Provider>;
@@ -176,7 +172,7 @@ export function UIProvider({
 export function useUIContext(): UIContextValue {
   const context = useContext(UIContext);
   if (!context) {
-    throw new Error("useUIContext must be used within a UIProvider");
+    throw new Error('useUIContext must be used within a UIProvider');
   }
   return context;
 }

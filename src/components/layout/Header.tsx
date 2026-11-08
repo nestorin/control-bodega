@@ -5,9 +5,9 @@
  * Presentational only - receives data via UIContext and props.
  */
 
-import { memo } from "react";
-import { useUIContext } from "@/context";
-import type { HeaderConfig } from "@/types";
+import { memo } from 'react';
+import { useUIContext } from '@/context';
+import type { HeaderConfig } from '@/types';
 
 interface HeaderProps {
   headerConfig: HeaderConfig;
@@ -15,13 +15,17 @@ interface HeaderProps {
   children?: React.ReactNode;
 }
 
-export const Header = memo(function Header({ headerConfig, onBack, children }: HeaderProps) {
+export const Header = memo(function Header({
+  headerConfig,
+  onBack,
+  children,
+}: HeaderProps) {
   const { isMobile } = useUIContext();
 
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-30 h-16 bg-white border-b border-gray-200 flex items-center px-4 ${
-        isMobile ? "pl-12" : "pl-20"
+        isMobile ? 'pl-12' : 'pl-20'
       }`}
       role="banner"
     >
@@ -54,7 +58,9 @@ export const Header = memo(function Header({ headerConfig, onBack, children }: H
             {headerConfig.subtitle}
           </p>
         )}
-        <h1 className="text-lg font-semibold text-gray-900 truncate">{headerConfig.title}</h1>
+        <h1 className="text-lg font-semibold text-gray-900 truncate">
+          {headerConfig.title}
+        </h1>
       </div>
 
       {/* Actions / custom children */}
@@ -67,6 +73,6 @@ export const Header = memo(function Header({ headerConfig, onBack, children }: H
   );
 });
 
-Header.displayName = "Header";
+Header.displayName = 'Header';
 
 export default Header;

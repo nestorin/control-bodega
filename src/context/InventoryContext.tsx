@@ -5,8 +5,15 @@
  * Uses useReducer for state management.
  */
 
-import { createContext, useContext, useReducer, useCallback, useMemo, ReactNode } from "react";
-import type { Producto, Almacen } from "@/types";
+import {
+  createContext,
+  useContext,
+  useReducer,
+  useCallback,
+  useMemo,
+  ReactNode,
+} from 'react';
+import type { Producto, Almacen } from '@/types';
 
 // ============================================
 // State & Action Types
@@ -18,20 +25,11 @@ interface InventoryState {
 }
 
 type InventoryAction =
-  | {
-      type: "INICIALIZAR_INVENTARIO_ALMACEN";
-      payload: { almacenId: string; productos: Producto[] };
-    }
-  | { type: "ACTIVAR_ALMACEN"; payload: Almacen }
-  | {
-      type: "AUMENTAR_INVENTARIO";
-      payload: { almacenId: string; productos: Array<{ productoId: string; cajas: number }> };
-    }
-  | {
-      type: "REDUCIR_INVENTARIO";
-      payload: { almacenId: string; productos: Array<{ productoId: string; cajas: number }> };
-    }
-  | { type: "RESET_ALL" };
+  | { type: 'INICIALIZAR_INVENTARIO_ALMACEN'; payload: { almacenId: string; productos: Producto[] } }
+  | { type: 'ACTIVAR_ALMACEN'; payload: Almacen }
+  | { type: 'AUMENTAR_INVENTARIO'; payload: { almacenId: string; productos: Array<{ productoId: string; cajas: number }> } }
+  | { type: 'REDUCIR_INVENTARIO'; payload: { almacenId: string; productos: Array<{ productoId: string; cajas: number }> } }
+  | { type: 'RESET_ALL' };
 
 // ============================================
 // Initial State
@@ -48,7 +46,7 @@ const initialState: InventoryState = {
 
 function inventoryReducer(state: InventoryState, action: InventoryAction): InventoryState {
   switch (action.type) {
-    case "INICIALIZAR_INVENTARIO_ALMACEN": {
+    case 'INICIALIZAR_INVENTARIO_ALMACEN': {
       const { almacenId, productos } = action.payload;
       if (state.inventario[almacenId]) {
         return state; // Already initialized
@@ -63,13 +61,13 @@ function inventoryReducer(state: InventoryState, action: InventoryAction): Inven
       };
     }
 
-    case "ACTIVAR_ALMACEN":
+    case 'ACTIVAR_ALMACEN':
       return {
         ...state,
         almacenActivo: action.payload,
       };
 
-    case "AUMENTAR_INVENTARIO": {
+    case 'AUMENTAR_INVENTARIO': {
       const { almacenId, productos } = action.payload;
       const almacen = state.inventario[almacenId] ?? {};
       const actualizado = { ...almacen };
@@ -82,7 +80,7 @@ function inventoryReducer(state: InventoryState, action: InventoryAction): Inven
       };
     }
 
-    case "REDUCIR_INVENTARIO": {
+    case 'REDUCIR_INVENTARIO': {
       const { almacenId, productos } = action.payload;
       const almacen = state.inventario[almacenId] ?? {};
       const actualizado = { ...almacen };
@@ -95,7 +93,7 @@ function inventoryReducer(state: InventoryState, action: InventoryAction): Inven
       };
     }
 
-    case "RESET_ALL":
+    case 'RESET_ALL':
       return initialState;
 
     default:
@@ -112,11 +110,11 @@ interface InventoryContextValue extends InventoryState {
   handleActivarAlmacen: (almacen: Almacen) => void;
   aumentarInventario: (
     almacenId: string,
-    productos: Array<{ productoId: string; cajas: number }>,
+    productos: Array<{ productoId: string; cajas: number }>
   ) => void;
   reducirInventario: (
     almacenId: string,
-    productos: Array<{ productoId: string; cajas: number }>,
+    productos: Array<{ productoId: string; cajas: number }>
   ) => void;
   getInventarioAlmacen: (almacenId: string) => Record<string, number>;
 }
@@ -130,33 +128,36 @@ interface InventoryProviderProps {
 export function InventoryProvider({ children }: InventoryProviderProps) {
   const [state, dispatch] = useReducer(inventoryReducer, initialState);
 
-  const inicializarInventarioAlmacen = useCallback((almacenId: string, productos: Producto[]) => {
-    dispatch({ type: "INICIALIZAR_INVENTARIO_ALMACEN", payload: { almacenId, productos } });
-  }, []);
+  const inicializarInventarioAlmacen = useCallback(
+    (almacenId: string, productos: Producto[]) => {
+      dispatch({ type: 'INICIALIZAR_INVENTARIO_ALMACEN', payload: { almacenId, productos } });
+    },
+    []
+  );
 
   const handleActivarAlmacen = useCallback((almacen: Almacen) => {
-    dispatch({ type: "ACTIVAR_ALMACEN", payload: almacen });
+    dispatch({ type: 'ACTIVAR_ALMACEN', payload: almacen });
   }, []);
 
   const aumentarInventario = useCallback(
     (almacenId: string, productos: Array<{ productoId: string; cajas: number }>) => {
-      dispatch({ type: "AUMENTAR_INVENTARIO", payload: { almacenId, productos } });
+      dispatch({ type: 'AUMENTAR_INVENTARIO', payload: { almacenId, productos } });
     },
-    [],
+    []
   );
 
   const reducirInventario = useCallback(
     (almacenId: string, productos: Array<{ productoId: string; cajas: number }>) => {
-      dispatch({ type: "REDUCIR_INVENTARIO", payload: { almacenId, productos } });
+      dispatch({ type: 'REDUCIR_INVENTARIO', payload: { almacenId, productos } });
     },
-    [],
+    []
   );
 
   const getInventarioAlmacen = useCallback(
     (almacenId: string) => {
       return state.inventario[almacenId] ?? {};
     },
-    [state.inventario],
+    [state.inventario]
   );
 
   const value = useMemo<InventoryContextValue>(
@@ -175,7 +176,7 @@ export function InventoryProvider({ children }: InventoryProviderProps) {
       aumentarInventario,
       reducirInventario,
       getInventarioAlmacen,
-    ],
+    ]
   );
 
   return <InventoryContext.Provider value={value}>{children}</InventoryContext.Provider>;
@@ -188,7 +189,7 @@ export function InventoryProvider({ children }: InventoryProviderProps) {
 export function useInventoryContext(): InventoryContextValue {
   const context = useContext(InventoryContext);
   if (!context) {
-    throw new Error("useInventoryContext must be used within an InventoryProvider");
+    throw new Error('useInventoryContext must be used within an InventoryProvider');
   }
   return context;
 }
