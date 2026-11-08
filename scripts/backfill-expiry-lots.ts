@@ -8,9 +8,9 @@
  * guard so a copied command cannot mutate production by accident.
  *
  * Usage:
- *   pnpm backfill:expiry-lots
- *   FIREBASE_ORG_ID=org_exepa_001 pnpm backfill:expiry-lots -- --before 2026-10-24
- *   ALLOW_EXPIRY_LOT_BACKFILL=1 pnpm backfill:expiry-lots -- --apply --run-id expiry-backfill-2026-11-07
+ *   FIREBASE_PROJECT_ID=exepa-almacen-safe pnpm backfill:expiry-lots
+ *   FIREBASE_PROJECT_ID=exepa-almacen-safe FIREBASE_ORG_ID=org_exepa_001 pnpm backfill:expiry-lots -- --before 2026-10-24
+ *   FIREBASE_PROJECT_ID=exepa-almacen-safe ALLOW_EXPIRY_LOT_BACKFILL=1 pnpm backfill:expiry-lots -- --apply --run-id expiry-backfill-2026-11-07
  */
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
@@ -25,6 +25,7 @@ import {
 } from "firebase-admin/firestore";
 
 const DEFAULT_ORG_ID = "org_exepa_001";
+const REQUIRED_PROJECT_ID = "exepa-almacen-safe";
 const ACTIVE_PALLET_STATUSES = new Set(["RECEIVED", "ACTIVE"]);
 const MAX_PALLETS_PER_PROJECTION = 498; // pallet markers + lot document + audit event <= 500 writes.
 const MONTHS_ES = [
@@ -335,7 +336,11 @@ export function buildBackfillPlan(input: {
 }
 
 function getDb() {
-  const app = getApps()[0] ?? initializeApp();
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  if (projectId !== REQUIRED_PROJECT_ID) {
+    throw new Error(`Refusing to run against project ${projectId ?? "(unset)"}; set FIREBASE_PROJECT_ID=${REQUIRED_PROJECT_ID}`);
+  }
+  const app = getApps()[0] ?? initializeApp({ projectId });
   return getFirestore(app);
 }
 
@@ -471,7 +476,9 @@ async function main() {
   const root = db.doc(`organizations/${organizationId}`);
   const [palletSnapshot, movementSnapshot, productSnapshot, existingIdentities] = await Promise.all(
     [
-      db.collectionGroup("pallets").where("organizationId", "==", organizationId).get(),
+      // Avoid requiring a collection-group index on legacy pallet documents;
+      // organization membership is validated again by buildBackfillPlan.
+      db.collectionGroup("pallets").get(),
       root.collection("inventory_movements").where("organizationId", "==", organizationId).get(),
       root.collection("products").get(),
       existingLotIdentities(db, organizationId),
@@ -488,11 +495,13 @@ async function main() {
     .map((document) => ({ id: document.id, data: document.data() }));
   const plan = buildBackfillPlan({
     organizationId,
-    pallets: palletSnapshot.docs.map((document) => ({
+    pallets: palletSnapshot.docs
+      .filter((document) => document.data().organizationId === organizationId)
+      .map((document) => ({
       path: document.ref.path,
       id: document.id,
       data: document.data(),
-    })),
+      })),
     receiptMovements,
     productNames,
     existingLotIdentities: existingIdentities,
