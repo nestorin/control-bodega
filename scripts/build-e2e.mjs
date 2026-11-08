@@ -48,6 +48,7 @@ const child = spawnSync("pnpm", ["run", "build"], {
     VITE_FIREBASE_STORAGE_BUCKET: `${projectId}.appspot.com`,
     VITE_FIREBASE_MESSAGING_SENDER_ID: "000000000000",
     VITE_FIREBASE_APP_ID: "1:000000000000:web:e2e",
+    VITE_RECAPTCHA_SITE_KEY: "e2e-recaptcha-site-key",
     VITE_OCR_URL: ocrEmulatorUrl,
     VITE_SENTRY_DSN: "",
     VITE_FIRESTORE_CATALOGOS: "true",
