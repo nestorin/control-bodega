@@ -1,62 +1,62 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getReception, editReception, getSupplier } = vi.hoisted(() => ({
+const mockServices = vi.hoisted(() => ({
   getReception: vi.fn(),
   editReception: vi.fn(),
   getSupplier: vi.fn(),
 }));
 
-vi.mock("@/lib/firebase", () => ({ db: {} }));
-vi.mock("@/hooks/useAuthorization", () => ({
-  useAuthorization: () => ({ user: { uid: "user-1" }, canQuery: true }),
+vi.mock('@/lib/firebase', () => ({ db: {} }));
+vi.mock('@/hooks/useAuthorization', () => ({
+  useAuthorization: () => ({ user: { uid: 'user-1' }, canQuery: true }),
 }));
-vi.mock("@/services/firestore", () => ({
+vi.mock('@/services/firestore', () => ({
   createFirestoreServices: () => ({
-    receptions: { getById: getReception, editReception },
-    suppliers: { getById: getSupplier },
+    receptions: { getById: mockServices.getReception, editReception: mockServices.editReception },
+    suppliers: { getById: mockServices.getSupplier },
   }),
 }));
 
-import EditarRecepcion from "@/screens/EditarRecepcion";
+import EditarRecepcion from '@/screens/EditarRecepcion';
 
 const receptionDraft = {
-  id: "reception-1",
-  warehouseId: "warehouse-north",
-  supplierId: "supplier-1",
-  supplierName: "Proveedor real",
-  supplierCode: "P-01",
-  logisticsProvider: "Logística real",
-  purchaseOrderNumber: "OC-1001",
-  folio: "REC-1001",
-  scheduledDate: "2026-10-30",
-  status: "DRAFT",
+  id: 'reception-1',
+  warehouseId: 'warehouse-north',
+  supplierId: 'supplier-1',
+  supplierName: 'Proveedor real',
+  supplierCode: 'P-01',
+  logisticsProvider: 'Logística real',
+  purchaseOrderNumber: 'OC-1001',
+  folio: 'REC-1001',
+  scheduledDate: '2026-10-30',
+  status: 'DRAFT',
   version: 4,
   palletCount: 2,
-  productName: "Producto real",
-  operationId: "operation-1",
-  actorUserId: "user-1",
+  productName: 'Producto real',
+  operationId: 'operation-1',
+  actorUserId: 'user-1',
   plannedPallets: [
     {
       palletNumber: 1,
       lineIndex: 0,
-      productId: "product-1",
-      productName: "Producto real",
+      productId: 'product-1',
+      productName: 'Producto real',
       quantity: 10,
-      unit: "cajas",
-      qrIdentifier: "TQR-reception-1-001",
-      status: "PLANNED",
+      unit: 'cajas',
+      qrIdentifier: 'TQR-reception-1-001',
+      status: 'PLANNED',
       activated: false,
     },
     {
       palletNumber: 2,
       lineIndex: 0,
-      productId: "product-1",
-      productName: "Producto real",
+      productId: 'product-1',
+      productName: 'Producto real',
       quantity: 5,
-      unit: "cajas",
-      qrIdentifier: "TQR-reception-1-002",
-      status: "PLANNED",
+      unit: 'cajas',
+      qrIdentifier: 'TQR-reception-1-002',
+      status: 'PLANNED',
       activated: false,
     },
   ],
@@ -103,9 +103,9 @@ const products = [
 describe("EditarRecepcion", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getReception.mockResolvedValue(receptionDraft);
-    getSupplier.mockResolvedValue({ id: "supplier-1", name: "Proveedor real", code: "P-01" });
-    editReception.mockResolvedValue(receptionDraft);
+    mockServices.getReception.mockResolvedValue(receptionDraft);
+    mockServices.getSupplier.mockResolvedValue({ id: 'supplier-1', name: 'Proveedor real', code: 'P-01' });
+    mockServices.editReception.mockResolvedValue(receptionDraft);
   });
 
   it("loads canonical data and persists allowed draft changes through edit_reception", async () => {

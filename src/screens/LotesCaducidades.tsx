@@ -1,10 +1,20 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { isFeatureEnabled } from "@/config/featureFlags";
-import { db } from "@/lib/firebase";
-import { createFirestoreServices } from "@/services/firestore";
-import { useAuthorization, isPermissionDenied } from "@/hooks/useAuthorization";
-import type { LotCaducidadDoc } from "@/services/firestore/types";
-import { WAREHOUSE_IDS } from "@/config/warehouses";
+/**
+ * LotesCaducidades — Migrated to new architecture (God Component Refactor Phase 7)
+ *
+ * Uses hooks directly instead of props:
+ * - useAuthorization for auth state
+ * - useInventory for inventory operations
+ * - useUIContext for UI state
+ */
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { isFeatureEnabled } from '@/config/featureFlags';
+import { db } from '@/lib/firebase';
+import { createFirestoreServices } from '@/services/firestore';
+import { useAuthorization, isPermissionDenied } from '@/hooks/useAuthorization';
+import { useUIContext } from '@/context';
+import type { LotCaducidadDoc } from '@/services/firestore/types';
+import { WAREHOUSE_IDS } from '@/config/warehouses';
 import {
   buildInventoryImportRows,
   parseInventoryImport,
@@ -12,54 +22,54 @@ import {
 } from "@/services/inventoryImport";
 import { aggregateMonthlyExpiries, expiryYears, MONTH_LABELS_ES } from "@/services/monthlyExpiry";
 
-const ORG_ID = "org_exepa_001";
+const ORG_ID = 'org_exepa_001';
 
 type MesKey = string; // "Dec-26"
-type SortField = "productName" | "lot" | "expiryDate" | "cajas" | "monthKey";
-type SortDir = "asc" | "desc";
+type SortField = 'productName' | 'lot' | 'expiryDate' | 'cajas' | 'monthKey';
+type SortDir = 'asc' | 'desc';
 
 interface LoteRow extends LotCaducidadDoc {
   diasParaCaducar: number;
-  status: "ok" | "proximo" | "vencido";
+  status: 'ok' | 'proximo' | 'vencido';
 }
 
 const MESES_LABELS: Record<number, string> = {
-  0: "Ene",
-  1: "Feb",
-  2: "Mar",
-  3: "Abr",
-  4: "May",
-  5: "Jun",
-  6: "Jul",
-  7: "Ago",
-  8: "Sep",
-  9: "Oct",
-  10: "Nov",
-  11: "Dic",
+  0: 'Ene',
+  1: 'Feb',
+  2: 'Mar',
+  3: 'Abr',
+  4: 'May',
+  5: 'Jun',
+  6: 'Jul',
+  7: 'Ago',
+  8: 'Sep',
+  9: 'Oct',
+  10: 'Nov',
+  11: 'Dic',
 };
 
 function formatMonthKey(ts: any): MesKey {
-  if (!ts) return "";
+  if (!ts) return '';
   const d = ts.toDate ? ts.toDate() : new Date(ts);
   return `${MESES_LABELS[d.getMonth()]}-${String(d.getFullYear()).slice(-2)}`;
 }
 
 function parseMonthKey(key: MesKey): Date | null {
-  const [mes, year] = key.split("-");
+  const [mes, year] = key.split('-');
   const mesNum = Object.entries(MESES_LABELS).find(([, v]) => v === mes)?.[0];
   if (mesNum === undefined) return null;
   return new Date(2000 + parseInt(year), parseInt(mesNum), 1);
 }
 
-function getStatus(expiryDate: any): "ok" | "proximo" | "vencido" {
-  if (!expiryDate) return "ok";
+function getStatus(expiryDate: any): 'ok' | 'proximo' | 'vencido' {
+  if (!expiryDate) return 'ok';
   const exp = expiryDate.toDate ? expiryDate.toDate() : new Date(expiryDate);
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
   const diff = Math.ceil((exp.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
-  if (diff < 0) return "vencido";
-  if (diff <= 30) return "proximo";
-  return "ok";
+  if (diff < 0) return 'vencido';
+  if (diff <= 30) return 'proximo';
+  return 'ok';
 }
 
 function getDiasParaCaducar(expiryDate: any): number {
@@ -70,7 +80,7 @@ function getDiasParaCaducar(expiryDate: any): number {
   return Math.ceil((exp.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-const assetPathPrefix = "/assets";
+const assetPathPrefix = '/assets';
 const imgWarehouse = `${assetPathPrefix}/66fcc.svg`;
 const imgAlert = `${assetPathPrefix}/c542a.svg`;
 const imgCalendar = `${assetPathPrefix}/ba9e1.svg`;
@@ -78,7 +88,12 @@ const imgDownload = `${assetPathPrefix}/8a4b5.svg`;
 const imgFilter = `${assetPathPrefix}/7f3a2.svg`;
 
 export default function LotesCaducidades() {
+  // ============================================
+  // New Architecture Hooks
+  // ============================================
   const { user, canQuery } = useAuthorization();
+  const { closeSidebarOnMobile } = useUIContext();
+
   const [lotes, setLotes] = useState<LoteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -90,16 +105,19 @@ export default function LotesCaducidades() {
   const [sortField, setSortField] = useState<SortField>("expiryDate");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editCajas, setEditCajas] = useState("");
+  const [editCajas, setEditCajas] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const [importPreview, setImportPreview] = useState<InventoryImportPreview | null>(null);
-  const [importFileName, setImportFileName] = useState("");
+  const [importFileName, setImportFileName] = useState('');
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'lotes' | 'grid'>('lotes');
 
-  const useFirestore = isFeatureEnabled("USE_FIRESTORE_LOTES") && !!db && canQuery;
+  const useFirestore = isFeatureEnabled('USE_FIRESTORE_LOTES') && !!db && canQuery;
   const [fsServices, setFsServices] = useState<ReturnType<typeof createFirestoreServices> | null>(
     null,
   );
@@ -131,10 +149,10 @@ export default function LotesCaducidades() {
     } catch (err) {
       setError(
         isPermissionDenied(err)
-          ? "No tenés permisos para consultar lotes de este almacén."
+          ? 'No tenés permisos para consultar lotes de este almacén.'
           : err instanceof Error
             ? err.message
-            : "Error al cargar lotes",
+            : 'Error al cargar lotes',
       );
       console.error(err);
     } finally {
@@ -148,8 +166,8 @@ export default function LotesCaducidades() {
 
   const filteredLotes = lotes
     .filter((l) => {
-      if (filterStatus !== "all" && l.status !== filterStatus) return false;
-      if (filterMonth !== "all" && l.monthKey !== filterMonth) return false;
+      if (filterStatus !== 'all' && l.status !== filterStatus) return false;
+      if (filterMonth !== 'all' && l.monthKey !== filterMonth) return false;
       if (search) {
         const s = search.toLowerCase();
         if (
@@ -164,14 +182,14 @@ export default function LotesCaducidades() {
     .sort((a, b) => {
       let av: any = a[sortField];
       let bv: any = b[sortField];
-      if (sortField === "expiryDate") {
+      if (sortField === 'expiryDate') {
         av = av?.toDate?.()?.getTime?.() ?? 0;
         bv = bv?.toDate?.()?.getTime?.() ?? 0;
       }
-      if (typeof av === "string") av = av.toLowerCase();
-      if (typeof bv === "string") bv = bv.toLowerCase();
-      if (av < bv) return sortDir === "asc" ? -1 : 1;
-      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      if (typeof av === 'string') av = av.toLowerCase();
+      if (typeof bv === 'string') bv = bv.toLowerCase();
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
       return 0;
     });
 
@@ -213,9 +231,9 @@ export default function LotesCaducidades() {
       );
       setLotes((prev) => prev.map((l) => (l.id === lote.id ? { ...l, cajas: nuevasCajas } : l)));
       setEditingId(null);
-      setEditCajas("");
+      setEditCajas('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al guardar");
+      setError(err instanceof Error ? err.message : 'Error al guardar');
     } finally {
       setSyncing(false);
     }
@@ -223,7 +241,7 @@ export default function LotesCaducidades() {
 
   const handleCancel = () => {
     setEditingId(null);
-    setEditCajas("");
+    setEditCajas('');
   };
 
   const handleSync = async () => {
@@ -232,7 +250,7 @@ export default function LotesCaducidades() {
 
   const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    event.target.value = "";
+    event.target.value = '';
     if (!file) return;
     setImportError(null);
     setImportFileName(file.name);
@@ -240,14 +258,14 @@ export default function LotesCaducidades() {
       setImportPreview(parseInventoryImport(await file.arrayBuffer(), file.name));
     } catch {
       setImportPreview(null);
-      setImportError("No se pudo leer el archivo. Usa XLS, XLSX o CSV.");
+      setImportError('No se pudo leer el archivo. Usa XLS, XLSX o CSV.');
     }
   };
 
-  const handleImportAction = async (mode: "REPLACE" | "ADD" | "DISCARD") => {
-    if (mode === "DISCARD") {
+  const handleImportAction = async (mode: 'REPLACE' | 'ADD' | 'DISCARD') => {
+    if (mode === 'DISCARD') {
       setImportPreview(null);
-      setImportFileName("");
+      setImportFileName('');
       return;
     }
     if (!importPreview || !fsServices || !user) return;
@@ -262,39 +280,39 @@ export default function LotesCaducidades() {
         `inventory-import-${crypto.randomUUID()}`,
       );
       setImportPreview(null);
-      setImportFileName("");
+      setImportFileName('');
       await loadLotes();
     } catch (err) {
-      setImportError(err instanceof Error ? err.message : "No se pudo importar el inventario.");
+      setImportError(err instanceof Error ? err.message : 'No se pudo importar el inventario.');
     } finally {
       setImporting(false);
     }
   };
 
   const exportCSV = () => {
-    const headers = ["Producto", "Lote", "Caducidad", "Mes", "Cajas", "Estado", "Días"];
+    const headers = ['Producto', 'Lote', 'Caducidad', 'Mes', 'Cajas', 'Estado', 'Días'];
     const rows = filteredLotes.map((l) => [
       l.productName,
       l.lot,
-      l.expiryDate?.toDate?.().toLocaleDateString("es-MX") ?? "",
+      l.expiryDate?.toDate?.().toLocaleDateString('es-MX') ?? '',
       l.monthKey,
       String(l.cajas),
-      l.status === "vencido" ? "VENCIDO" : l.status === "proximo" ? "PRÓXIMO" : "OK",
+      l.status === 'vencido' ? 'VENCIDO' : l.status === 'proximo' ? 'PRÓXIMO' : 'OK',
       String(l.diasParaCaducar),
     ]);
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    const a = document.createElement('a');
     a.href = url;
     a.download = `lotes-caducidades-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  const getStatusBadge = (status: LoteRow["status"]) => {
+  const getStatusBadge = (status: LoteRow['status']) => {
     switch (status) {
-      case "vencido":
+      case 'vencido':
         return (
           <span
             className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#fee2e2] text-[#b91c1c] text-[11px] font-bold"
@@ -315,7 +333,7 @@ export default function LotesCaducidades() {
             VENCIDO
           </span>
         );
-      case "proximo":
+      case 'proximo':
         return (
           <span
             className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#fef3c7] text-[#92400e] text-[11px] font-bold"
@@ -359,14 +377,14 @@ export default function LotesCaducidades() {
     }
   };
 
-  const getStatusColor = (status: LoteRow["status"]) => {
+  const getStatusColor = (status: LoteRow['status']) => {
     switch (status) {
-      case "vencido":
-        return "bg-[#fee2e2] text-[#b91c1c]";
-      case "proximo":
-        return "bg-[#fef3c7] text-[#92400e]";
+      case 'vencido':
+        return 'bg-[#fee2e2] text-[#b91c1c]';
+      case 'proximo':
+        return 'bg-[#fef3c7] text-[#92400e]';
       default:
-        return "bg-[#dcfce7] text-[#166534]";
+        return 'bg-[#dcfce7] text-[#166534]';
     }
   };
 
@@ -381,7 +399,7 @@ export default function LotesCaducidades() {
               className="font-extrabold text-[#16343f] text-xl md:text-2xl"
               style={{ fontFamily: "'Inter',sans-serif", fontWeight: 800 }}
             >
-              Lotes y Caducidades
+              Inventario
             </h1>
             <p className="text-[12px] text-[#607078]" style={{ fontFamily: "'Inter',sans-serif" }}>
               Control de inventario por lote · Tehuacan-1
@@ -417,13 +435,13 @@ export default function LotesCaducidades() {
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
-              className={syncing ? "animate-spin" : ""}
+              className={syncing ? 'animate-spin' : ''}
             >
               <path d="M23 4v6h-6" />
               <path d="M1 20v-6h6" />
               <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
             </svg>
-            {syncing ? "Sincronizando..." : "Sincronizar"}
+            {syncing ? 'Sincronizando...' : 'Sincronizar'}
           </button>
           <button
             onClick={exportCSV}
@@ -435,6 +453,38 @@ export default function LotesCaducidades() {
           </button>
         </div>
       </header>
+
+      {/* Tabs */}
+      <div className="bg-white border-b border-[#dce4e7] px-4 md:px-6">
+        <nav className="flex gap-1 md:gap-2 pb-3" role="tablist" aria-label="Secciones de inventario">
+          <button
+            role="tab"
+            aria-selected={activeTab === 'lotes'}
+            onClick={() => setActiveTab('lotes')}
+            className={`px-4 py-2 rounded-[10px] text-[12px] font-bold transition-colors whitespace-nowrap ${
+              activeTab === 'lotes'
+                ? 'bg-[#16343f] text-white'
+                : 'text-[#607078] hover:bg-[#f4f7f8]'
+            }`}
+            style={{ fontFamily: "'Inter',sans-serif", fontWeight: 700 }}
+          >
+            Lotes y Caducidades
+          </button>
+          <button
+            role="tab"
+            aria-selected={activeTab === 'grid'}
+            onClick={() => setActiveTab('grid')}
+            className={`px-4 py-2 rounded-[10px] text-[12px] font-bold transition-colors whitespace-nowrap ${
+              activeTab === 'grid'
+                ? 'bg-[#16343f] text-white'
+                : 'text-[#607078] hover:bg-[#f4f7f8]'
+            }`}
+            style={{ fontFamily: "'Inter',sans-serif", fontWeight: 700 }}
+          >
+            Vista Grid
+          </button>
+        </nav>
+      </div>
 
       {importPreview && (
         <section
@@ -452,21 +502,21 @@ export default function LotesCaducidades() {
             <div className="flex gap-2">
               <button
                 disabled={importing}
-                onClick={() => handleImportAction("REPLACE")}
+                onClick={() => handleImportAction('REPLACE')}
                 className="px-3 py-2 rounded bg-[#16343f] text-white font-bold"
               >
                 Sustituir
               </button>
               <button
                 disabled={importing}
-                onClick={() => handleImportAction("ADD")}
+                onClick={() => handleImportAction('ADD')}
                 className="px-3 py-2 rounded bg-[#16845b] text-white font-bold"
               >
                 Sumar
               </button>
               <button
                 disabled={importing}
-                onClick={() => handleImportAction("DISCARD")}
+                onClick={() => handleImportAction('DISCARD')}
                 className="px-3 py-2 rounded border border-[#dce4e7] font-bold"
               >
                 Descartar
@@ -612,21 +662,21 @@ export default function LotesCaducidades() {
         style={{ fontFamily: "'Inter',sans-serif" }}
       >
         <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-[#dcfce7] text-[#166534]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#166534]"></span> OK:{" "}
-          {lotes.filter((l) => l.status === "ok").length}
+          <span className="w-1.5 h-1.5 rounded-full bg-[#166534]"></span> OK: {' '}
+          {lotes.filter((l) => l.status === 'ok').length}
         </span>
         <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-[#fef3c7] text-[#92400e]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#92400e]"></span> Próximos:{" "}
-          {lotes.filter((l) => l.status === "proximo").length}
+          <span className="w-1.5 h-1.5 rounded-full bg-[#92400e]"></span> Próximos: {' '}
+          {lotes.filter((l) => l.status === 'proximo').length}
         </span>
         <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-[#fee2e2] text-[#b91c1c]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#b91c1c]"></span> Vencidos:{" "}
-          {lotes.filter((l) => l.status === "vencido").length}
+          <span className="w-1.5 h-1.5 rounded-full bg-[#b91c1c]"></span> Vencidos: {' '}
+          {lotes.filter((l) => l.status === 'vencido').length}
         </span>
         <span className="text-[#607078]">Total: {lotes.length} lotes</span>
         {lastSync && (
           <span className="text-[#99aab5] ml-auto">
-            Última sync: {lastSync.toLocaleTimeString("es-MX")}
+            Última sync: {lastSync.toLocaleTimeString('es-MX')}
           </span>
         )}
       </div>
@@ -760,26 +810,26 @@ export default function LotesCaducidades() {
                 <thead className="bg-[#f8fafb] border-b border-[#dce4e7]">
                   <tr>
                     {[
-                      { key: "productName", label: "Producto" },
-                      { key: "lot", label: "Lote" },
-                      { key: "expiryDate", label: "Caducidad" },
-                      { key: "monthKey", label: "Mes" },
-                      { key: "cajas", label: "Cajas", align: "right" },
-                      { key: "status", label: "Estado" },
-                      { key: "diasParaCaducar", label: "Días", align: "right" },
+                      { key: 'productName', label: 'Producto' },
+                      { key: 'lot', label: 'Lote' },
+                      { key: 'expiryDate', label: 'Caducidad' },
+                      { key: 'monthKey', label: 'Mes' },
+                      { key: 'cajas', label: 'Cajas', align: 'right' },
+                      { key: 'status', label: 'Estado' },
+                      { key: 'diasParaCaducar', label: 'Días', align: 'right' },
                     ].map((col) => (
                       <th
                         key={col.key}
                         onClick={() => {
                           if (sortField === col.key)
-                            setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                            setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
                           else {
                             setSortField(col.key as SortField);
-                            setSortDir("asc");
+                            setSortDir('asc');
                           }
                         }}
                         className={`px-4 py-3 text-[11px] font-bold uppercase text-[#607078] cursor-pointer select-none hover:bg-[#edf1f3] ${
-                          col.align === "right" ? "text-right" : ""
+                          col.align === 'right' ? 'text-right' : ''
                         }`}
                         style={{
                           fontFamily: "'Inter',sans-serif",
@@ -797,7 +847,7 @@ export default function LotesCaducidades() {
                               stroke="currentColor"
                               strokeWidth="2.5"
                             >
-                              {sortDir === "asc" ? (
+                              {sortDir === 'asc' ? (
                                 <path d="M18 15l-6-6-6 6" />
                               ) : (
                                 <path d="M6 9l6 6 6-6" />
@@ -823,11 +873,11 @@ export default function LotesCaducidades() {
                     <tr
                       key={lote.id}
                       className={`border-b border-[#edf1f3] hover:bg-[#f8fafb] transition-colors ${
-                        lote.status === "vencido"
-                          ? "bg-[#fffaf9]"
-                          : lote.status === "proximo"
-                            ? "bg-[#fffdf5]"
-                            : ""
+                        lote.status === 'vencido'
+                          ? 'bg-[#fffaf9]'
+                          : lote.status === 'proximo'
+                            ? 'bg-[#fffdf5]'
+                            : ''
                       }`}
                     >
                       <td
@@ -841,11 +891,11 @@ export default function LotesCaducidades() {
                       </td>
                       <td className="px-4 py-3 text-[13px] text-[#36434a] font-mono">{lote.lot}</td>
                       <td className="px-4 py-3 text-[13px] text-[#36434a]">
-                        {lote.expiryDate?.toDate?.().toLocaleDateString("es-MX", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        }) ?? "—"}
+                        {lote.expiryDate?.toDate?.().toLocaleDateString('es-MX', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        }) ?? '—'}
                       </td>
                       <td className="px-4 py-3 text-[13px] text-[#36434a] font-medium">
                         {lote.monthKey}
@@ -857,7 +907,7 @@ export default function LotesCaducidades() {
                             min="0"
                             value={editCajas}
                             onChange={(e) => setEditCajas(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleSave(lote)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSave(lote)}
                             onBlur={() => handleCancel()}
                             autoFocus
                             className="w-20 px-2 py-1 border border-[#f2b84b] rounded-[6px] text-[13px] text-right focus:outline-none focus:ring-1 focus:ring-[#f2b84b]"
@@ -871,7 +921,7 @@ export default function LotesCaducidades() {
                               fontWeight: 600,
                             }}
                           >
-                            {lote.cajas.toLocaleString("es-MX")}
+                            {lote.cajas.toLocaleString('es-MX')}
                           </span>
                         )}
                       </td>
@@ -885,7 +935,7 @@ export default function LotesCaducidades() {
                             : Math.abs(lote.diasParaCaducar)}
                         </span>
                         <span className="ml-1 text-[11px] text-[#99aab5]">
-                          {lote.diasParaCaducar >= 0 ? "días" : "vencido"}
+                          {lote.diasParaCaducar >= 0 ? 'días' : 'vencido'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -962,6 +1012,9 @@ export default function LotesCaducidades() {
               </div>
             )}
           </div>
+        )}
+        {activeTab === 'grid' && (
+          <InventoryGridTab />
         )}
       </div>
     </div>
