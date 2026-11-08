@@ -46,6 +46,10 @@ CREATE_RECEPTION_FIXED_WRITES = 3  # reception, audit event, operation record
 MAX_PLANNED_PALLETS = 999
 MAX_EVIDENCE_URL = 4096
 EVIDENCE_BUCKET = "exepa-almacen-safe.firebasestorage.app"
+_MONTH_KEYS_ES = (
+    "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+    "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
+)
 
 
 def _data(req):
@@ -204,6 +208,18 @@ def _iso_expiry(value, required=False):
 
 def _expiry_timestamp(value):
     return datetime.combine(date.fromisoformat(value), time.min, tzinfo=timezone.utc)
+
+
+def _expiry_month_key(expiry_date):
+    """Return the legacy/UI month key without relying on server locale."""
+    expiry = date.fromisoformat(expiry_date)
+    return f"{_MONTH_KEYS_ES[expiry.month - 1]}-{expiry.year % 100:02d}"
+
+
+def _lot_projection_id(warehouse_id, product_id, lot, expiry_date):
+    """Use a deterministic, Firestore-safe id for one warehouse/product/lot/expiry."""
+    projection_key = "\0".join((warehouse_id, product_id, lot, expiry_date))
+    return f"lot-{sha256(projection_key.encode('utf-8')).hexdigest()[:32]}"
 
 
 @https_fn.on_call(cors=CORS_OPTS)
@@ -631,23 +647,36 @@ def register_reception_pallet(req: https_fn.CallableRequest):
             pallet_ref = reception_ref.collection("pallets").document(pallet_id)
             if planned_pallet.get("receptionId", reception_id) != reception_id:
                 raise https_fn.HttpsError("invalid-argument", "Planned pallet belongs to another reception")
-            if planned_pallet.get("status") in {"ACTIVE", "RECEIVED"} or planned_pallet.get("activated"):
-                existing_pallet = _transaction_snapshot(transaction, pallet_ref)
-                existing_movement = _transaction_snapshot(transaction, movement_ref)
-                if existing_pallet is not None and existing_pallet.exists and existing_movement is not None and existing_movement.exists:
-                    result = {"palletId": pallet_id, "movementId": movement_ref.id, "idempotent": True}
-                    transaction.set(operation_ref, {"kind": "register_reception_pallet", "payloadDigest": digest,
-                        "result": result, "actorUserId": actor["userId"], "createdAt": firestore.SERVER_TIMESTAMP})
-                    return result
-                raise _error("QR activation is incomplete")
-            if planned_pallet.get("status") not in {"IN_CAPTURE", "PLANNED"}:
-                raise _error("QR cannot be activated from its current state")
             lot, expiry_date = _validate_capture_ready(
                 planned_pallet,
                 data.get("lot"),
                 data.get("expiryDate"),
             )
             expiry_value = _expiry_timestamp(expiry_date)
+            product_name = _string(planned_pallet.get("productName"), "planned productName", 256)
+            lot_projection_id = _lot_projection_id(warehouse_id, product_id, lot, expiry_date)
+            lot_ref = root.collection("lotes_caducidades").document(lot_projection_id)
+            if planned_pallet.get("status") in {"ACTIVE", "RECEIVED"} or planned_pallet.get("activated"):
+                existing_pallet = _transaction_snapshot(transaction, pallet_ref)
+                existing_movement = _transaction_snapshot(transaction, movement_ref)
+                existing_lot = _transaction_snapshot(transaction, lot_ref)
+                if (
+                    existing_pallet is not None and existing_pallet.exists
+                    and existing_movement is not None and existing_movement.exists
+                    and existing_lot is not None and existing_lot.exists
+                ):
+                    result = {
+                        "palletId": pallet_id,
+                        "movementId": movement_ref.id,
+                        "lotProjectionId": lot_projection_id,
+                        "idempotent": True,
+                    }
+                    transaction.set(operation_ref, {"kind": "register_reception_pallet", "payloadDigest": digest,
+                        "result": result, "actorUserId": actor["userId"], "createdAt": firestore.SERVER_TIMESTAMP})
+                    return result
+                raise _error("QR activation is incomplete")
+            if planned_pallet.get("status") not in {"IN_CAPTURE", "PLANNED"}:
+                raise _error("QR cannot be activated from its current state")
         else:
             raise https_fn.HttpsError("failed-precondition", "Reception has no canonical pallet plan")
         expected = _version(data.get("expectedVersion"))
@@ -657,6 +686,14 @@ def register_reception_pallet(req: https_fn.CallableRequest):
         pallet_snapshot = _transaction_snapshot(transaction, pallet_ref)
         if pallet_snapshot is not None and pallet_snapshot.exists:
             raise _error("pallet id collision")
+        lot_snapshot = _transaction_snapshot(transaction, lot_ref)
+        existing_lot = lot_snapshot.to_dict() if lot_snapshot is not None and lot_snapshot.exists else None
+        existing_cajas = (existing_lot or {}).get("cajas", 0)
+        if isinstance(existing_cajas, bool) or not isinstance(existing_cajas, int) or existing_cajas < 0:
+            raise https_fn.HttpsError("failed-precondition", "Lot projection quantity is invalid")
+        projected_cajas = existing_cajas + quantity
+        if projected_cajas > 2 ** 53 - 1:
+            raise https_fn.HttpsError("resource-exhausted", "Lot projection quantity is too large")
         now = firestore.SERVER_TIMESTAMP
         # Firestore transforms cannot appear inside array elements. Keep the
         # server transform on direct document fields and materialize the
@@ -673,6 +710,22 @@ def register_reception_pallet(req: https_fn.CallableRequest):
             "direction": "IN", "quantity": quantity, "unit": _string(data.get("unit", "cajas"), "unit", 32),
             "lot": lot, "expiryDate": expiry_value, "operationId": operation_id,
             "actorUserId": actor["userId"], "occurredAt": now})
+        if existing_lot is None:
+            transaction.set(lot_ref, {
+                "id": lot_projection_id,
+                "organizationId": ORG_ID,
+                "warehouseId": warehouse_id,
+                "productId": product_id,
+                "productName": product_name,
+                "lot": lot,
+                "expiryDate": expiry_value,
+                "monthKey": _expiry_month_key(expiry_date),
+                "cajas": projected_cajas,
+                "createdAt": now,
+                "updatedAt": now,
+            })
+        else:
+            transaction.update(lot_ref, {"cajas": projected_cajas, "updatedAt": now})
         reception_update = {
             "version": current_version + 1,
             "status": "IN_PROGRESS" if reception.get("status") == "DRAFT" else reception.get("status"),
@@ -690,7 +743,12 @@ def register_reception_pallet(req: https_fn.CallableRequest):
             "entityType": "pallet", "entityId": pallet_id, "action": "CREATE",
             "actorUserId": actor["userId"], "operationId": operation_id,
             "occurredAt": now, "schemaVersion": 1})
-        result = {"palletId": pallet_id, "movementId": movement_ref.id, "idempotent": False}
+        result = {
+            "palletId": pallet_id,
+            "movementId": movement_ref.id,
+            "lotProjectionId": lot_projection_id,
+            "idempotent": False,
+        }
         transaction.set(operation_ref, {"kind": "register_reception_pallet", "payloadDigest": digest,
             "result": result, "actorUserId": actor["userId"], "createdAt": now})
         return result

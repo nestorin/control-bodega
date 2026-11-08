@@ -11,6 +11,8 @@ import receptions
 from receptions import (
     _canonical_warehouse_id,
     _digest,
+    _expiry_month_key,
+    _lot_projection_id,
     _operation_result,
     _normalize_planned_pallets,
     _iso_expiry,
@@ -189,22 +191,22 @@ class ReceptionCommandContractTests(unittest.TestCase):
             },
         ]
 
-        result = _normalize_planned_pallets("reception-op-20261024", lines, requested)
+        result = _normalize_planned_pallets("reception-op-20261024", "reception-1", lines, requested)
 
         self.assertEqual(
             [pallet["qrIdentifier"] for pallet in result],
             [
-                "TQR-reception-op-20261024-001",
-                "TQR-reception-op-20261024-002",
-                "TQR-reception-op-20261024-003",
+                "TQR-20261024-001",
+                "TQR-20261024-002",
+                "TQR-20261024-003",
             ],
         )
         self.assertEqual([pallet["productId"] for pallet in result], ["prod-1", "prod-1", "prod-2"])
         self.assertEqual([pallet["quantity"] for pallet in result], [20, 5, 6])
         self.assertEqual(result[0]["status"], "PLANNED")
         self.assertFalse(result[0]["activated"])
-        self.assertEqual(result[0]["receptionId"], "reception-op-20261024")
-        self.assertEqual(result[0]["palletId"], "pallet-reception-op-20261024-001")
+        self.assertEqual(result[0]["receptionId"], "reception-1")
+        self.assertEqual(result[0]["palletId"], "pallet-20261024-001")
 
     def test_scan_accepts_only_planned_or_in_capture_qr_for_this_reception(self):
         planned = {"qrIdentifier": "TQR-reception-1-001", "status": "PLANNED", "activated": False}
@@ -236,10 +238,17 @@ class ReceptionCommandContractTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(https_fn.HttpsError):
                 _iso_expiry(value, required=True)
 
+    def test_lot_projection_identity_keeps_expiry_lots_distinct(self):
+        projection_id = _lot_projection_id("wh_tehuacan_1", "product-1", "L-001", "2027-03-15")
+        self.assertEqual(projection_id, _lot_projection_id("wh_tehuacan_1", "product-1", "L-001", "2027-03-15"))
+        self.assertNotEqual(projection_id, _lot_projection_id("wh_tehuacan_1", "product-1", "L-001", "2027-04-15"))
+        self.assertEqual(_expiry_month_key("2027-03-15"), "Mar-27")
+
     def test_planned_pallet_quantity_must_reconcile_to_reception_lines(self):
         with self.assertRaises(https_fn.HttpsError):
             _normalize_planned_pallets(
                 "reception-op-20261024",
+                "reception-1",
                 [{"productId": "prod-1", "quantity": 20, "unit": "cajas"}],
                 [{
                     "palletNumber": 1,
@@ -264,6 +273,7 @@ class ReceptionCommandContractTests(unittest.TestCase):
                 with self.assertRaises(https_fn.HttpsError):
                     _normalize_planned_pallets(
                         "reception-op-20261024",
+                        "reception-1",
                         [{"productId": "prod-1", "quantity": 1, "unit": "cajas"}],
                         [{**base, "palletNumber": invalid_number}],
                     )
@@ -331,6 +341,7 @@ class ReceptionCommandContractTests(unittest.TestCase):
                     "receptionId": reception_id,
                     "palletNumber": 1,
                     "productId": "product-1",
+                    "productName": "Agua mineral",
                     "quantity": 24,
                     "unit": "cajas",
                     "qrIdentifier": qr_identifier,
@@ -366,6 +377,161 @@ class ReceptionCommandContractTests(unittest.TestCase):
         self.assertEqual(planned_pallet["activatedAt"].tzinfo, timezone.utc)
         self.assertIsNot(planned_pallet["activatedAt"], firestore.SERVER_TIMESTAMP)
         self.assertIs(transaction.updates[0][1]["updatedAt"], firestore.SERVER_TIMESTAMP)
+        lot_writes = [write for write in transaction.sets if "/lotes_caducidades/" in write[0].path]
+        self.assertEqual(len(lot_writes), 1)
+        _, lot_projection = lot_writes[0]
+        self.assertEqual(lot_projection["productName"], "Agua mineral")
+        self.assertEqual(lot_projection["lot"], "L-001")
+        self.assertEqual(lot_projection["expiryDate"], datetime(2027, 3, 15, tzinfo=timezone.utc))
+        self.assertEqual(lot_projection["monthKey"], "Mar-27")
+        self.assertEqual(lot_projection["cajas"], 24)
+
+        second_qr_identifier = "TQR-reception-1-002"
+        lot_projection_id = _lot_projection_id("wh_tehuacan_1", "product-1", "L-001", "2027-03-15")
+        second_transaction = Transaction({
+            f"{root}/receptions/{reception_id}": {
+                "organizationId": receptions.ORG_ID,
+                "warehouseId": "wh_tehuacan_1",
+                "status": "IN_PROGRESS",
+                "version": 5,
+                "plannedPallets": [{
+                    "palletId": "pallet-reception-1-002",
+                    "receptionId": reception_id,
+                    "palletNumber": 2,
+                    "productId": "product-1",
+                    "productName": "Agua mineral",
+                    "quantity": 5,
+                    "unit": "cajas",
+                    "qrIdentifier": second_qr_identifier,
+                    "status": "IN_CAPTURE",
+                    "activated": False,
+                    "lot": "L-001",
+                    "expiryDate": "2027-03-15",
+                }],
+            },
+            f"{root}/lotes_caducidades/{lot_projection_id}": {"cajas": 24},
+        })
+        second_request = SimpleNamespace(data={
+            "operationId": "register-pallet-2",
+            "receptionId": reception_id,
+            "warehouseId": "wh_tehuacan_1",
+            "productId": "product-1",
+            "qrIdentifier": second_qr_identifier,
+            "quantity": 5,
+            "unit": "cajas",
+            "lot": "L-001",
+            "expiryDate": "2027-03-15",
+        })
+        with (
+            patch.object(receptions.firestore, "client", return_value=Database(second_transaction)),
+            patch.object(receptions.firestore, "transactional", side_effect=lambda callback: callback),
+            patch.object(receptions, "_check_actor", return_value={"userId": "operator-1"}),
+        ):
+            inspect.unwrap(receptions.register_reception_pallet)(second_request)
+        lot_updates = [write for write in second_transaction.updates if write[0].path.endswith(lot_projection_id)]
+        self.assertEqual(lot_updates[0][1]["cajas"], 29)
+
+    def test_register_pallet_replay_requires_existing_lot_projection_without_recounting(self):
+        class Reference:
+            def __init__(self, path):
+                self.path = path
+                self.id = path.rsplit("/", 1)[-1]
+
+            def collection(self, collection_id):
+                return Collection(f"{self.path}/{collection_id}")
+
+        class Collection:
+            def __init__(self, path):
+                self.path = path
+
+            def document(self, document_id=None):
+                return Reference(f"{self.path}/{document_id or 'generated'}")
+
+        class Snapshot:
+            def __init__(self, data=None):
+                self.exists = data is not None
+                self._data = data
+
+            def to_dict(self):
+                return self._data
+
+        class Transaction:
+            def __init__(self, documents):
+                self.documents = documents
+                self.sets = []
+                self.updates = []
+
+            def get(self, reference):
+                return Snapshot(self.documents.get(reference.path))
+
+            def set(self, reference, data):
+                self.sets.append((reference, data))
+
+            def update(self, reference, data):
+                self.updates.append((reference, data))
+
+        class Database:
+            def __init__(self, transaction):
+                self._transaction = transaction
+
+            def collection(self, collection_id):
+                return Collection(collection_id)
+
+            def transaction(self):
+                return self._transaction
+
+        reception_id = "reception-1"
+        qr_identifier = "TQR-reception-1-001"
+        warehouse_id = "wh_tehuacan_1"
+        root = f"organizations/{receptions.ORG_ID}"
+        lot_projection_id = _lot_projection_id(warehouse_id, "product-1", "L-001", "2027-03-15")
+        transaction = Transaction({
+            f"{root}/receptions/{reception_id}": {
+                "organizationId": receptions.ORG_ID,
+                "warehouseId": warehouse_id,
+                "status": "IN_PROGRESS",
+                "plannedPallets": [{
+                    "palletId": "pallet-reception-1-001",
+                    "receptionId": reception_id,
+                    "palletNumber": 1,
+                    "productId": "product-1",
+                    "productName": "Agua mineral",
+                    "quantity": 24,
+                    "unit": "cajas",
+                    "qrIdentifier": qr_identifier,
+                    "status": "ACTIVE",
+                    "activated": True,
+                    "lot": "L-001",
+                    "expiryDate": "2027-03-15",
+                }],
+            },
+            f"{root}/receptions/{reception_id}/pallets/pallet-reception-1-001": {"id": "pallet-reception-1-001"},
+            f"{root}/inventory_movements/movement-{reception_id}-001": {"id": "movement"},
+            f"{root}/lotes_caducidades/{lot_projection_id}": {"cajas": 24},
+        })
+        request = SimpleNamespace(data={
+            "operationId": "register-pallet-retry-1",
+            "receptionId": reception_id,
+            "warehouseId": warehouse_id,
+            "productId": "product-1",
+            "qrIdentifier": qr_identifier,
+            "quantity": 24,
+            "unit": "cajas",
+            "lot": "L-001",
+            "expiryDate": "2027-03-15",
+        })
+
+        with (
+            patch.object(receptions.firestore, "client", return_value=Database(transaction)),
+            patch.object(receptions.firestore, "transactional", side_effect=lambda callback: callback),
+            patch.object(receptions, "_check_actor", return_value={"userId": "operator-1"}),
+        ):
+            result = inspect.unwrap(receptions.register_reception_pallet)(request)
+
+        self.assertTrue(result["idempotent"])
+        self.assertEqual(result["lotProjectionId"], lot_projection_id)
+        self.assertEqual(transaction.updates, [])
+        self.assertEqual(len(transaction.sets), 1)  # only the new operation receipt
 
 
 if __name__ == "__main__":
