@@ -13,6 +13,10 @@ import {
 import { generateReceptionQrPngs } from "@/services/receptionQr";
 import { QRCodeSVG } from "qrcode.react";
 import "./TarimaDetalle.css";
+import { useReceptionFlow } from "@/hooks/useReceptionFlow";
+import { useCatalogos } from "@/hooks/useCatalogos";
+import { useUIContext } from "@/context";
+import { useAuthorization } from "@/hooks/useAuthorization";
 
 const assetPathPrefix = "/assets";
 const imgWarehouse = `${assetPathPrefix}/fc229.svg`;
@@ -50,7 +54,7 @@ interface Props {
 export default function TarimaDetalle({
   onBack,
   onViewReference,
-  currentReception,
+  currentReception: currentReceptionProp,
   qrCode,
   authorizedWarehouseIds,
 }: Props) {
@@ -74,6 +78,33 @@ export default function TarimaDetalle({
     status: "loading",
   });
   const [legacyMode, setLegacyMode] = useState(false);
+
+  // ============================================
+  // New Architecture Hooks
+  // ============================================
+  const {
+    currentReception: ctxCurrentReception,
+    navigate,
+    transition,
+  } = useReceptionFlow();
+
+  const {
+    catalogoProductos,
+    catalogoProveedores,
+    catalogoConversiones,
+    catalogosLoading,
+    catalogosError,
+    getAlmacenActivo,
+  } = useCatalogos();
+
+  const { closeSidebarOnMobile, isMobile } = useUIContext();
+
+  // ============================================
+  // Legacy Props Fallback (for migration period)
+  // ============================================
+  const currentReception = currentReceptionProp ?? ctxCurrentReception;
+  const onBackLegacy = onBack ?? (() => navigate("captura-tarima"));
+  const onViewReferenceLegacy = onViewReference;
 
   useEffect(() => {
     if (qrCode) {
