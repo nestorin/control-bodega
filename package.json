@@ -25,7 +25,8 @@
     "lint": "oxfmt --check",
     "typecheck": "tsc --noEmit --skipLibCheck",
     "seed:expiries": "tsx scripts/seed-expiries.ts",
-    "audit:legacy": "tsx scripts/audit-legacy-firestore.ts"
+    "audit:legacy": "tsx scripts/audit-legacy-firestore.ts",
+    "backfill:expiry-lots": "tsx scripts/backfill-expiry-lots.ts"
   },
   "dependencies": {
     "@sentry/react": "^11.4.0",
