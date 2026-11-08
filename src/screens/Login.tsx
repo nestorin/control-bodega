@@ -7,6 +7,7 @@ import { auth } from "@/lib/firebase";
 
 const assetPathPrefix = "/assets";
 const imgLogo = `${assetPathPrefix}/4cca0.svg`;
+const isMockAuthMode = import.meta.env.VITE_USE_MOCK_AUTH === "true";
 
 function authenticationErrorMessage(error: unknown): string {
   const code =
@@ -96,6 +97,11 @@ export default function Login() {
 
   useEffect(() => {
     if (authLoading || !user) return;
+
+    // The E2E auth provider supplies an active user up front so protected
+    // routes can be exercised without a real credential. Keep /login
+    // available in that mode; only a form submission should leave it.
+    if (isMockAuthMode && !awaitingMembership) return;
 
     if (accessStatus === "ACTIVE" && profile) {
       navigate("/", { replace: true });
