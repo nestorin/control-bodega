@@ -1,4 +1,16 @@
-import { QRCodeSVG } from "qrcode.react";
+/**
+ * ImpresionEtiquetas — Migrated to new architecture (God Component Refactor Phase 7)
+ *
+ * Uses hooks directly instead of props:
+ * - useReceptionFlow for navigation and reception state
+ * - useCatalogos for product/supplier catalogs
+ * - useUIContext for UI state
+ */
+
+import { QRCodeSVG } from 'qrcode.react';
+import { useReceptionFlow } from '@/hooks/useReceptionFlow';
+import { useCatalogos } from '@/hooks/useCatalogos';
+import { useUIContext } from '@/context';
 
 interface Tarima {
   id: string;
@@ -22,15 +34,18 @@ interface Props {
     tarimas: number;
   } | null;
   conversionesTabla?: Array<{
-    producto: string;
-    codigo: string;
-    unidades: number;
-    unidad: string;
-    piezasPorCaja: number;
-    cajasPorTarima: number;
-    cajas: number;
-    tarimas: number;
-    stickers: number;
+    productId: string;
+    productName: string;
+    originalUnit: string;
+    originalQuantity: number;
+    conversions: Array<{
+      unit: string;
+      quantity: number;
+      stickers: Array<{
+        qrPayload: string;
+        quantity: number;
+      }>;
+    }>;
   }>;
 }
 
@@ -51,33 +66,33 @@ function Etiqueta({
   const row = (label: string, value: string, last = false) => (
     <div
       style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "baseline",
-        paddingBottom: last ? 0 : "4px",
-        borderBottom: last ? "none" : "1px solid #edf1f3",
-        marginBottom: last ? 0 : "4px",
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        paddingBottom: last ? 0 : '4px',
+        borderBottom: last ? 'none' : '1px solid #edf1f3',
+        marginBottom: last ? 0 : '4px',
       }}
     >
       <span
         style={{
-          fontFamily: "Inter, sans-serif",
-          fontSize: "10.5px",
+          fontFamily: 'Inter, sans-serif',
+          fontSize: '10.5px',
           fontWeight: 400,
-          color: "#607078",
-          whiteSpace: "nowrap",
+          color: '#607078',
+          whiteSpace: 'nowrap',
         }}
       >
         {label}
       </span>
       <span
         style={{
-          fontFamily: "Inter, sans-serif",
-          fontSize: "10.5px",
+          fontFamily: 'Inter, sans-serif',
+          fontSize: '10.5px',
           fontWeight: 700,
-          color: "#172126",
-          textAlign: "right",
-          maxWidth: "55%",
+          color: '#172126',
+          textAlign: 'right',
+          maxWidth: '55%',
         }}
       >
         {value}
@@ -92,44 +107,44 @@ function Etiqueta({
   return (
     <div
       style={{
-        width: "50%",
-        height: "50%",
-        boxSizing: "border-box",
-        padding: "16px 20px 12px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "10px",
-        borderRight: !isRightCol ? "1px dashed #c8d4d8" : "none",
-        borderBottom: !isLastRow ? "1px dashed #c8d4d8" : "none",
+        width: '50%',
+        height: '50%',
+        boxSizing: 'border-box',
+        padding: '16px 20px 12px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+        borderRight: !isRightCol ? '1px dashed #c8d4d8' : 'none',
+        borderBottom: !isLastRow ? '1px dashed #c8d4d8' : 'none',
       }}
     >
       {/* QR — grande y centrado arriba */}
-      <div style={{ display: "flex", justifyContent: "center" }}>
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
         <QRCodeSVG
           value={tarima.id}
           size={200}
           level="H"
           marginSize={2}
-          style={{ display: "block" }}
+          style={{ display: 'block' }}
         />
       </div>
 
       {/* Footer: tarima + ID + cara/copia */}
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "10px",
-          flexWrap: "wrap",
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '10px',
+          flexWrap: 'wrap',
         }}
       >
         <span
           style={{
-            fontFamily: "Inter, sans-serif",
-            fontSize: "11px",
+            fontFamily: 'Inter, sans-serif',
+            fontSize: '11px',
             fontWeight: 400,
-            color: "#607078",
+            color: '#607078',
           }}
         >
           {stickerInfo}
@@ -138,19 +153,19 @@ function Etiqueta({
           <>
             <span
               style={{
-                width: "3px",
-                height: "3px",
-                borderRadius: "50%",
-                background: "#c8d4d8",
-                display: "inline-block",
+                width: '3px',
+                height: '3px',
+                borderRadius: '50%',
+                background: '#c8d4d8',
+                display: 'inline-block',
               }}
             />
             <span
               style={{
-                fontFamily: "Inter, sans-serif",
-                fontSize: "12px",
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '12px',
                 fontWeight: 800,
-                color: "#172126",
+                color: '#172126',
               }}
             >
               {tarima.id}
@@ -162,67 +177,67 @@ function Etiqueta({
       {/* Datos — debajo del QR, en dos columnas */}
       <div
         style={{
-          borderTop: "1px solid #dce4e7",
-          paddingTop: "8px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "4px",
+          borderTop: '1px solid #dce4e7',
+          paddingTop: '8px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px',
         }}
       >
         <p
           style={{
-            fontFamily: "Inter, sans-serif",
-            fontSize: "13px",
+            fontFamily: 'Inter, sans-serif',
+            fontSize: '13px',
             fontWeight: 800,
-            color: "#172126",
-            margin: "0 0 2px",
+            color: '#172126',
+            margin: '0 0 2px',
           }}
         >
           {tarima.producto}
         </p>
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "3px 16px",
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '3px 16px',
           }}
         >
           {[
-            ["Recepción", tarima.fechaRecepcion],
-            ["Orden de compra", tarima.ordenCompra],
-            ["Lote", tarima.lote],
-            ["Caducidad", tarima.caducidad],
-            ["Cajas", `${tarima.cajas} cajas`],
-            ["Proveedor", tarima.proveedor],
-            ["Prov. logístico", tarima.proveedorLogistico],
-            ["Unidades / caja", tarima.unidadesPorCaja ? `${tarima.unidadesPorCaja} uds` : "—"],
+            ['Recepción', tarima.fechaRecepcion],
+            ['Orden de compra', tarima.ordenCompra],
+            ['Lote', tarima.lote],
+            ['Caducidad', tarima.caducidad],
+            ['Cajas', `${tarima.cajas} cajas`],
+            ['Proveedor', tarima.proveedor],
+            ['Prov. logístico', tarima.proveedorLogistico],
+            ['Unidades / caja', tarima.unidadesPorCaja ? `${tarima.unidadesPorCaja} uds` : '—'],
           ].map(([label, value]) => (
             <div
               key={label}
               style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: "6px",
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: '6px',
               }}
             >
               <span
                 style={{
-                  fontFamily: "Inter, sans-serif",
-                  fontSize: "9.5px",
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: '9.5px',
                   fontWeight: 400,
-                  color: "#607078",
-                  whiteSpace: "nowrap",
+                  color: '#607078',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {label}
               </span>
               <span
                 style={{
-                  fontFamily: "Inter, sans-serif",
-                  fontSize: "9.5px",
+                  fontFamily: 'Inter, sans-serif',
+                  fontSize: '9.5px',
                   fontWeight: 700,
-                  color: "#172126",
-                  textAlign: "right",
+                  color: '#172126',
+                  textAlign: 'right',
                 }}
               >
                 {value}
@@ -235,56 +250,81 @@ function Etiqueta({
   );
 }
 
-export default function ImpresionEtiquetas({
-  onClose,
-  currentReception,
-  conversionesTabla,
-}: Props) {
-  const ocFolio = currentReception?.ocFolio ?? "OC-24891";
-  const ocNumber = ocFolio.replace("OC-", "");
+export default function ImpresionEtiquetas({ onClose }: Props) {
+  // ============================================
+  // New Architecture Hooks
+  // ============================================
+  const {
+    currentReception: ctxCurrentReception,
+    navigate,
+    transition,
+  } = useReceptionFlow();
 
-  // Si hay conversionesTabla, generar tarimas basadas en productos reales
-  // Si no, usar datos de ejemplo
-  const tarimas: Tarima[] =
-    conversionesTabla && conversionesTabla.length > 0
-      ? conversionesTabla.flatMap((conv, idx) =>
-          Array.from({ length: conv.tarimas }, (_, i) => ({
-            id: `TQR-${ocNumber}-${String(idx * 10 + i + 1).padStart(3, "0")}`,
-            numero: idx * 10 + i + 1,
-            total: conversionesTabla.reduce((a, b) => a + b.tarimas, 0),
+  const {
+    catalogoProductos,
+    catalogoProveedores,
+    catalogoConversiones,
+    catalogosLoading,
+    catalogosError,
+    getAlmacenActivo,
+  } = useCatalogos();
+
+  const { closeSidebarOnMobile, isMobile } = useUIContext();
+
+  // ============================================
+  // Legacy Props Fallback (for migration period)
+  // ============================================
+  const currentReception = ctxCurrentReception;
+  const onCloseLegacy = onClose ?? (() => navigate('home'));
+
+  const ocFolio = currentReception?.ocFolio ?? 'OC-24891';
+    const ocNumber = ocFolio.replace('OC-', '');
+    const conversionesTabla = currentReception?.conversionesTabla ?? [];
+
+    // Si hay conversionesTabla, generar tarimas basadas en productos reales
+    // Si no, usar datos de ejemplo
+    const tarimas: Tarima[] =
+      conversionesTabla && conversionesTabla.length > 0
+        ? conversionesTabla.flatMap((conv, idx) =>
+            conv.conversions.flatMap((conversion) =>
+              conversion.stickers.map((sticker, si) => ({
+                id: sticker.qrPayload,
+                numero: idx * 10 + si + 1,
+                total: conversionesTabla.reduce((a, b) => a + b.conversions.reduce((c, d) => c + d.stickers.length, 0), 0),
+                ordenCompra: ocFolio,
+                fechaRecepcion: '19 Sep 2026 · 09:42',
+                producto: conv.productName,
+                caducidad: '15 Mar 2027',
+                cajas: Math.ceil(conversion.quantity / 24),
+                unidadesPorCaja: 24,
+                lote: 'LT-0926-A',
+                proveedor: 'Distribuidora del Norte',
+                proveedorLogistico: 'Logística Veloz',
+              }))
+            )
+          )
+        : Array.from({ length: currentReception?.tarimas ?? 20 }, (_, i) => ({
+            id: `TQR-${ocNumber}-${String(i + 1).padStart(3, '0')}`,
+            numero: i + 1,
+            total: currentReception?.tarimas ?? 20,
             ordenCompra: ocFolio,
-            fechaRecepcion: "19 Sep 2026 · 09:42",
-            producto: conv.producto,
-            caducidad: "15 Mar 2027",
-            cajas: Math.ceil(conv.cajas / conv.tarimas),
-            unidadesPorCaja: conv.piezasPorCaja,
-            lote: "LT-0926-A",
-            proveedor: "Distribuidora del Norte",
-            proveedorLogistico: "Logística Veloz",
-          })),
-        )
-      : Array.from({ length: currentReception?.tarimas ?? 20 }, (_, i) => ({
-          id: `TQR-${ocNumber}-${String(i + 1).padStart(3, "0")}`,
-          numero: i + 1,
-          total: currentReception?.tarimas ?? 20,
-          ordenCompra: ocFolio,
-          fechaRecepcion: "19 Sep 2026 · 09:42",
-          producto: "Agua mineral 600 ml",
-          caducidad: "15 Mar 2027",
-          cajas: 48,
-          unidadesPorCaja: i % 3 === 0 ? null : 24,
-          lote: "LT-0926-A",
-          proveedor: "Distribuidora del Norte",
-          proveedorLogistico: "Logística Veloz",
-        }));
+            fechaRecepcion: '19 Sep 2026 · 09:42',
+            producto: 'Agua mineral 600 ml',
+            caducidad: '15 Mar 2027',
+            cajas: 48,
+            unidadesPorCaja: i % 3 === 0 ? null : 24,
+            lote: 'LT-0926-A',
+            proveedor: 'Distribuidora del Norte',
+            proveedorLogistico: 'Logística Veloz',
+          }));
 
   // NUEVO: Generar stickers - 4 por tarima (2 caras × 2 copias)
   const stickers = tarimas.flatMap((tarima) =>
     [1, 2, 3, 4].map((stickerNum, si) => ({
       ...tarima,
       stickerIndex: si,
-      stickerFace: si < 2 ? "Cara A" : "Cara B",
-      stickerCopy: si % 2 === 0 ? "Copia 1" : "Copia 2",
+      stickerFace: si < 2 ? 'Cara A' : 'Cara B',
+      stickerCopy: si % 2 === 0 ? 'Copia 1' : 'Copia 2',
     })),
   );
 
@@ -299,26 +339,26 @@ export default function ImpresionEtiquetas({
       <div
         className="no-print"
         style={{
-          position: "fixed",
+          position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           zIndex: 100,
-          background: "#16343f",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 28px",
-          height: "60px",
+          background: '#16343f',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 28px',
+          height: '60px',
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <p
             style={{
-              fontFamily: "Inter, sans-serif",
-              fontSize: "15px",
+              fontFamily: 'Inter, sans-serif',
+              fontSize: '15px',
               fontWeight: 700,
-              color: "white",
+              color: 'white',
               margin: 0,
             }}
           >
@@ -326,9 +366,9 @@ export default function ImpresionEtiquetas({
           </p>
           <span
             style={{
-              fontFamily: "Inter, sans-serif",
-              fontSize: "13px",
-              color: "#b9c9cf",
+              fontFamily: 'Inter, sans-serif',
+              fontSize: '13px',
+              color: '#b9c9cf',
             }}
           >
             {conversionesTabla && conversionesTabla.length > 0
@@ -336,20 +376,20 @@ export default function ImpresionEtiquetas({
               : `${tarimas.length} etiquetas · {pages.length} páginas · 4 por hoja`}
           </span>
         </div>
-        <div style={{ display: "flex", gap: "10px" }}>
+        <div style={{ display: 'flex', gap: '10px' }}>
           <button
-            onClick={onClose}
+            onClick={onCloseLegacy}
             style={{
-              height: "36px",
-              padding: "0 18px",
-              borderRadius: "10px",
-              border: "1px solid rgba(255,255,255,0.2)",
-              background: "transparent",
-              fontFamily: "Inter, sans-serif",
-              fontSize: "13px",
+              height: '36px',
+              padding: '0 18px',
+              borderRadius: '10px',
+              border: '1px solid rgba(255,255,255,0.2)',
+              background: 'transparent',
+              fontFamily: 'Inter, sans-serif',
+              fontSize: '13px',
               fontWeight: 700,
-              color: "white",
-              cursor: "pointer",
+              color: 'white',
+              cursor: 'pointer',
             }}
           >
             ← Volver
@@ -357,19 +397,19 @@ export default function ImpresionEtiquetas({
           <button
             onClick={() => window.print()}
             style={{
-              height: "36px",
-              padding: "0 18px",
-              borderRadius: "10px",
-              border: "none",
-              background: "#f2b84b",
-              fontFamily: "Inter, sans-serif",
-              fontSize: "13px",
+              height: '36px',
+              padding: '0 18px',
+              borderRadius: '10px',
+              border: 'none',
+              background: '#f2b84b',
+              fontFamily: 'Inter, sans-serif',
+              fontSize: '13px',
               fontWeight: 700,
-              color: "#16343f",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
+              color: '#16343f',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
             }}
           >
             🖨 Imprimir todas
@@ -380,9 +420,9 @@ export default function ImpresionEtiquetas({
       {/* Pages */}
       <div
         style={{
-          paddingTop: "60px",
-          background: "#edf1f3",
-          minHeight: "100vh",
+          paddingTop: '60px',
+          background: '#edf1f3',
+          minHeight: '100vh',
         }}
         className="no-print-bg"
       >
@@ -391,15 +431,15 @@ export default function ImpresionEtiquetas({
             key={pi}
             className="print-page"
             style={{
-              width: "297mm",
-              height: "210mm",
-              margin: "24px auto",
-              background: "white",
-              display: "flex",
-              flexWrap: "wrap",
-              boxShadow: "0 4px 20px rgba(22,52,63,0.12)",
-              pageBreakAfter: "always",
-              overflow: "hidden",
+              width: '297mm',
+              height: '210mm',
+              margin: '24px auto',
+              background: 'white',
+              display: 'flex',
+              flexWrap: 'wrap',
+              boxShadow: '0 4px 20px rgba(22,52,63,0.12)',
+              pageBreakAfter: 'always',
+              overflow: 'hidden',
             }}
           >
             {page.map((tarima, i) => (

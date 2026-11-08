@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+/**
+ * EditarRecepcion — Migrated to new architecture (God Component Refactor Phase 7)
+ *
+ * Uses hooks directly instead of props:
+ * - useReceptionFlow for navigation and reception state
+ * - useCatalogos for supplier catalogs
+ * - useAuthorization for auth state
+ */
+
+import { useEffect, useMemo, useState } from 'react';
 import {
   createFirestoreServices,
   type PlannedReceptionPalletDraft,
@@ -33,41 +42,101 @@ interface EditableProductLine {
 function isEditableDraft(reception: ReceptionDoc): boolean {
   const pallets = reception.plannedPallets ?? [];
   return (
-    reception.status === "DRAFT" &&
+    reception.status === 'DRAFT' &&
     pallets.length > 0 &&
-    pallets.every((pallet) => pallet.status === "PLANNED" && !pallet.activated)
+    pallets.every((pallet) => pallet.status === 'PLANNED' && !pallet.activated)
   );
 }
 
 function receptionErrorMessage(error: unknown): string {
   const code =
-    typeof error === "object" && error !== null && "code" in error
+    typeof error === 'object' && error !== null && 'code' in error
       ? String((error as { code?: unknown }).code)
-      : "";
-  if (code.includes("permission-denied")) return "No tenés permisos para editar esta recepción.";
-  if (code.includes("failed-precondition")) {
-    return "La recepción cambió o ya comenzó su captura. Volvé al listado y consultá su estado actual.";
+      : '';
+  if (code.includes('permission-denied')) return 'No tenés permisos para editar esta recepción.';
+  if (code.includes('failed-precondition')) {
+    return 'La recepción cambió o ya comenzó su captura. Volvé al listado y consultá su estado actual.';
   }
-  return error instanceof Error ? error.message : "No se pudo cargar la recepción.";
+  return error instanceof Error ? error.message : 'No se pudo cargar la recepción.';
 }
 
 export default function EditarRecepcion({ recId, suppliers, products, onBack, onSave }: Props) {
   const { user, canQuery } = useAuthorization();
+
+  const {
+    catalogoProveedores,
+    catalogosLoading,
+    catalogosError,
+  } = useCatalogos();
+
+  // ============================================
+  // Legacy Props Fallback (for migration period)
+  // ============================================
+  const recId = editId;
+  const onBackLegacy = () => {
+    ctxCancelReception();
+    navigate('recepciones');
+  };
+  const onSaveLegacy = () => {
+    navigate('recepciones');
+  };
+
   const services = useMemo(() => (db ? createFirestoreServices(db, ORG_ID) : null), []);
   const [reception, setReception] = useState<ReceptionDoc | null>(null);
-  const [supplierId, setSupplierId] = useState("");
-  const [logisticsProvider, setLogisticsProvider] = useState("");
+  const [supplierId, setSupplierId] = useState('');
+  const [logisticsProvider, setLogisticsProvider] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [productLines, setProductLines] = useState<EditableProductLine[]>([]);
 
+  // Filter suppliers by type
+  const merchandiseSuppliers = catalogoProveedores.filter((supplier) => supplier.tipo === 'mercancia');
+  const logisticsSuppliers = catalogoProveedores.filter((supplier) => supplier.tipo === 'logistica');
+
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError(null);
-    if (!canQuery || !services) {
-      setError("Se requiere una sesión autorizada para consultar la recepción.");
+    
+    // Use editReceptionData from context if available, otherwise load from Firestore
+    if (editReceptionData) {
+      if (!active) return;
+      const receptionData = editReceptionData as unknown as ReceptionDoc;
+      setReception(receptionData);
+      setSupplierId(
+        receptionData.supplierId ||
+          merchandiseSuppliers.find((supplier) => supplier.nombre === receptionData.supplierName)?.id ||
+          '',
+      );
+      setLogisticsProvider(receptionData.logisticsProvider || '');
+
+      // Initialize editable product lines from plannedPallets
+      const plannedPallets = receptionData.plannedPallets ?? [];
+      const linesMap = new Map<number, EditableProductLine>();
+      plannedPallets.forEach((pallet) => {
+        const existing = linesMap.get(pallet.lineIndex);
+        if (existing) {
+          existing.quantity += pallet.quantity;
+          existing.pallets += 1;
+        } else {
+          linesMap.set(pallet.lineIndex, {
+            lineIndex: pallet.lineIndex,
+            productId: pallet.productId,
+            productName: pallet.productName,
+            quantity: pallet.quantity,
+            unit: pallet.unit,
+            pallets: 1,
+          });
+        }
+      });
+      setProductLines(Array.from(linesMap.values()).sort((a, b) => a.lineIndex - b.lineIndex));
+      setLoading(false);
+      return;
+    }
+    
+    if (!canQuery || !services || !recId) {
+      setError('Se requiere una sesión autorizada para consultar la recepción.');
       setLoading(false);
       return () => {
         active = false;
@@ -79,16 +148,16 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
       .then((loaded) => {
         if (!active) return;
         if (!loaded) {
-          setError("No se encontró la recepción seleccionada.");
+          setError('No se encontró la recepción seleccionada.');
           return;
         }
         setReception(loaded);
         setSupplierId(
           loaded.supplierId ||
-            suppliers.find((supplier) => supplier.nombre === loaded.supplierName)?.id ||
-            "",
+            merchandiseSuppliers.find((supplier) => supplier.nombre === loaded.supplierName)?.id ||
+            '',
         );
-        setLogisticsProvider(loaded.logisticsProvider || "");
+        setLogisticsProvider(loaded.logisticsProvider || '');
 
         // Initialize editable product lines from plannedPallets
         const plannedPallets = loaded.plannedPallets ?? [];
@@ -121,7 +190,7 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
     return () => {
       active = false;
     };
-  }, [canQuery, recId, services, suppliers]);
+  }, [canQuery, recId, services, merchandiseSuppliers, editReceptionData]);
 
   const editable = reception ? isEditableDraft(reception) : false;
   const totalPallets =
@@ -148,10 +217,10 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
       ...prev,
       {
         lineIndex: nextLineIndex,
-        productId: "",
-        productName: "",
+        productId: '',
+        productName: '',
         quantity: 1,
-        unit: "cajas",
+        unit: 'cajas',
         pallets: 1,
       },
     ]);
@@ -166,10 +235,10 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
     setSaving(true);
     setError(null);
     try {
-      const selectedSupplier = suppliers.find((supplier) => supplier.id === supplierId);
-      if (!supplierId) throw new Error("Seleccioná un proveedor de mercancía.");
+      const selectedSupplier = merchandiseSuppliers.find((supplier) => supplier.id === supplierId);
+      if (!supplierId) throw new Error('Seleccioná un proveedor de mercancía.');
       if (!selectedSupplier && supplierId !== reception.supplierId) {
-        throw new Error("El proveedor seleccionado ya no está disponible en el catálogo.");
+        throw new Error('El proveedor seleccionado ya no está disponible en el catálogo.');
       }
 
       const supplierRecord = await services.suppliers.getById(supplierId);
@@ -222,10 +291,10 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
         supplierCode: supplierRecord.code,
         supplierName: supplierRecord.name,
         logisticsProvider: logisticsProvider.trim(),
-        productName: productLines.map((l) => l.productName).join(", "),
+        productName: productLines.map((l) => l.productName).join(', '),
         palletCount: plannedPallets.length,
         plannedPallets,
-        status: "DRAFT",
+        status: 'DRAFT',
         operationId,
         actorUserId: user.uid,
       };
@@ -239,7 +308,7 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
         reception.version,
       );
       setReception(updated);
-      onSave();
+      onSaveLegacy();
     } catch (saveError) {
       setError(receptionErrorMessage(saveError));
     } finally {
@@ -258,17 +327,15 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
     return (
       <section className="m-4 rounded-2xl bg-white p-6 md:m-7">
         <p role="alert" className="text-red-700">
-          {error || "No se pudo cargar la recepción."}
+          {error || 'No se pudo cargar la recepción.'}
         </p>
-        <button type="button" className="mt-4 rounded-lg border px-4 py-2" onClick={onBack}>
+        <button type="button" className="mt-4 rounded-lg border px-4 py-2" onClick={onBackLegacy}>
           Volver
         </button>
       </section>
     );
   }
 
-  const merchandiseSuppliers = suppliers.filter((supplier) => supplier.tipo === "mercancia");
-  const logisticsSuppliers = suppliers.filter((supplier) => supplier.tipo === "logistica");
   const displayFolio = reception.folio || reception.purchaseOrderNumber || reception.id;
 
   return (
@@ -277,7 +344,7 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-[#3276a8]">
-              {editable ? "BORRADOR EDITABLE" : "CONSULTA DE RECEPCIÓN"}
+              {editable ? 'BORRADOR EDITABLE' : 'CONSULTA DE RECEPCIÓN'}
             </p>
             <h1 className="mt-1 text-2xl font-extrabold text-[#172126]">{displayFolio}</h1>
           </div>
@@ -302,7 +369,7 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
           <div className="rounded-xl bg-[#f4f7f8] p-4">
             <p className="text-xs font-bold uppercase text-[#607078]">Orden de compra</p>
             <p className="mt-1 font-semibold text-[#172126]">
-              {reception.purchaseOrderNumber || "—"}
+              {reception.purchaseOrderNumber || '—'}
             </p>
           </div>
           <div className="rounded-xl bg-[#f4f7f8] p-4">
@@ -329,7 +396,7 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
                     (supplier) => supplier.id === reception.supplierId,
                   ) && (
                     <option value={reception.supplierId}>
-                      {reception.supplierName || reception.supplierCode || "Proveedor actual"}
+                      {reception.supplierName || reception.supplierCode || 'Proveedor actual'}
                     </option>
                   )}
                 {merchandiseSuppliers.map((supplier) => (
@@ -340,7 +407,7 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
               </select>
             ) : (
               <span className="min-h-11 rounded-lg bg-[#f4f7f8] px-3 py-3 text-[#172126]">
-                {reception.supplierName || reception.supplierCode || "Sin proveedor"}
+                {reception.supplierName || reception.supplierCode || 'Sin proveedor'}
               </span>
             )}
           </label>
@@ -365,7 +432,7 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
               </select>
             ) : (
               <span className="min-h-11 rounded-lg bg-[#f4f7f8] px-3 py-3 text-[#172126]">
-                {reception.logisticsProvider || "Sin proveedor logístico"}
+                {reception.logisticsProvider || 'Sin proveedor logístico'}
               </span>
             )}
           </label>
@@ -473,7 +540,7 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
           ) : (
             <p className="rounded-xl bg-[#f4f7f8] p-4 text-sm text-[#607078]">
               Esta recepción no tiene un plan detallado de tarimas.
-              {editable && " Agregá productos usando el botón de arriba."}
+              {editable && ' Agregá productos usando el botón de arriba.'}
             </p>
           )}
         </div>
@@ -520,7 +587,7 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
           <button
             type="button"
             className="min-h-11 rounded-lg border border-[#dce4e7] px-5 font-bold text-[#16343f]"
-            onClick={onBack}
+            onClick={onBackLegacy}
           >
             Volver
           </button>
@@ -531,7 +598,7 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
               disabled={saving}
               onClick={() => void handleSave()}
             >
-              {saving ? "Guardando…" : "Guardar cambios"}
+              {saving ? 'Guardando…' : 'Guardar cambios'}
             </button>
           )}
         </footer>
