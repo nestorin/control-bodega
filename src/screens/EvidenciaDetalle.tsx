@@ -1,16 +1,8 @@
-/**
- * EvidenciaDetalle — Migrated to new architecture (God Component Refactor Phase 7)
- *
- * Uses hooks directly instead of props:
- * - useReceptionFlow for navigation
- * - useUIContext for UI state
- */
-
-import { useEffect, useRef, useState } from 'react';
-import { getBlob, ref } from 'firebase/storage';
-import { storage } from '@/lib/firebase';
-import { downloadBlob } from '@/services/pdfGenerator';
-import { generateEvidencePdf, type EvidencePalletRow } from '@/services/evidencePdf';
+import { useEffect, useRef, useState } from "react";
+import { getBlob, ref } from "firebase/storage";
+import { storage } from "@/lib/firebase";
+import { downloadBlob } from "@/services/pdfGenerator";
+import { generateEvidencePdf, type EvidencePalletRow } from "@/services/evidencePdf";
 import {
   buildAuthenticatedEvidenceLink,
   buildEvidenceShareMessage,
@@ -80,9 +72,9 @@ function EditablePhotoCard({
         className="rounded-[16px] overflow-hidden flex items-center justify-center relative group"
         style={{
           height: 180,
-          background: src ? 'transparent' : '#e7f0f2',
-          border: src ? (editing ? '2px solid #3276a8' : 'none') : '2px dashed #b9d9e4',
-          cursor: editing ? 'pointer' : 'default',
+          background: src ? "transparent" : "#e7f0f2",
+          border: src ? (editing ? "2px solid #3276a8" : "none") : "2px dashed #b9d9e4",
+          cursor: editing ? "pointer" : "default",
         }}
       >
         {src ? (
@@ -119,7 +111,7 @@ function EditablePhotoCard({
               height="32"
               viewBox="0 0 24 24"
               fill="none"
-              stroke={editing ? '#3276a8' : '#607078'}
+              stroke={editing ? "#3276a8" : "#607078"}
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -132,10 +124,10 @@ function EditablePhotoCard({
               style={{
                 fontFamily: "'Inter', sans-serif",
                 fontWeight: 400,
-                color: editing ? '#3276a8' : '#607078',
+                color: editing ? "#3276a8" : "#607078",
               }}
             >
-              {editing ? 'Toca para agregar foto' : 'Sin foto'}
+              {editing ? "Toca para agregar foto" : "Sin foto"}
             </p>
           </div>
         )}
@@ -178,7 +170,7 @@ function EditRow({
   label,
   value,
   onChange,
-  type = 'text',
+  type = "text",
 }: {
   label: string;
   value: string;
@@ -214,11 +206,11 @@ function useProtectedEvidenceImage(path: string | null) {
     }
     // Previews are valid only in the active tab. New evidence always uses the
     // canonical protected Storage path below.
-    if (path.startsWith('blob:') || path.startsWith('data:')) {
+    if (path.startsWith("blob:") || path.startsWith("data:")) {
       setSrc(path);
       return;
     }
-    if (!storage || !path.startsWith('organizations/')) {
+    if (!storage || !path.startsWith("organizations/")) {
       setSrc(null);
       return;
     }
@@ -241,59 +233,22 @@ function useProtectedEvidenceImage(path: string | null) {
   return src;
 }
 
-export default function EvidenciaDetalle() {
-  // ============================================
-  // New Architecture Hooks
-  // ============================================
-  const {
-    navigate,
-    selectedEvidencia,
-    setSelectedEvidencia: ctxSetSelectedEvidencia,
-  } = useReceptionFlow();
-
-  const { closeSidebarOnMobile } = useUIContext();
-
-  // ============================================
-  // Legacy Props Fallback (for migration period)
-  // ============================================
-  const ev = selectedEvidencia;
-  const onBackLegacy = () => {
-    ctxSetSelectedEvidencia(null);
-    closeSidebarOnMobile();
-    navigate('evidencias');
-  };
-  const onDeleteLegacy = () => {
-    // Delete is handled by the list screen
-    navigate('evidencias');
-  };
-
+export default function EvidenciaDetalle({ evidencia: ev, onBack, onDelete }: Props) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<EvidenciaData | null>(ev);
+  const [draft, setDraft] = useState(ev);
   const [downloadError, setDownloadError] = useState<string | null>(null);
-
-  // Sync draft with selectedEvidencia changes
-  useEffect(() => {
-    if (ev) {
-      setDraft(ev);
-    }
-  }, [ev]);
-
-  const trailerPhoto = useProtectedEvidenceImage(draft?.fotoTrailer ?? null);
-  const productPhoto = useProtectedEvidenceImage(draft?.fotoProducto ?? null);
+  const trailerPhoto = useProtectedEvidenceImage(draft.fotoTrailer);
+  const productPhoto = useProtectedEvidenceImage(draft.fotoProducto);
 
   function field(key: keyof EvidenciaData) {
-    return String(draft?.[key] ?? '');
+    return String(draft[key] ?? "");
   }
   function set(key: keyof EvidenciaData) {
-    return (v: string) => setDraft((d): EvidenciaData | null => {
-      if (!d) return d;
-      return { ...d, [key]: key === 'tarimas' ? Number(v) : v };
-    });
+    return (v: string) => setDraft((d) => ({ ...d, [key]: key === "tarimas" ? Number(v) : v }));
   }
 
   function sendWhatsApp() {
-    if (!draft) return;
     const d = draft;
     const evidenceLink = d.receptionId ? buildAuthenticatedEvidenceLink(d.receptionId) : null;
     const msg = buildEvidenceShareMessage({
@@ -303,17 +258,16 @@ export default function EvidenciaDetalle() {
       palletCount: d.tarimas,
       evidenceLink,
     });
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   }
 
   async function downloadEvidence() {
-    if (!draft) return;
     setDownloadError(null);
     try {
       const blob = await generateEvidencePdf({
         evidenceId: draft.evidenceId || draft.id,
         receptionId: draft.receptionId || draft.id,
-        date: [draft.fecha, draft.hora].filter(Boolean).join(' '),
+        date: [draft.fecha, draft.hora].filter(Boolean).join(" "),
         item: draft.item,
         supplier: draft.proveedor,
         logisticsProvider: draft.proveedorLogistico,
@@ -327,12 +281,12 @@ export default function EvidenciaDetalle() {
       });
       downloadBlob(
         blob,
-        `Evidencia-${(draft.evidenceId || draft.id).replace(/[^a-zA-Z0-9-]/g, '-')}.pdf`,
+        `Evidencia-${(draft.evidenceId || draft.id).replace(/[^a-zA-Z0-9-]/g, "-")}.pdf`,
       );
     } catch (error) {
-      console.error('Evidence PDF download failed:', error);
+      console.error("Evidence PDF download failed:", error);
       setDownloadError(
-        'No se pudo descargar la evidencia. Verificá tu conexión e intentá nuevamente.',
+        "No se pudo descargar la evidencia. Verificá tu conexión e intentá nuevamente.",
       );
     }
   }
@@ -405,19 +359,13 @@ export default function EvidenciaDetalle() {
               label="Mercancía en tráiler"
               src={trailerPhoto}
               editing={editing}
-              onFile={(url) => setDraft((d) => {
-                if (!d) return d;
-                return { ...d, fotoTrailer: url };
-              })}
+              onFile={(url) => setDraft((d) => ({ ...d, fotoTrailer: url }))}
             />
             <EditablePhotoCard
               label="Producto y caducidad"
               src={productPhoto}
               editing={editing}
-              onFile={(url) => setDraft((d) => {
-                if (!d) return d;
-                return { ...d, fotoProducto: url };
-              })}
+              onFile={(url) => setDraft((d) => ({ ...d, fotoProducto: url }))}
             />
           </div>
 
@@ -451,7 +399,7 @@ export default function EvidenciaDetalle() {
           )}
 
           <button
-            onClick={onBackLegacy}
+            onClick={onBack}
             className="flex items-center gap-2 w-full h-11 justify-center rounded-[12px] border border-[#dce4e7] bg-white hover:bg-[#f8fafb] transition-colors touch-target"
           >
             <svg
@@ -630,8 +578,8 @@ export default function EvidenciaDetalle() {
           <div
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
             style={{
-              background: 'rgba(22,52,63,0.45)',
-              backdropFilter: 'blur(4px)',
+              background: "rgba(22,52,63,0.45)",
+              backdropFilter: "blur(4px)",
             }}
             onClick={() => setShowDeleteConfirm(false)}
           >
@@ -679,7 +627,7 @@ export default function EvidenciaDetalle() {
                     lineHeight: 1.5,
                   }}
                 >
-                  Se eliminará <strong style={{ color: '#172126' }}>{draft.id}</strong> y sus fotos.
+                  Se eliminará <strong style={{ color: "#172126" }}>{draft.id}</strong> y sus fotos.
                   Esta acción no se puede deshacer.
                 </p>
               </div>
@@ -691,8 +639,8 @@ export default function EvidenciaDetalle() {
                     fontFamily: "'Inter', sans-serif",
                     fontSize: 14,
                     fontWeight: 700,
-                    color: '#172126',
-                    cursor: 'pointer',
+                    color: "#172126",
+                    cursor: "pointer",
                   }}
                 >
                   Cancelar
@@ -700,17 +648,17 @@ export default function EvidenciaDetalle() {
                 <button
                   onClick={() => {
                     setShowDeleteConfirm(false);
-                    onDeleteLegacy();
-                    onBackLegacy();
+                    onDelete?.();
+                    onBack();
                   }}
                   className="flex-1 h-11 lg:h-12 rounded-[12px] border-none hover:opacity-90 transition-opacity touch-target"
                   style={{
                     fontFamily: "'Inter', sans-serif",
                     fontSize: 14,
                     fontWeight: 700,
-                    color: 'white',
-                    background: '#c54b45',
-                    cursor: 'pointer',
+                    color: "white",
+                    background: "#c54b45",
+                    cursor: "pointer",
                   }}
                 >
                   Sí, borrar
@@ -731,44 +679,44 @@ export default function EvidenciaDetalle() {
             className="font-bold text-[#172126] text-[14px] lg:text-[15px] pb-2"
             style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
           >
-            {editing ? '✏️ Editando información' : 'Información de la mercancía'}
+            {editing ? "✏️ Editando información" : "Información de la mercancía"}
           </p>
           <div className="w-full">
             {editing ? (
               <>
-                <EditRow label="Ítem recibido" value={field('item')} onChange={set('item')} />
+                <EditRow label="Ítem recibido" value={field("item")} onChange={set("item")} />
                 <EditRow
                   label="Proveedor de mercancía"
-                  value={field('proveedor')}
-                  onChange={set('proveedor')}
+                  value={field("proveedor")}
+                  onChange={set("proveedor")}
                 />
                 <EditRow
                   label="Proveedor logístico"
-                  value={field('proveedorLogistico')}
-                  onChange={set('proveedorLogistico')}
+                  value={field("proveedorLogistico")}
+                  onChange={set("proveedorLogistico")}
                 />
                 <EditRow
                   label="Orden de compra"
-                  value={field('ocFolio')}
-                  onChange={set('ocFolio')}
+                  value={field("ocFolio")}
+                  onChange={set("ocFolio")}
                 />
-                <EditRow label="Lote" value={field('lote')} onChange={set('lote')} />
+                <EditRow label="Lote" value={field("lote")} onChange={set("lote")} />
                 <EditRow
                   label="Tarimas recibidas"
-                  value={field('tarimas')}
-                  onChange={set('tarimas')}
+                  value={field("tarimas")}
+                  onChange={set("tarimas")}
                   type="number"
                 />
                 <EditRow
                   label="Caducidad del producto"
-                  value={field('caducidad')}
-                  onChange={set('caducidad')}
+                  value={field("caducidad")}
+                  onChange={set("caducidad")}
                   type="date"
                 />
                 <EditRow
                   label="Fecha de recepción"
-                  value={field('fecha')}
-                  onChange={set('fecha')}
+                  value={field("fecha")}
+                  onChange={set("fecha")}
                 />
               </>
             ) : (
@@ -789,7 +737,7 @@ export default function EvidenciaDetalle() {
               <button
                 onClick={sendWhatsApp}
                 className="flex gap-2 h-[48px] w-full items-center justify-center rounded-[12px] cursor-pointer transition-opacity hover:opacity-90 touch-target"
-                style={{ background: '#25D366' }}
+                style={{ background: "#25D366" }}
               >
                 <WhatsAppIcon />
                 <span

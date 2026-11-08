@@ -169,8 +169,6 @@ if (auth) {
   auth.languageCode = "es";
 }
 
-export { app };
-
 // Network detection for offline queue
 if (db && typeof window !== "undefined") {
   // Network detection for offline queue

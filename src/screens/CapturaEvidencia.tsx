@@ -1,19 +1,9 @@
-/**
- * CapturaEvidencia — Migrated to new architecture (God Component Refactor Phase 7)
- *
- * Uses hooks directly instead of props:
- * - useReceptionFlow for navigation and reception state
- * - useCatalogos for product catalog access
- * - useUIContext for UI state
- * - useAuthorization for auth state
- */
-
-import { useState, useRef, useEffect } from 'react';
-import { isFeatureEnabled } from '@/config/featureFlags';
-import { createFirestoreServices } from '@/services/firestore';
-import { db, storage } from '@/lib/firebase';
-import { useAuthorization } from '@/hooks/useAuthorization';
-import { deleteObject, ref, uploadBytes } from 'firebase/storage';
+import { useState, useRef, useEffect } from "react";
+import { isFeatureEnabled } from "@/config/featureFlags";
+import { createFirestoreServices } from "@/services/firestore";
+import { db, storage } from "@/lib/firebase";
+import { useAuthorization } from "@/hooks/useAuthorization";
+import { deleteObject, ref, uploadBytes } from "firebase/storage";
 import {
   buildAuthenticatedEvidenceLink,
   buildEvidenceShareMessage,
@@ -21,8 +11,8 @@ import {
 import { uploadEvidencePair } from "@/services/evidenceUpload";
 import { evidenceDocumentPath, validateEvidenceDocument } from "@/services/evidenceDocument";
 
-const imgArrowRight = '/assets/55de6.svg';
-const ORG_ID = 'org_exepa_001';
+const imgArrowRight = "/assets/55de6.svg";
+const ORG_ID = "org_exepa_001";
 
 interface PhotoSlot {
   label: string;
@@ -36,6 +26,21 @@ interface EvidenceForm {
   tarimas: string;
   caducidad: string;
   lote: string;
+}
+
+interface Props {
+  onBack: () => void;
+  receptionId?: string;
+  currentReception?: {
+    proveedor?: string;
+    proveedorLogistico?: string;
+    warehouseId?: string;
+    productos?: Array<{ nombre?: string }>;
+    tarimas?: number;
+    caducidad?: string;
+    lote?: string;
+  } | null;
+  onContinue: (evidence: { photos: [string | null, string | null]; form: EvidenceForm }) => void;
 }
 
 function TrailerIcon({ size = 56 }: { size?: number }) {
@@ -122,10 +127,10 @@ function PhotoUploadBox({
       onClick={() => ref.current?.click()}
       className="relative flex flex-col items-center justify-center gap-2 rounded-[16px] cursor-pointer overflow-hidden transition-all"
       style={{
-        width: '100%',
+        width: "100%",
         height: 160,
-        background: slot.file ? 'transparent' : '#e7f0f2',
-        border: slot.file ? 'none' : '2px dashed #3276a8',
+        background: slot.file ? "transparent" : "#e7f0f2",
+        border: slot.file ? "none" : "2px dashed #3276a8",
       }}
     >
       {slot.file ? (
@@ -147,7 +152,7 @@ function PhotoUploadBox({
             </svg>
             <span
               className="text-white text-[11px] font-bold"
-              style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
+              style={{ fontFamily: "'Inter', sans-serif" }}
             >
               Cambiar foto
             </span>
@@ -194,65 +199,40 @@ function PhotoUploadBox({
   );
 }
 
-export default function CapturaEvidencia() {
-  // ============================================
-  // New Architecture Hooks
-  // ============================================
-  const {
-    currentReception: ctxCurrentReception,
-    navigate,
-    transition,
-  } = useReceptionFlow();
-
-  const {
-    catalogoProductos,
-  } = useCatalogos();
-
-  const { closeSidebarOnMobile, isMobile } = useUIContext();
-
-  // ============================================
-  // Legacy Props Fallback (for migration period)
-  // ============================================
-  const currentReception = ctxCurrentReception;
-  const onBack = () => navigate('home');
-  const onContinue = () => navigate('captura-tarima');
-
-  // ============================================
-  // Local State
-  // ============================================
+export default function CapturaEvidencia({ onContinue, currentReception, receptionId }: Props) {
   const [photos, setPhotos] = useState<[string | null, string | null]>([null, null]);
   const [photoFiles, setPhotoFiles] = useState<[File | null, File | null]>([null, null]);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [form, setForm] = useState<EvidenceForm>({
-    proveedor: currentReception?.proveedor || '',
-    item: currentReception?.productos?.[0]?.nombre || '',
-    tarimas: currentReception?.tarimas ? String(currentReception.tarimas) : '',
-    caducidad: currentReception?.caducidad || '',
-    lote: currentReception?.lote || '',
+    proveedor: currentReception?.proveedor || "",
+    item: currentReception?.productos?.[0]?.nombre || "",
+    tarimas: currentReception?.tarimas ? String(currentReception.tarimas) : "",
+    caducidad: currentReception?.caducidad || "",
+    lote: currentReception?.lote || "",
   });
   const [notices, setNotices] = useState<string[]>([]);
-  const [noticeKind, setNoticeKind] = useState<'warning' | 'error'>('warning');
+  const [noticeKind, setNoticeKind] = useState<"warning" | "error">("warning");
   const [saved, setSaved] = useState(false);
   const [saveNotice, setSaveNotice] = useState(false);
 
   // TEST-ONLY: Load test data from localStorage for legacy mode
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('test') === 'legacy-captura-evidencia') {
+    if (params.get("test") === "legacy-captura-evidencia") {
       try {
-        const saved = localStorage.getItem('test-evidencia-form');
+        const saved = localStorage.getItem("test-evidencia-form");
         if (saved) {
           const data = JSON.parse(saved);
           setForm({
-            proveedor: data.proveedor || '',
-            item: data.item || '',
-            tarimas: data.tarimas || '',
-            caducidad: data.caducidad || '',
-            lote: data.lote || '',
+            proveedor: data.proveedor || "",
+            item: data.item || "",
+            tarimas: data.tarimas || "",
+            caducidad: data.caducidad || "",
+            lote: data.lote || "",
           });
         }
       } catch (e) {
-        console.warn('[TEST] No se pudo leer test-evidencia-form:', e);
+        console.warn("[TEST] No se pudo leer test-evidencia-form:", e);
       }
     }
   }, []);
@@ -262,9 +242,9 @@ export default function CapturaEvidencia() {
 
   // TEST-ONLY: Disable Firestore in test mode to avoid emulator connection issues
   const isTestMode =
-    new URLSearchParams(window.location.search).get('test') === 'legacy-captura-evidencia';
+    new URLSearchParams(window.location.search).get("test") === "legacy-captura-evidencia";
   const useFirestore =
-    !isTestMode && isFeatureEnabled('USE_FIRESTORE_RECEPCIONES') && !!db && canQuery;
+    !isTestMode && isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery;
 
   const [fsServices, setFsServices] = useState<ReturnType<typeof createFirestoreServices> | null>(
     null,
@@ -281,13 +261,11 @@ export default function CapturaEvidencia() {
 
   function buildWhatsAppMessage() {
     return buildEvidenceShareMessage({
-      receptionId: currentReception?.receptionId || 'Sin recepción',
+      receptionId: receptionId || "Sin recepción",
       supplier: form.proveedor,
       item: form.item,
       palletCount: form.tarimas,
-      evidenceLink: currentReception?.receptionId
-        ? buildAuthenticatedEvidenceLink(currentReception.receptionId)
-        : null,
+      evidenceLink: receptionId ? buildAuthenticatedEvidenceLink(receptionId) : null,
     });
   }
 
@@ -299,12 +277,11 @@ export default function CapturaEvidencia() {
       const evidenceStorage = storage;
       const trailerFile = photoFiles[0];
       const productFile = photoFiles[1];
-      const receptionId = currentReception?.receptionId;
       if (receptionId && user && evidenceStorage && warehouseId && trailerFile && productFile) {
         const extension = (file: File) => {
-          if (file.type === 'image/png') return 'png';
-          if (file.type === 'image/webp') return 'webp';
-          return 'jpg';
+          if (file.type === "image/png") return "png";
+          if (file.type === "image/webp") return "webp";
+          return "jpg";
         };
         const evidencePhotos = {
           trailer: `organizations/${ORG_ID}/warehouses/${warehouseId}/receptions/${receptionId}/evidence/trailer.${extension(trailerFile)}`,
@@ -365,7 +342,7 @@ export default function CapturaEvidencia() {
         return true;
       }
     } catch (e) {
-      console.error('Failed to save evidence to Firestore:', e);
+      console.error("Failed to save evidence to Firestore:", e);
       return false;
     }
     return false;
@@ -388,8 +365,8 @@ export default function CapturaEvidencia() {
       const persisted = await saveEvidenceToFirestore();
       if (!persisted) {
         setSaved(false);
-        setNoticeKind('error');
-        setNotices(['No se pudo guardar la evidencia. Verificá tus permisos y conexión.']);
+        setNoticeKind("error");
+        setNotices(["No se pudo guardar la evidencia. Verificá tus permisos y conexión."]);
         return false;
       }
     }
@@ -401,43 +378,42 @@ export default function CapturaEvidencia() {
     return true;
   }
 
-  const slots: Omit<PhotoSlot, 'file'>[] = [
+  const slots: Omit<PhotoSlot, "file">[] = [
     {
-      label: 'Foto de la mercancía dentro del tráiler',
-      hint: 'Toma o sube foto con puertas abiertas',
+      label: "Foto de la mercancía dentro del tráiler",
+      hint: "Toma o sube foto con puertas abiertas",
     },
     {
-      label: 'Foto del producto y su caducidad',
-      hint: 'Asegúrate que la fecha de caducidad sea visible',
+      label: "Foto del producto y su caducidad",
+      hint: "Asegúrate que la fecha de caducidad sea visible",
     },
   ];
 
   async function handleContinue() {
     const missing: string[] = [];
-    if (!photos[0]) missing.push('Foto del tráiler');
-    if (!photos[1]) missing.push('Foto del producto y caducidad');
-    if (!form.proveedor.trim()) missing.push('Nombre del proveedor');
-    if (!form.item.trim()) missing.push('Ítem a recibir');
-    if (!form.tarimas.trim()) missing.push('Cantidad de tarimas');
-    if (!form.caducidad.trim()) missing.push('Caducidad del producto');
+    if (!photos[0]) missing.push("Foto del tráiler");
+    if (!photos[1]) missing.push("Foto del producto y caducidad");
+    if (!form.proveedor.trim()) missing.push("Nombre del proveedor");
+    if (!form.item.trim()) missing.push("Ítem a recibir");
+    if (!form.tarimas.trim()) missing.push("Cantidad de tarimas");
+    if (!form.caducidad.trim()) missing.push("Caducidad del producto");
 
     if (missing.length > 0) {
-      setNoticeKind('warning');
+      setNoticeKind("warning");
       setNotices(missing);
       setTimeout(() => setNotices([]), 5000);
       return;
     }
     if (!(await handleSave())) return;
-    // Pass evidence data to parent via ReceptionFlow
-    transition('pallets');
-    onContinue();
+    // Pass evidence data to parent
+    onContinue({ photos, form });
   }
 
   return (
     <div className="flex flex-col gap-[18px] items-start p-7 size-full overflow-y-auto">
       {/* Progress */}
       <div className="bg-[#dce4e7] flex flex-col h-2 items-start overflow-hidden rounded-full w-full shrink-0">
-        <div className="bg-[#f2b84b] h-2 rounded-full" style={{ width: '16%' }} />
+        <div className="bg-[#f2b84b] h-2 rounded-full" style={{ width: "16%" }} />
       </div>
 
       {/* Header card */}
@@ -496,7 +472,7 @@ export default function CapturaEvidencia() {
               <div className="flex items-center gap-1">
                 <div
                   className={`size-2 rounded-full shrink-0 ${
-                    photos[i] ? 'bg-[#16845b]' : 'bg-[#dce4e7]'
+                    photos[i] ? "bg-[#16845b]" : "bg-[#dce4e7]"
                   }`}
                 />
                 <p
@@ -504,10 +480,10 @@ export default function CapturaEvidencia() {
                   style={{
                     fontFamily: "'Inter', sans-serif",
                     fontWeight: 600,
-                    color: photos[i] ? '#16845b' : '#607078',
+                    color: photos[i] ? "#16845b" : "#607078",
                   }}
                 >
-                  {photos[i] ? 'Foto capturada' : 'Pendiente'}
+                  {photos[i] ? "Foto capturada" : "Pendiente"}
                 </p>
               </div>
             </div>
@@ -562,31 +538,31 @@ export default function CapturaEvidencia() {
         <div className="flex flex-col gap-3 w-full">
           {[
             {
-              key: 'proveedor',
-              label: 'Nombre del proveedor',
-              placeholder: 'Ej. Distribuidora del Norte',
+              key: "proveedor",
+              label: "Nombre del proveedor",
+              placeholder: "Ej. Distribuidora del Norte",
             },
             {
-              key: 'item',
-              label: 'Nombre del ítem a recibir',
-              placeholder: 'Ej. Agua mineral 600 ml',
+              key: "item",
+              label: "Nombre del ítem a recibir",
+              placeholder: "Ej. Agua mineral 600 ml",
             },
             {
-              key: 'tarimas',
-              label: 'Cantidad de tarimas a recibir',
-              placeholder: 'Ej. 20',
-              type: 'number',
+              key: "tarimas",
+              label: "Cantidad de tarimas a recibir",
+              placeholder: "Ej. 20",
+              type: "number",
             },
             {
-              key: 'caducidad',
-              label: 'Caducidad del producto',
-              placeholder: 'DD/MM/AAAA',
-              type: 'date',
+              key: "caducidad",
+              label: "Caducidad del producto",
+              placeholder: "DD/MM/AAAA",
+              type: "date",
             },
             {
-              key: 'lote',
-              label: 'Lote del producto (opcional)',
-              placeholder: 'Ej. L-2026-001',
+              key: "lote",
+              label: "Lote del producto (opcional)",
+              placeholder: "Ej. L-2026-001",
             },
           ].map(({ key, label, placeholder, type }) => (
             <div key={key} className="flex flex-col gap-[6px]">
@@ -601,7 +577,7 @@ export default function CapturaEvidencia() {
                 id={`evidence-${key}`}
                 name={key}
                 aria-label={label}
-                type={type ?? 'text'}
+                type={type ?? "text"}
                 placeholder={placeholder}
                 value={form[key as keyof EvidenceForm]}
                 onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
@@ -616,14 +592,14 @@ export default function CapturaEvidencia() {
         {notices.length > 0 && (
           <div
             className={`flex gap-3 items-start p-[14px] rounded-[12px] w-full ${
-              noticeKind === 'error'
-                ? 'bg-[#fff0ee] border border-[#d9534f]'
-                : 'bg-[#fff8e6] border border-[#f2b84b]'
+              noticeKind === "error"
+                ? "bg-[#fff0ee] border border-[#d9534f]"
+                : "bg-[#fff8e6] border border-[#f2b84b]"
             }`}
           >
             <span
               className={`text-[16px] shrink-0 mt-[1px] ${
-                noticeKind === 'error' ? 'text-[#d9534f]' : 'text-[#f2b84b]'
+                noticeKind === "error" ? "text-[#d9534f]" : "text-[#f2b84b]"
               }`}
             >
               ⚠
@@ -631,20 +607,20 @@ export default function CapturaEvidencia() {
             <div className="flex flex-col gap-1">
               <p
                 className={`font-bold text-[13px] ${
-                  noticeKind === 'error' ? 'text-[#a32d2a]' : 'text-[#7a5c00]'
+                  noticeKind === "error" ? "text-[#a32d2a]" : "text-[#7a5c00]"
                 }`}
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
               >
-                {noticeKind === 'error'
-                  ? 'No se pudo guardar la evidencia:'
-                  : 'Revisá los datos requeridos:'}
+                {noticeKind === "error"
+                  ? "No se pudo guardar la evidencia:"
+                  : "Revisá los datos requeridos:"}
               </p>
               <ul className="flex flex-col gap-[2px]">
                 {notices.map((n) => (
                   <li
                     key={n}
                     className={`text-[12px] ${
-                      noticeKind === 'error' ? 'text-[#a32d2a]' : 'text-[#7a5c00]'
+                      noticeKind === "error" ? "text-[#a32d2a]" : "text-[#7a5c00]"
                     }`}
                     style={{
                       fontFamily: "'Inter', sans-serif",
@@ -694,8 +670,8 @@ export default function CapturaEvidencia() {
               onClick={handleSave}
               className="flex gap-2 h-11 md:h-[52px] items-center justify-center px-4 md:px-5 rounded-[14px] cursor-pointer transition-colors border touch-target w-full sm:w-auto"
               style={{
-                background: saved ? '#e2f5ec' : 'white',
-                borderColor: saved ? '#16845b' : '#dce4e7',
+                background: saved ? "#e2f5ec" : "white",
+                borderColor: saved ? "#16845b" : "#dce4e7",
               }}
             >
               {saved ? (
@@ -732,10 +708,10 @@ export default function CapturaEvidencia() {
                 style={{
                   fontFamily: "'Inter', sans-serif",
                   fontWeight: 700,
-                  color: saved ? '#16845b' : '#172126',
+                  color: saved ? "#16845b" : "#172126",
                 }}
               >
-                {saved ? 'Guardado' : 'Guardar evidencia'}
+                {saved ? "Guardado" : "Guardar evidencia"}
               </p>
             </button>
 
@@ -745,17 +721,17 @@ export default function CapturaEvidencia() {
                 saved &&
                 window.open(
                   `https://wa.me/?text=${encodeURIComponent(buildWhatsAppMessage())}`,
-                  '_blank',
+                  "_blank",
                 )
               }
               className="flex gap-2 h-11 md:h-[52px] items-center justify-center px-4 md:px-5 rounded-[14px] transition-colors border touch-target w-full sm:w-auto"
               style={{
-                background: saved ? '#25D366' : '#b9d9e4',
-                borderColor: saved ? '#25D366' : '#b9d9e4',
-                cursor: saved ? 'pointer' : 'not-allowed',
+                background: saved ? "#25D366" : "#b9d9e4",
+                borderColor: saved ? "#25D366" : "#b9d9e4",
+                cursor: saved ? "pointer" : "not-allowed",
                 opacity: saved ? 1 : 0.6,
               }}
-              title={saved ? 'Enviar por WhatsApp' : 'Guarda la evidencia primero'}
+              title={saved ? "Enviar por WhatsApp" : "Guarda la evidencia primero"}
             >
               <svg
                 width="18"

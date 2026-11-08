@@ -1,9 +1,13 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import "@testing-library/jest-dom";
-import { ReceptionProvider, CatalogosProvider, InventoryProvider, UIProvider } from "@/context";
-import Configuracion from "@/screens/Configuracion";
+import { useState } from "react";
+import { describe, expect, it, vi } from "vitest";
+import Configuracion, {
+  type Almacen,
+  type Conversion,
+  type Producto,
+  type Proveedor,
+} from "@/screens/Configuracion";
 
 const mocks = vi.hoisted(() => {
   const deleteProduct = vi.fn();
@@ -81,25 +85,29 @@ vi.mock("@/services/firestore", () => ({
   createFirestoreServices: () => mocks.services,
 }));
 
+const initialAlmacenes: Almacen[] = [];
+const initialConversiones: Conversion[] = [];
+
 function Harness() {
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
+
   return (
-    <ReceptionProvider>
-      <CatalogosProvider>
-        <InventoryProvider>
-          <UIProvider>
-            <Configuracion />
-          </UIProvider>
-        </InventoryProvider>
-      </CatalogosProvider>
-    </ReceptionProvider>
+    <Configuracion
+      productos={productos}
+      setProductos={setProductos}
+      proveedores={proveedores}
+      setProveedores={setProveedores}
+      conversiones={initialConversiones}
+      setConversiones={vi.fn()}
+      almacenes={initialAlmacenes}
+      setAlmacenes={vi.fn()}
+      onActivarAlmacen={vi.fn()}
+    />
   );
 }
 
 describe("Configuracion catalog deletion", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it("keeps a product visible when Firestore deletion fails", async () => {
     const user = userEvent.setup();
     mocks.deleteProduct.mockRejectedValueOnce(new Error("delete failed"));

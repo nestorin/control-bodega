@@ -1,103 +1,115 @@
-/**
- * EscanearQR — Migrated to new architecture (God Component Refactor Phase 7)
- *
- * Uses hooks directly instead of props:
- * - useReceptionFlow for navigation
- * - useQrScanner for QR scanning (Phase 6)
- */
+import { useEffect, useRef, useState } from "react";
+import { BrowserMultiFormatReader } from "@zxing/browser";
 
-import { useEffect, useRef, useState } from 'react';
-import { BrowserMultiFormatReader } from '@zxing/browser';
-import { useReceptionFlow } from '@/hooks/useReceptionFlow';
-import { useQrScanner } from '@/hooks/useQrScanner';
+interface Props {
+  onFound: (id: string) => void;
+  onClose: () => void;
+}
 
-export default function EscanearQR() {
-  // ============================================
-  // New Architecture Hooks
-  // ============================================
-  const {
-    navigate,
-    setScannedQrCode: ctxSetScannedQrCode,
-  } = useReceptionFlow();
+export default function EscanearQR({ onFound, onClose }: Props) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const controlsRef = useRef<{ stop: () => void } | null>(null);
+  const onFoundRef = useRef(onFound);
+  const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(true);
+  const [manualId, setManualId] = useState("");
 
-  // Use the Phase 6 QR scanner hook
-  const {
-    qrReaderRef,
-    isScanning,
-    scanError,
-    lastResult,
-    startScanning,
-    stopScanning,
-  } = useQrScanner();
+  useEffect(() => {
+    onFoundRef.current = onFound;
+  }, [onFound]);
 
-  // Legacy callbacks replaced by navigation
-  const onFound = (id: string) => {
-    // Store scanned QR in context, then navigate to captura-tarima
-    ctxSetScannedQrCode(id);
-    navigate('captura-tarima');
-  };
+  useEffect(() => {
+    const reader = new BrowserMultiFormatReader();
+    readerRef.current = reader;
+    let active = true;
+    if (!window.isSecureContext && window.location.hostname !== "localhost") {
+      setError("La cámara requiere una conexión segura (HTTPS). Abre la aplicación con HTTPS.");
+      return () => {
+        active = false;
+        (reader as any).reset?.();
+      };
+    }
+    if (!navigator.mediaDevices?.getUserMedia || !videoRef.current) {
+      setError(
+        "Este navegador no permite acceder a la cámara. Prueba con Chrome o Safari actualizado.",
+      );
+      return () => {
+        active = false;
+        (reader as any).reset?.();
+      };
+    }
+    reader
+      .decodeFromVideoDevice(undefined, videoRef.current, (result) => {
+        if (result) {
+          setScanning(false);
+          onFoundRef.current(result.getText());
+        }
+      })
+      .then((controls) => {
+        if (!active) {
+          controls.stop();
+          return;
+        }
+        controlsRef.current = controls;
+        if (videoRef.current) {
+          videoRef.current.muted = true;
+          videoRef.current.playsInline = true;
+          void videoRef.current.play().catch(() => undefined);
+        }
+      })
+      .catch((cause: unknown) => {
+        const cameraError = cause as { name?: string };
+        setError(
+          cameraError.name === "NotAllowedError" || cameraError.name === "PermissionDeniedError"
+            ? "El permiso de cámara está bloqueado. Habilítalo en los ajustes del sitio y vuelve a intentar."
+            : cameraError.name === "NotFoundError" || cameraError.name === "DevicesNotFoundError"
+              ? "No se detectó ninguna cámara en este equipo. Podés ingresar el código QR manualmente usando el campo de abajo."
+              : cameraError.name === "NotReadableError" || cameraError.name === "TrackStartError"
+                ? "La cámara está siendo usada por otra aplicación. Ciérrala e inténtalo de nuevo."
+                : "No se pudo iniciar la cámara. Revisa los permisos del navegador e inténtalo de nuevo.",
+        );
+      });
 
-  const onClose = () => {
-    navigate('home');
-  };
-
-  // Manual input state
-  const [manualId, setManualId] = useState('');
-  const [showManualError, setShowManualError] = useState(false);
+    return () => {
+      active = false;
+      controlsRef.current?.stop();
+      controlsRef.current = null;
+      (reader as any).reset?.();
+    };
+  }, []);
 
   function handleManual(e: React.FormEvent) {
     e.preventDefault();
-    if (manualId.trim()) {
-      onFound(manualId.trim().toUpperCase());
-    }
+    if (manualId.trim()) onFound(manualId.trim().toUpperCase());
   }
-
-  // Handle manual ID validation
-  const handleManualChange = (value: string) => {
-    setManualId(value);
-    setShowManualError(false);
-  };
-
-  // Handle manual submit with validation
-  const handleManualSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = manualId.trim().toUpperCase();
-    if (trimmed) {
-      // Basic QR format validation
-      if (/^TQR-[A-Z0-9]+-\d{3}$/.test(trimmed) || /^[A-Z0-9-]+$/.test(trimmed)) {
-        onFound(trimmed);
-      } else {
-        setShowManualError(true);
-      }
-    }
-  };
 
   return (
     <div
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '28px',
-        padding: '40px 28px',
-        height: '100%',
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "28px",
+        padding: "40px 28px",
+        height: "100%",
       }}
     >
       <div
         style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '6px',
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "6px",
         }}
       >
         <p
           style={{
-            fontFamily: 'Inter, sans-serif',
-            fontSize: '22px',
+            fontFamily: "Inter, sans-serif",
+            fontSize: "22px",
             fontWeight: 800,
-            color: '#172126',
+            color: "#172126",
             margin: 0,
           }}
         >
@@ -105,10 +117,10 @@ export default function EscanearQR() {
         </p>
         <p
           style={{
-            fontFamily: 'Inter, sans-serif',
-            fontSize: '14px',
+            fontFamily: "Inter, sans-serif",
+            fontSize: "14px",
             fontWeight: 400,
-            color: '#607078',
+            color: "#607078",
             margin: 0,
           }}
         >
@@ -119,21 +131,21 @@ export default function EscanearQR() {
       {/* Camera viewfinder */}
       <div
         style={{
-          position: 'relative',
-          width: 'min(320px, calc(100vw - 40px))',
-          aspectRatio: '1 / 1',
-          borderRadius: '20px',
-          overflow: 'hidden',
-          background: '#172126',
+          position: "relative",
+          width: "min(320px, calc(100vw - 40px))",
+          aspectRatio: "1 / 1",
+          borderRadius: "20px",
+          overflow: "hidden",
+          background: "#172126",
         }}
       >
         <video
-          ref={qrReaderRef}
+          ref={videoRef}
           style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            display: scanError ? 'none' : 'block',
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: error ? "none" : "block",
           }}
           muted
           playsInline
@@ -141,41 +153,41 @@ export default function EscanearQR() {
         />
 
         {/* Corner guides */}
-        {isScanning && !scanError && (
+        {scanning && !error && (
           <>
             {[
               {
                 top: 16,
                 left: 16,
-                borderTop: '3px solid #f2b84b',
-                borderLeft: '3px solid #f2b84b',
+                borderTop: "3px solid #f2b84b",
+                borderLeft: "3px solid #f2b84b",
               },
               {
                 top: 16,
                 right: 16,
-                borderTop: '3px solid #f2b84b',
-                borderRight: '3px solid #f2b84b',
+                borderTop: "3px solid #f2b84b",
+                borderRight: "3px solid #f2b84b",
               },
               {
                 bottom: 16,
                 left: 16,
-                borderBottom: '3px solid #f2b84b',
-                borderLeft: '3px solid #f2b84b',
+                borderBottom: "3px solid #f2b84b",
+                borderLeft: "3px solid #f2b84b",
               },
               {
                 bottom: 16,
                 right: 16,
-                borderBottom: '3px solid #f2b84b',
-                borderRight: '3px solid #f2b84b',
+                borderBottom: "3px solid #f2b84b",
+                borderRight: "3px solid #f2b84b",
               },
             ].map((style, i) => (
               <div
                 key={i}
                 style={{
-                  position: 'absolute',
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '3px',
+                  position: "absolute",
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "3px",
                   ...style,
                 }}
               />
@@ -183,28 +195,28 @@ export default function EscanearQR() {
             {/* Scan line animation */}
             <div
               style={{
-                position: 'absolute',
-                left: '10%',
-                right: '10%',
-                height: '2px',
-                background: 'rgba(242,184,75,0.7)',
-                borderRadius: '1px',
-                animation: 'scanline 2s ease-in-out infinite',
+                position: "absolute",
+                left: "10%",
+                right: "10%",
+                height: "2px",
+                background: "rgba(242,184,75,0.7)",
+                borderRadius: "1px",
+                animation: "scanline 2s ease-in-out infinite",
               }}
             />
           </>
         )}
 
-        {scanError && (
+        {error && (
           <div
             style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
-              gap: '12px',
-              padding: '24px',
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
+              gap: "12px",
+              padding: "24px",
             }}
           >
             <svg
@@ -222,15 +234,15 @@ export default function EscanearQR() {
             </svg>
             <p
               style={{
-                fontFamily: 'Inter, sans-serif',
-                fontSize: '12px',
+                fontFamily: "Inter, sans-serif",
+                fontSize: "12px",
                 fontWeight: 400,
-                color: '#b9c9cf',
-                textAlign: 'center',
+                color: "#b9c9cf",
+                textAlign: "center",
                 margin: 0,
               }}
             >
-              {scanError}
+              {error}
             </p>
           </div>
         )}
@@ -239,90 +251,76 @@ export default function EscanearQR() {
       {/* Manual fallback */}
       <div
         style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '10px',
-          width: '100%',
-          maxWidth: '320px',
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "10px",
+          width: "100%",
+          maxWidth: "320px",
         }}
       >
         <p
           style={{
-            fontFamily: 'Inter, sans-serif',
-            fontSize: '12px',
+            fontFamily: "Inter, sans-serif",
+            fontSize: "12px",
             fontWeight: 400,
-            color: '#607078',
+            color: "#607078",
             margin: 0,
           }}
         >
           ¿No funciona la cámara? Ingresa el ID manualmente
         </p>
-        <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: '8px', width: '100%' }}>
+        <form onSubmit={handleManual} style={{ display: "flex", gap: "8px", width: "100%" }}>
           <input
             value={manualId}
-            onChange={(e) => handleManualChange(e.target.value)}
+            onChange={(e) => setManualId(e.target.value)}
             placeholder="TQR-24891-003"
             style={{
               flex: 1,
-              height: '44px',
-              padding: '0 14px',
-              borderRadius: '10px',
-              border: showManualError ? '1px solid #d9534f' : '1px solid #dce4e7',
-              fontFamily: 'Inter, sans-serif',
-              fontSize: '14px',
+              height: "44px",
+              padding: "0 14px",
+              borderRadius: "10px",
+              border: "1px solid #dce4e7",
+              fontFamily: "Inter, sans-serif",
+              fontSize: "14px",
               fontWeight: 600,
-              color: '#172126',
-              outline: 'none',
+              color: "#172126",
+              outline: "none",
             }}
           />
           <button
             type="submit"
             style={{
-              height: '44px',
-              padding: '0 18px',
-              borderRadius: '10px',
-              background: '#16343f',
-              border: 'none',
-              fontFamily: 'Inter, sans-serif',
-              fontSize: '13px',
+              height: "44px",
+              padding: "0 18px",
+              borderRadius: "10px",
+              background: "#16343f",
+              border: "none",
+              fontFamily: "Inter, sans-serif",
+              fontSize: "13px",
               fontWeight: 700,
-              color: 'white',
-              cursor: 'pointer',
+              color: "white",
+              cursor: "pointer",
             }}
           >
             Buscar
           </button>
         </form>
-        {showManualError && (
-          <p
-            style={{
-              fontFamily: 'Inter, sans-serif',
-              fontSize: '11px',
-              fontWeight: 400,
-              color: '#d9534f',
-              margin: 0,
-              textAlign: 'center',
-            }}
-          >
-            Formato inválido. Ej: TQR-24891-003
-          </p>
-        )}
       </div>
 
       <button
         onClick={onClose}
         style={{
-          height: '44px',
-          padding: '0 24px',
-          borderRadius: '12px',
-          border: '1px solid #dce4e7',
-          background: 'white',
-          fontFamily: 'Inter, sans-serif',
-          fontSize: '14px',
+          height: "44px",
+          padding: "0 24px",
+          borderRadius: "12px",
+          border: "1px solid #dce4e7",
+          background: "white",
+          fontFamily: "Inter, sans-serif",
+          fontSize: "14px",
           fontWeight: 700,
-          color: '#172126',
-          cursor: 'pointer',
+          color: "#172126",
+          cursor: "pointer",
         }}
       >
         Cancelar
