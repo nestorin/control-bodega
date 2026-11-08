@@ -38,6 +38,9 @@ jobs:
       - name: Run TypeScript type check
         run: pnpm tsc --noEmit
 
+      - name: Validate deployable Cloud Functions exports
+        run: python3 scripts/functions_deploy_targets.py --format firebase
+
   unit-tests:
     name: Unit Tests (Vitest)
     runs-on: ubuntu-latest
@@ -352,11 +355,13 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa/sa.json
         run: |
-          # Deploy only the reception callables changed in this release. The
-          # existing Auth before-create trigger is unchanged and updating its
-          # Identity Toolkit config requires a separate permission not granted
-          # to this deployment identity.
-          firebase deploy --only functions:create_reception,functions:edit_reception,functions:register_reception_pallet,functions:confirm_reception,functions:save_evidence,functions:save_reception_pallet_capture,functions:validate_reception_pallet_scan --project exepa-almacen-safe
+          # Deploy every HTTP callable re-exported from functions/main.py.
+          # The target list is generated from the source of truth, so adding a
+          # callable cannot silently leave production on an older backend.
+          # Auth before-create remains outside this transaction because it
+          # updates Identity Toolkit configuration and needs separate IAM.
+          FUNCTION_TARGETS="$(python3 scripts/functions_deploy_targets.py --format firebase)"
+          firebase deploy --only "$FUNCTION_TARGETS" --project exepa-almacen-safe
 
       # Publish the frontend only after the rules and callable backend it uses.
       - name: Deploy to Firebase Hosting

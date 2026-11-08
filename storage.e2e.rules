@@ -1,0 +1,11 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // E2E fixture only: the browser intentionally uses mock auth, so Storage
+    // cannot receive a Firebase Auth token. Production always deploys
+    // storage.rules; firebase.e2e.json is the only config that selects this.
+    match /{object=**} {
+      allow read, write: if true;
+    }
+  }
+}

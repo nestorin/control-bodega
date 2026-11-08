@@ -37,7 +37,7 @@
     "source": "dataconnect"
   },
   "storage": {
-    "rules": "storage.rules"
+    "rules": "storage.e2e.rules"
   },
   "emulators": {
     "hosting": {
