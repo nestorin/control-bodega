@@ -108,7 +108,7 @@ def _actor(req: https_fn.CallableRequest, db) -> dict:
     return _membership(db, uid)
 
 
-@https_fn.on_call(cors=CORS_OPTS)
+@https_fn.on_call(cors=CORS_OPTS, enforce_app_check=True)
 def adjust_inventory(req: https_fn.CallableRequest):
     """Create one validated receipt/transfer movement and its audit event."""
     uid = _auth_uid(req)
@@ -191,7 +191,7 @@ def adjust_inventory(req: https_fn.CallableRequest):
     return {"movementId": movement_id, "operationId": operation_id, "idempotent": idempotent}
 
 
-@https_fn.on_call(cors=CORS_OPTS)
+@https_fn.on_call(cors=CORS_OPTS, enforce_app_check=True)
 def update_membership(req: https_fn.CallableRequest):
     """Admin-only membership mutation with last-admin protection."""
     uid = _auth_uid(req)
@@ -291,7 +291,7 @@ def update_membership(req: https_fn.CallableRequest):
     return _transaction(db.transaction())
 
 
-@https_fn.on_call(cors=CORS_OPTS)
+@https_fn.on_call(cors=CORS_OPTS, enforce_app_check=True)
 def import_inventory(req: https_fn.CallableRequest):
     """Apply an idempotent inventory import through the trusted ledger."""
     uid = _auth_uid(req)

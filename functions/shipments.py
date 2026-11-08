@@ -43,7 +43,7 @@ def _claim_scanned_pallets(
         transaction.update(pallet_refs_by_id[pallet_id], {"shipmentId": shipment_id})
 
 
-@https_fn.on_call(cors=CORS_OPTS)
+@https_fn.on_call(cors=CORS_OPTS, enforce_app_check=True)
 def confirm_shipment(req: https_fn.CallableRequest):
     """Confirm a shipment with membership, stock and pallet checks in one transaction."""
     if req.auth is None:

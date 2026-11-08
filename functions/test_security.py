@@ -1,4 +1,5 @@
 import base64
+import ast
 import io
 import inspect
 import unittest
@@ -16,6 +17,46 @@ from ocr.paddle_ocr import _extract_product_lines
 
 
 class SecurityAndOcrTests(unittest.TestCase):
+    def test_sensitive_callable_mutations_enforce_app_check(self):
+        expected_mutations = {
+            "receptions.py": {
+                "save_reception_pallet_capture",
+                "create_reception",
+                "edit_reception",
+                "register_reception_pallet",
+                "save_evidence",
+                "confirm_reception",
+                "mutate_reception",
+            },
+            "rbac.py": {"adjust_inventory", "update_membership", "import_inventory"},
+            "shipments.py": {"confirm_shipment"},
+        }
+
+        for filename, function_names in expected_mutations.items():
+            tree = ast.parse(Path(__file__).with_name(filename).read_text())
+            decorators_by_function = {
+                node.name: node.decorator_list
+                for node in ast.walk(tree)
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            }
+            for function_name in function_names:
+                decorators = decorators_by_function[function_name]
+                self.assertTrue(
+                    any(
+                        isinstance(decorator, ast.Call)
+                        and isinstance(decorator.func, ast.Attribute)
+                        and decorator.func.attr == "on_call"
+                        and any(
+                            keyword.arg == "enforce_app_check"
+                            and isinstance(keyword.value, ast.Constant)
+                            and keyword.value.value is True
+                            for keyword in decorator.keywords
+                        )
+                        for decorator in decorators
+                    ),
+                    f"{filename}:{function_name} must enforce App Check",
+                )
+
     def test_cfdi_rfc_pattern_matches_corporate_and_individual_formats(self):
         rfcs = paddle_ocr._find_all_rfcs("Emisor ABC010101AB1 Receptor GODE561231GR8")
 

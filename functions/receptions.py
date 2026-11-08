@@ -250,7 +250,7 @@ def validate_reception_pallet_scan(req: https_fn.CallableRequest):
     }
 
 
-@https_fn.on_call(cors=CORS_OPTS)
+@https_fn.on_call(cors=CORS_OPTS, enforce_app_check=True)
 def save_reception_pallet_capture(req: https_fn.CallableRequest):
     """Persist resumable capture data without registering inventory."""
     data = _data(req)
@@ -310,7 +310,7 @@ def save_reception_pallet_capture(req: https_fn.CallableRequest):
     return txn(db.transaction())
 
 
-@https_fn.on_call(cors=CORS_OPTS)
+@https_fn.on_call(cors=CORS_OPTS, enforce_app_check=True)
 def create_reception(req: https_fn.CallableRequest):
     data = _data(req)
     operation_id = _validate_operation_id(data.get("operationId"))
@@ -455,7 +455,7 @@ def create_reception(req: https_fn.CallableRequest):
     return txn(db.transaction())
 
 
-@https_fn.on_call(cors=CORS_OPTS)
+@https_fn.on_call(cors=CORS_OPTS, enforce_app_check=True)
 def edit_reception(req: https_fn.CallableRequest):
     """Replace a reception draft and its planned pallet QR set atomically."""
     data = _data(req)
@@ -586,7 +586,7 @@ def edit_reception(req: https_fn.CallableRequest):
     return txn(db.transaction())
 
 
-@https_fn.on_call(cors=CORS_OPTS)
+@https_fn.on_call(cors=CORS_OPTS, enforce_app_check=True)
 def register_reception_pallet(req: https_fn.CallableRequest):
     data = _data(req)
     operation_id = _validate_operation_id(data.get("operationId"))
@@ -816,12 +816,12 @@ def _update_reception(req, action):
     return txn(db.transaction())
 
 
-@https_fn.on_call(cors=CORS_OPTS)
+@https_fn.on_call(cors=CORS_OPTS, enforce_app_check=True)
 def save_evidence(req: https_fn.CallableRequest):
     return _update_reception(req, "evidence")
 
 
-@https_fn.on_call(cors=CORS_OPTS)
+@https_fn.on_call(cors=CORS_OPTS, enforce_app_check=True)
 def confirm_reception(req: https_fn.CallableRequest):
     return _update_reception(req, "confirm")
 
@@ -900,7 +900,7 @@ def reception_mutation_options(req: https_fn.CallableRequest):
     }
 
 
-@https_fn.on_call(cors=CORS_OPTS)
+@https_fn.on_call(cors=CORS_OPTS, enforce_app_check=True)
 def mutate_reception(req: https_fn.CallableRequest):
     """Admin-only, idempotent cancel/restore/hide/show or safe draft deletion."""
     data = _data(req)

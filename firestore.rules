@@ -359,6 +359,9 @@ service cloud.firestore {
             resource.data.organizationId == orgId &&
             resource.data.receptionId == receptionId &&
             shipmentClaimUnchanged() &&
+            // Pallet identity, product, quantity, lot, expiry and lifecycle
+            // state are inventory facts. Client writes may not rewrite them.
+            hasOnlyChanged(['updatedAt']) &&
             isOperatorOrAbove(orgId);
           allow delete: if isSupervisorOrAdmin(orgId);
         }

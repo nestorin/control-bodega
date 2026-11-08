@@ -571,6 +571,29 @@ describe("Firestore security rules (emulator)", () => {
     );
   });
 
+  rulesTest("denies client rewrites of critical pallet inventory facts", async () => {
+    const db = testEnv!.authenticatedContext("operator-1").firestore();
+    const palletRef = doc(
+      db,
+      `organizations/${orgId}/receptions/rec-pallet-wh1/pallets/pallet-wh1`,
+    );
+
+    for (const [field, value] of Object.entries({
+      id: "pallet-rewritten",
+      organizationId: "other-org",
+      receptionId: "other-reception",
+      warehouseId: wh2,
+      qrIdentifier: "forged-qr",
+      productId: "forged-product",
+      quantity: 999999,
+      lot: "forged-lot",
+      expiryDate: Timestamp.now(),
+      status: "STORED",
+    })) {
+      await assertFails(updateDoc(palletRef, { [field]: value }));
+    }
+  });
+
   rulesTest("denies a tarima created against another warehouse's embarque", async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), `organizations/${orgId}/embarques/embarque-wh2`), {
