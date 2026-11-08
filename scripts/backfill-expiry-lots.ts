@@ -338,7 +338,9 @@ export function buildBackfillPlan(input: {
 function getDb() {
   const projectId = process.env.FIREBASE_PROJECT_ID;
   if (projectId !== REQUIRED_PROJECT_ID) {
-    throw new Error(`Refusing to run against project ${projectId ?? "(unset)"}; set FIREBASE_PROJECT_ID=${REQUIRED_PROJECT_ID}`);
+    throw new Error(
+      `Refusing to run against project ${projectId ?? "(unset)"}; set FIREBASE_PROJECT_ID=${REQUIRED_PROJECT_ID}`,
+    );
   }
   const app = getApps()[0] ?? initializeApp({ projectId });
   return getFirestore(app);
@@ -498,9 +500,9 @@ async function main() {
     pallets: palletSnapshot.docs
       .filter((document) => document.data().organizationId === organizationId)
       .map((document) => ({
-      path: document.ref.path,
-      id: document.id,
-      data: document.data(),
+        path: document.ref.path,
+        id: document.id,
+        data: document.data(),
       })),
     receiptMovements,
     productNames,
