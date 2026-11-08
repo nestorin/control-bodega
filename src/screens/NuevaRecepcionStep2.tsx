@@ -1,16 +1,29 @@
-import { Select, type Proveedor, type Producto } from "./Configuracion";
-import { isFeatureEnabled } from "@/config/featureFlags";
-import { createFirestoreServices } from "@/services/firestore";
-import { db } from "@/lib/firebase";
-import { useAuthorization } from "@/hooks/useAuthorization";
-import { useState, useEffect } from "react";
-import { Panel } from "@/components/ui";
+/**
+ * NuevaRecepcionStep2 — Migrated to new architecture (God Component Refactor Phase 7)
+ *
+ * Uses hooks directly instead of props:
+ * - useReceptionFlow for navigation and reception state
+ * - useCatalogos for product/supplier catalogs
+ * - useAuthorization for auth state
+ * - useUIContext for UI state
+ */
 
-const assetPathPrefix = "/assets";
+import { Select, type Proveedor, type Producto } from './Configuracion';
+import { isFeatureEnabled } from '@/config/featureFlags';
+import { createFirestoreServices } from '@/services/firestore';
+import { db } from '@/lib/firebase';
+import { useAuthorization } from '@/hooks/useAuthorization';
+import { useState, useEffect } from 'react';
+import { Panel } from '@/components/ui';
+import { useReceptionFlow } from '@/hooks/useReceptionFlow';
+import { useCatalogos } from '@/hooks/useCatalogos';
+import { useUIContext } from '@/context';
+
+const assetPathPrefix = '/assets';
 const imgCheck = `${assetPathPrefix}/3eae4.svg`;
 const imgWarehouse = `${assetPathPrefix}/ccb3f.svg`;
 
-const ORG_ID = "org_exepa_001";
+const ORG_ID = 'org_exepa_001';
 
 type ReceptionOcrProduct = {
   productId: string | null;
@@ -19,7 +32,7 @@ type ReceptionOcrProduct = {
   unidad: string | null;
   cantidad: number;
   importe: number;
-  estadoMatch: "confirmado" | "sugerido" | "manual";
+  estadoMatch: 'confirmado' | 'sugerido' | 'manual';
 };
 
 interface Props {
@@ -58,8 +71,38 @@ export default function NuevaRecepcionStep2({
   catalogosStatus,
   conversiones = [],
 }: Props) {
+  // ============================================
+  // New Architecture Hooks
+  // ============================================
+  const {
+    currentReception: ctxCurrentReception,
+    transition,
+    navigate,
+  } = useReceptionFlow();
+
+  const {
+    catalogoProductos,
+    catalogoProveedores,
+    catalogoConversiones,
+    catalogosLoading,
+    catalogosError,
+    getAlmacenActivo,
+  } = useCatalogos();
+
+  const { closeSidebarOnMobile, isMobile } = useUIContext();
+
+  // ============================================
+  // Legacy Props Fallback (for migration period)
+  // ============================================
+  const currentReception = ctxCurrentReception;
+  const onBackLegacy = onBack ?? (() => navigate('nueva-step1'));
+  const onContinueLegacy = onContinue;
+  const catalogosLegacy = catalogos ?? { proveedores: catalogoProveedores, productos: catalogoProductos };
+  const catalogosStatusLegacy = { loading: catalogosLoading, error: catalogosError };
+  const conversionesLegacy = conversiones ?? catalogoConversiones;
+
   // Guard: don't render until catalogs are loaded (prevents empty logistics provider list)
-  if (catalogosStatus?.loading) {
+  if (catalogosStatusLegacy.loading) {
     return (
       <div className="flex flex-col gap-4 p-6" style={{ fontFamily: "'Inter',sans-serif" }}>
         <div
@@ -73,16 +116,15 @@ export default function NuevaRecepcionStep2({
     );
   }
 
-  const catalogoConversiones = conversiones;
-  const proveedoresMercancia = catalogos.proveedores
-    .filter((p) => p.tipo === "mercancia")
+  const proveedoresMercancia = catalogosLegacy.proveedores
+    .filter((p) => p.tipo === 'mercancia')
     .map((p) => ({ value: p.nombre, label: p.nombre }));
-  const proveedoresLogistica = catalogos.proveedores
-    .filter((p) => p.tipo === "logistica")
+  const proveedoresLogistica = catalogosLegacy.proveedores
+    .filter((p) => p.tipo === 'logistica')
     .map((p) => ({ value: p.nombre, label: p.nombre }));
 
   const { canQuery } = useAuthorization();
-  const useFirestore = isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery;
+  const useFirestore = isFeatureEnabled('USE_FIRESTORE_RECEPCIONES') && !!db && canQuery;
   const [fsServices, setFsServices] = useState<ReturnType<typeof createFirestoreServices> | null>(
     null,
   );
@@ -105,11 +147,11 @@ export default function NuevaRecepcionStep2({
   >([]);
 
   function tarimasPara(producto: ReceptionOcrProduct) {
-    const conversion = catalogoConversiones.find(
+    const conversion = conversionesLegacy.find(
       (item) => item.producto.trim().toUpperCase() === producto.nombre.trim().toUpperCase(),
     );
-    if (!conversion || producto.estadoMatch !== "confirmado") return null;
-    return producto.unidad?.toLowerCase().includes("pieza")
+    if (!conversion || producto.estadoMatch !== 'confirmado') return null;
+    return producto.unidad?.toLowerCase().includes('pieza')
       ? Math.ceil(producto.cantidad / conversion.piezasPorCaja / conversion.cajasPorTarima)
       : Math.ceil(producto.cantidad / conversion.cajasPorTarima);
   }
@@ -117,9 +159,9 @@ export default function NuevaRecepcionStep2({
   function calcularConversionesYStickers() {
     if (!initialData?.productos) return [];
     const tabla = initialData.productos
-      .filter((p) => p.estadoMatch === "confirmado" && p.productId)
+      .filter((p) => p.estadoMatch === 'confirmado' && p.productId)
       .map((p) => {
-        const conversion = catalogoConversiones.find(
+        const conversion = conversionesLegacy.find(
           (c) => c.producto.trim().toUpperCase() === p.nombre.trim().toUpperCase(),
         );
 
@@ -127,7 +169,7 @@ export default function NuevaRecepcionStep2({
         const cajasPorTarima = conversion?.cajasPorTarima || 10;
 
         let cajas = p.cantidad;
-        if (p.unidad?.toLowerCase().includes("pieza")) {
+        if (p.unidad?.toLowerCase().includes('pieza')) {
           cajas = Math.ceil(p.cantidad / piezasPorCaja);
         }
 
@@ -137,9 +179,9 @@ export default function NuevaRecepcionStep2({
         return {
           producto: p.nombre,
           productId: p.productId,
-          codigo: p.codigo || "—",
+          codigo: p.codigo || '—',
           unidades: p.cantidad,
-          unidad: p.unidad || "unidades",
+          unidad: p.unidad || 'unidades',
           piezasPorCaja,
           cajasPorTarima,
           cajas,
@@ -171,18 +213,20 @@ export default function NuevaRecepcionStep2({
       try {
         await fsServices.receptions.advanceToInProgress(
           initialData.receptionId,
-          "user",
+          'user',
           `op-${Date.now()}`,
         );
       } catch (e) {
-        console.error("Firestore advance reception failed:", e);
+        console.error('Firestore advance reception failed:', e);
         // Continue anyway
       } finally {
         setAdvancing(false);
       }
     }
 
-    onContinue();
+    // Navigate to captura-tarima using new architecture
+    transition('pallets');
+    onContinueLegacy();
   }
 
   return (
@@ -210,15 +254,15 @@ export default function NuevaRecepcionStep2({
                   >
                     <div>
                       <p className="font-bold text-[#172126]">
-                        {producto.estadoMatch === "confirmado" ? "✓" : "⚠"} {producto.nombre}
+                        {producto.estadoMatch === 'confirmado' ? '✓' : '⚠'} {producto.nombre}
                       </p>
                       <p className="text-[#607078]">
-                        {producto.codigo || "Sin código"} · {producto.cantidad}{" "}
-                        {producto.unidad || "unidades"}
+                        {producto.codigo || 'Sin código'} · {producto.cantidad} {' '}
+                        {producto.unidad || 'unidades'}
                       </p>
                     </div>
                     <p className="font-bold text-[#3276a8]">
-                      {tarimas === null ? "Revisar conversión" : `${tarimas} tarimas`}
+                      {tarimas === null ? 'Revisar conversión' : `${tarimas} tarimas`}
                     </p>
                   </div>
                 );
@@ -309,7 +353,7 @@ export default function NuevaRecepcionStep2({
                 className="font-semibold text-[#172126] text-base md:text-[15px] w-full truncate"
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600 }}
               >
-                {initialData?.tarimas ?? "20"}
+                {initialData?.tarimas ?? '20'}
               </p>
             </div>
             <p
@@ -328,7 +372,7 @@ export default function NuevaRecepcionStep2({
               Proveedor de mercancía
             </label>
             <Select
-              value={initialData?.proveedor ?? "Distribuidora del Norte"}
+              value={initialData?.proveedor ?? 'Distribuidora del Norte'}
               onChange={() => {}}
               options={proveedoresMercancia}
               placeholder="Seleccionar proveedor"
@@ -346,7 +390,7 @@ export default function NuevaRecepcionStep2({
               Proveedor logístico
             </label>
             <Select
-              value={initialData?.proveedorLogistico ?? ""}
+              value={initialData?.proveedorLogistico ?? ''}
               onChange={() => {}}
               options={proveedoresLogistica}
               placeholder="Seleccionar transportista"
@@ -368,13 +412,13 @@ export default function NuevaRecepcionStep2({
             className="font-extrabold text-[#172126] text-sm md:text-[13px] truncate"
             style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
           >
-            {initialData?.ocFolio ?? "OC-24891"}
+            {initialData?.ocFolio ?? 'OC-24891'}
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 w-full">
           <button
-            onClick={onBack}
+            onClick={onBackLegacy}
             className="bg-white border border-[#dce4e7] flex flex-1 h-11 md:h-[52px] items-center justify-center px-3 md:px-5 rounded-[14px] cursor-pointer hover:bg-[#f8fafb] transition-colors touch-target"
           >
             <p
@@ -394,7 +438,7 @@ export default function NuevaRecepcionStep2({
               className="font-bold text-white text-sm md:text-[15px] whitespace-nowrap"
               style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
             >
-              {advancing ? "Avanzando..." : "Crear recepción"}
+              {advancing ? 'Avanzando...' : 'Crear recepción'}
             </p>
           </button>
         </div>
@@ -403,7 +447,7 @@ export default function NuevaRecepcionStep2({
       <Panel className="flex flex-1 flex-col items-center justify-center min-w-0 p-4 md:p-5">
         <div className="flex flex-col gap-2 md:gap-[18px] items-center w-full">
           <div className="bg-[#fff5dd] flex flex-col gap-2 items-center justify-center rounded-[28px] size-[180px] md:size-[230px]">
-            <img alt="" style={{ width: "120px", height: "105px" }} src={imgWarehouse} />
+            <img alt="" style={{ width: '120px', height: '105px' }} src={imgWarehouse} />
             <p
               className="font-extrabold text-[#8e592e] text-[10px] md:text-[11px] whitespace-nowrap"
               style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
