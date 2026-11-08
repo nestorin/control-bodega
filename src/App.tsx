@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
 import { useAuthorization } from "@/hooks/useAuthorization";
@@ -36,6 +36,12 @@ import Configuracion, {
   type Almacen,
   ALMACENES_INIT,
 } from "./screens/Configuracion";
+// Etiquetado Module
+import EtiquetadoDashboard from "./screens/EtiquetadoDashboard";
+import NuevaEtiquetado from "./screens/NuevaEtiquetado";
+import EntregarEtiquetado from "./screens/EntregarEtiquetado";
+import RecibirEtiquetado from "./screens/RecibirEtiquetado";
+import ConciliarEtiquetado from "./screens/ConciliarEtiquetado";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { programacionToAppReception } from "@/services/domain/programacionToApp";
 import { isFeatureEnabled } from "@/config/featureFlags";
@@ -47,6 +53,8 @@ import {
   CANONICAL_SUPPLIER_LOCAL,
 } from "@/config/supplierCatalog";
 import { useReceptionSession } from "@/domains/reception/useReceptionSession";
+import { LabelingBatchProvider } from "@/context/LabelingBatchContext";
+import { LabelingCatalogProvider } from "@/context/LabelingCatalogContext";
 
 const assetPathPrefix = "/assets";
 const imgPackage = `${assetPathPrefix}/4cca0.svg`;
@@ -103,9 +111,78 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          {/* Etiquetado Module Routes */}
+          <Route
+            path="/etiquetado"
+            element={
+              <LabelingRoute>
+                <EtiquetadoDashboard />
+              </LabelingRoute>
+            }
+          />
+          <Route
+            path="/etiquetado/nuevo"
+            element={
+              <LabelingRoute>
+                <NuevaEtiquetado />
+              </LabelingRoute>
+            }
+          />
+          <Route
+            path="/etiquetado/entregar"
+            element={
+              <LabelingRoute>
+                <EntregarEtiquetado />
+              </LabelingRoute>
+            }
+          />
+          <Route
+            path="/etiquetado/recibir"
+            element={
+              <LabelingRoute>
+                <RecibirEtiquetado />
+              </LabelingRoute>
+            }
+          />
+          <Route
+            path="/etiquetado/conciliar"
+            element={
+              <LabelingRoute>
+                <ConciliarEtiquetado />
+              </LabelingRoute>
+            }
+          />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
+  );
+}
+
+function LabelingRoute({ children }: { children: ReactNode }) {
+  const { canQuery } = useAuthorization();
+
+  return (
+    <ProtectedRoute>
+      {!isFeatureEnabled("ENABLE_LABELING_UI") ? (
+        <LabelingUnavailable />
+      ) : (
+        <LabelingBatchProvider>
+          <LabelingCatalogProvider canQuery={canQuery}>{children}</LabelingCatalogProvider>
+        </LabelingBatchProvider>
+      )}
+    </ProtectedRoute>
+  );
+}
+
+function LabelingUnavailable() {
+  return (
+    <main className="mx-auto max-w-2xl p-6" role="status" aria-live="polite">
+      <h1 className="text-xl font-semibold">Etiquetado no habilitado</h1>
+      <p className="mt-2 text-gray-600">
+        Esta función de la interfaz todavía no está habilitada. No se ejecutaron operaciones de
+        persistencia.
+      </p>
+    </main>
   );
 }
 

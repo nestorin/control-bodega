@@ -307,15 +307,41 @@ def import_inventory(req: https_fn.CallableRequest):
         raise https_fn.HttpsError("permission-denied", "Inventory import denied")
     normalized = []
     for row in rows:
-        if not isinstance(row, dict) or not isinstance(row.get("productId"), str) or not isinstance(row.get("warehouseId"), str):
+        if not isinstance(row, dict):
             raise https_fn.HttpsError("invalid-argument", "Invalid inventory import row")
+        
+        # Support both productId and productName
+        product_id = row.get("productId")
+        product_name = row.get("productName")
+        
+        if not product_id and not product_name:
+            raise https_fn.HttpsError("invalid-argument", "Each row must have either productId or productName")
+        
         quantity = row.get("quantity")
         if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 0 or quantity > 100000:
             raise https_fn.HttpsError("invalid-argument", "Invalid inventory quantity")
-        warehouse_id = row["warehouseId"]
+        
+        warehouse_id = row.get("warehouseId")
+        if not isinstance(warehouse_id, str) or not warehouse_id:
+            raise https_fn.HttpsError("invalid-argument", "warehouseId is required")
         if not _warehouse_allowed(member, warehouse_id):
             raise https_fn.HttpsError("permission-denied", "Warehouse access denied")
-        normalized.append((row["productId"], warehouse_id, quantity))
+        
+        # Resolve productId from productName if needed
+        if product_name and not product_id:
+            # Look up product by exact name match
+            products_query = db.collection(f"organizations/{ORG_ID}/products").where("name", "==", product_name).limit(2)
+            products_snap = products_query.get()
+            if len(products_snap) == 0:
+                raise https_fn.HttpsError("not-found", f"Product not found: {product_name}")
+            if len(products_snap) > 1:
+                raise https_fn.HttpsError("invalid-argument", f"Multiple products found with name: {product_name}")
+            product_id = products_snap[0].id
+        
+        if not product_id:
+            raise https_fn.HttpsError("invalid-argument", "Could not resolve productId")
+        
+        normalized.append((product_id, warehouse_id, quantity))
 
     operation_ref = db.document(f"organizations/{ORG_ID}/inventory_operations/{operation_id}")
 

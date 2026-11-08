@@ -2,9 +2,11 @@
 // Controlled via Vite env vars: VITE_FIRESTORE_CATALOGOS=true, etc.
 
 export const FEATURE_FLAGS = {
+  ENABLE_LABELING_UI: import.meta.env.VITE_ENABLE_LABELING_UI === "true",
   // Catalogs are authoritative in Firestore. Keep this domain enabled in
   // production even when the hosting build omits local .env files.
   USE_FIRESTORE_CATALOGOS: import.meta.env.VITE_FIRESTORE_CATALOGOS !== "false",
+  USE_FIRESTORE_LABELING_CATALOGOS: import.meta.env.VITE_FIRESTORE_LABELING_CATALOGOS !== "false",
   USE_FIRESTORE_RECEPCIONES: import.meta.env.VITE_FIRESTORE_RECEPCIONES === "true",
   USE_FIRESTORE_EVIDENCIAS: import.meta.env.VITE_FIRESTORE_EVIDENCIAS === "true",
   USE_FIRESTORE_INVENTARIO: import.meta.env.VITE_FIRESTORE_INVENTARIO === "true",

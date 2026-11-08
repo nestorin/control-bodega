@@ -603,6 +603,28 @@ export default function LotesCaducidades() {
               ))}
             </select>
           )}
+          {/* Warehouse selector for import */}
+          {importPreview && (
+            <select
+              aria-label="Almacén destino para importación"
+              value={importPreview.validRows[0]?.warehouseId || WAREHOUSE_IDS.NORTH}
+              onChange={(e) => {
+                const newWarehouseId = e.target.value;
+                if (importPreview && newWarehouseId) {
+                  const updatedRows = importPreview.validRows.map(r => ({ ...r, warehouseId: newWarehouseId }));
+                  setImportPreview({
+                    ...importPreview,
+                    validRows: updatedRows
+                  });
+                }
+              }}
+              className="px-3 py-2 bg-[#f4f7f8] border border-[#dce4e7] rounded-[10px] text-[12px] focus:border-[#f2b84b] focus:outline-none focus:ring-1 focus:ring-[#f2b84b]"
+              style={{ fontFamily: "'Inter',sans-serif", minWidth: "200px" }}
+            >
+              <option value={WAREHOUSE_IDS.NORTH}>Tehuacan-1</option>
+              <option value={WAREHOUSE_IDS.SOUTH}>Tehuacan-2</option>
+            </select>
+          )}
         </div>
       </div>
 

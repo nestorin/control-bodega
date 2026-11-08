@@ -8,12 +8,12 @@ describe("inventory import", () => {
     XLSX.utils.book_append_sheet(
       workbook,
       XLSX.utils.json_to_sheet([
-        { productId: "p-1", warehouseId: "wh-1", quantity: 4 },
-        { productId: "", warehouseId: "wh-1", quantity: 2 },
+        { producto: "p-1", almacen: "wh-1", cantidad: 4 },
+        { producto: "", almacen: "wh-1", cantidad: 2 },
       ]),
       "Inventory",
     );
-    const preview = parseInventoryImport(XLSX.write(workbook, { type: "array", bookType: "xlsx" }));
+    const preview = parseInventoryImport(XLSX.write(workbook, { type: "array", bookType: "xlsx" }), "test.xlsx", "wh-1");
     expect(preview.validRows).toHaveLength(1);
     expect(preview.errors).toHaveLength(1);
   });
@@ -23,27 +23,28 @@ describe("inventory import", () => {
     XLSX.utils.book_append_sheet(
       workbook,
       XLSX.utils.json_to_sheet([
-        { productId: "p-1", warehouseId: "wh-1", quantity: "" },
-        { productId: "", warehouseId: "wh-1", quantity: "" },
-        { productId: "p-2", warehouseId: "", quantity: "" },
+        { producto: "p-1", almacen: "wh-1", cantidad: "" },
+        { producto: "", almacen: "wh-1", cantidad: "" },
+        { producto: "p-2", almacen: "", cantidad: "" },
       ]),
       "Inventory",
     );
-    const preview = parseInventoryImport(XLSX.write(workbook, { type: "array", bookType: "xlsx" }));
+    const preview = parseInventoryImport(XLSX.write(workbook, { type: "array", bookType: "xlsx" }), "test.xlsx", "wh-1");
     expect(preview.validRows).toEqual([
-      { rowNumber: 2, productId: "p-1", warehouseId: "wh-1", quantity: 0 },
+      { rowNumber: 2, productName: "p-1", warehouseId: "wh-1", quantity: 0 },
+      { rowNumber: 4, productName: "p-2", warehouseId: "wh-1", quantity: 0 },
     ]);
-    expect(preview.errors).toHaveLength(2);
+    expect(preview.errors).toHaveLength(1);
   });
 
   it("merges duplicate product/warehouse rows before an authorized write", () => {
     const rows = buildInventoryImportRows({
       validRows: [
-        { rowNumber: 2, productId: "p-1", warehouseId: "wh-1", quantity: 4 },
-        { rowNumber: 3, productId: "p-1", warehouseId: "wh-1", quantity: 6 },
+        { rowNumber: 2, productName: "p-1", warehouseId: "wh-1", quantity: 4 },
+        { rowNumber: 3, productName: "p-1", warehouseId: "wh-1", quantity: 6 },
       ],
       errors: [],
     });
-    expect(rows).toEqual([{ rowNumber: 3, productId: "p-1", warehouseId: "wh-1", quantity: 10 }]);
+    expect(rows).toEqual([{ rowNumber: 3, productName: "p-1", warehouseId: "wh-1", quantity: 10 }]);
   });
 });
