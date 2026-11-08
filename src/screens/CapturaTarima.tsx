@@ -9,29 +9,29 @@
  * - useQrScanner for typed QR scanning with AbortController
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { isFeatureEnabled } from '@/config/featureFlags';
-import { createFirestoreServices } from '@/services/firestore';
-import { db, storage } from '@/lib/firebase';
-import { WAREHOUSE_IDS } from '@/config/warehouses';
-import { useAuthorization } from '@/hooks/useAuthorization';
-import { Timestamp } from 'firebase/firestore';
-import { resolveCatalogProduct } from '@/services/domain/productMatching';
-import { palletRegistrationErrorMessage } from '@/services/palletRegistrationError';
-import { Panel } from '@/components/ui';
-import { parseTarimaQR, buildTarimaQR } from '@/types/qrcode';
-import type { PlannedReceptionPallet } from '@/services/firestore/types';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { isFeatureEnabled } from "@/config/featureFlags";
+import { createFirestoreServices } from "@/services/firestore";
+import { db, storage } from "@/lib/firebase";
+import { WAREHOUSE_IDS } from "@/config/warehouses";
+import { useAuthorization } from "@/hooks/useAuthorization";
+import { Timestamp } from "firebase/firestore";
+import { resolveCatalogProduct } from "@/services/domain/productMatching";
+import { palletRegistrationErrorMessage } from "@/services/palletRegistrationError";
+import { Panel } from "@/components/ui";
+import { parseTarimaQR, buildTarimaQR } from "@/types/qrcode";
+import type { PlannedReceptionPallet } from "@/services/firestore/types";
 import {
   getFirstIncompletePalletIndex,
   shouldReadLocalPalletCache,
-} from '@/domains/reception/receptionLifecycle';
-import { useReceptionFlow } from '@/hooks/useReceptionFlow';
-import { useCatalogos } from '@/hooks/useCatalogos';
-import { useInventory } from '@/hooks/useInventory';
-import { useUIContext } from '@/context';
-import { useQrScanner } from '@/hooks/useQrScanner';
+} from "@/domains/reception/receptionLifecycle";
+import { useReceptionFlow } from "@/hooks/useReceptionFlow";
+import { useCatalogos } from "@/hooks/useCatalogos";
+import { useInventory } from "@/hooks/useInventory";
+import { useUIContext } from "@/context";
+import { useQrScanner } from "@/hooks/useQrScanner";
 
-const assetPathPrefix = '/assets';
+const assetPathPrefix = "/assets";
 const imgIndicador = `${assetPathPrefix}/08d70.svg`;
 const imgIndicador1 = `${assetPathPrefix}/9d6fd.svg`;
 const imgArrowRight = `${assetPathPrefix}/55de6.svg`;
@@ -39,14 +39,14 @@ const imgCheck = `${assetPathPrefix}/3eae4.svg`;
 const imgWarehouse = `${assetPathPrefix}/ccb3f.svg`;
 const imgKey = `${assetPathPrefix}/key.svg`;
 
-const ORG_ID = 'org_exepa_001';
+const ORG_ID = "org_exepa_001";
 
 function checkpointOperationId(receptionId: string, palletNumber: number): string {
   return `checkpoint-${receptionId.slice(-32)}-${palletNumber}-${Date.now()}`;
 }
 
 export function canCreateExtraPallet(accessStatus: string, role: string | undefined): boolean {
-  return accessStatus === 'ACTIVE' && (role === 'ADMIN' || role === 'SUPERVISOR');
+  return accessStatus === "ACTIVE" && (role === "ADMIN" || role === "SUPERVISOR");
 }
 
 interface ConversionesTablaItem {
@@ -104,10 +104,7 @@ export default function CapturaTarima() {
     getAlmacenActivo,
   } = useCatalogos();
 
-  const {
-    aumentarInventario,
-    getInventarioAlmacen,
-  } = useInventory();
+  const { aumentarInventario, getInventarioAlmacen } = useInventory();
 
   const { closeSidebarOnMobile, isMobile } = useUIContext();
 
@@ -135,9 +132,10 @@ export default function CapturaTarima() {
   const almacenActivo = getAlmacenActivo() ?? null;
   const catalogos = { productos: catalogoProductos };
   const onAumentarInventario = aumentarInventario;
-  const onBack = () => navigate('home');
-  const onFinish = () => navigate('completada');
-  const conversionesTablaBase = (currentReception?.conversionesTabla ?? []) as unknown as ConversionesTablaItem[];
+  const onBack = () => navigate("home");
+  const onFinish = () => navigate("completada");
+  const conversionesTablaBase = (currentReception?.conversionesTabla ??
+    []) as unknown as ConversionesTablaItem[];
 
   // ============================================
   // Local State
@@ -146,22 +144,27 @@ export default function CapturaTarima() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('test') === 'legacy-captura-tarima') {
+    if (params.get("test") === "legacy-captura-tarima") {
       setTestModeKey((prev) => prev + 1);
     }
   }, []);
 
   // Use type assertion to handle the union of ConversionesTablaItem and ConversionTableRow
-  const conversionesTabla = testModeKey > 0
-    ? (JSON.parse(localStorage.getItem('conversionesTabla') || '[]') as ConversionesTablaItem[])
-    : (conversionesTablaBase as unknown as ConversionesTablaItem[]);
+  const conversionesTabla =
+    testModeKey > 0
+      ? (JSON.parse(localStorage.getItem("conversionesTabla") || "[]") as ConversionesTablaItem[])
+      : (conversionesTablaBase as unknown as ConversionesTablaItem[]);
 
   // ============================================
   // Firestore Services Init
   // ============================================
-  const isTestMode = new URLSearchParams(window.location.search).get('test') === 'legacy-captura-tarima';
-  const useFirestore = !isTestMode && isFeatureEnabled('USE_FIRESTORE_RECEPCIONES') && !!db && canQuery;
-  const [fsServices, setFsServices] = useState<ReturnType<typeof createFirestoreServices> | null>(null);
+  const isTestMode =
+    new URLSearchParams(window.location.search).get("test") === "legacy-captura-tarima";
+  const useFirestore =
+    !isTestMode && isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery;
+  const [fsServices, setFsServices] = useState<ReturnType<typeof createFirestoreServices> | null>(
+    null,
+  );
   const [firestoreReady, setFirestoreReady] = useState(false);
   const canAddExtraTarima = canCreateExtraPallet(accessStatus, profile?.role);
 
@@ -180,80 +183,85 @@ export default function CapturaTarima() {
   const [tarimasList, setTarimasList] = useState<TarimaData[]>(() => {
     // Guard: if no currentReception, return empty
     if (!currentReception) return [];
-    
+
     // Use the PlannedReceptionPallet from firestore/types which has the correct fields
-    const plannedPallets = currentReception.plannedPallets as Array<{
-      qrIdentifier: string;
-      palletNumber: number;
-      productId?: string;
-      productName: string;
-      quantity: number;
-      unit: string;
-      status?: string;
-      lot?: string;
-      expiryDate?: string;
-    }> | undefined;
-    
+    const plannedPallets = currentReception.plannedPallets as
+      | Array<{
+          qrIdentifier: string;
+          palletNumber: number;
+          productId?: string;
+          productName: string;
+          quantity: number;
+          unit: string;
+          status?: string;
+          lot?: string;
+          expiryDate?: string;
+        }>
+      | undefined;
+
     if (plannedPallets?.length) {
       return plannedPallets.map((pallet) => ({
         id: pallet.qrIdentifier,
         numero: pallet.palletNumber,
         total: plannedPallets!.length,
         ocFolio: currentReception.ocFolio,
-        fechaRecepcion: currentReception.fechaRecepcion || '',
+        fechaRecepcion: currentReception.fechaRecepcion || "",
         producto: pallet.productName,
         productId: pallet.productId,
-        codigo: '',
-        caducidad: pallet.expiryDate || currentReception.caducidad || '',
+        codigo: "",
+        caducidad: pallet.expiryDate || currentReception.caducidad || "",
         cajas: pallet.quantity,
         unidadesPorCaja: 1,
         unidad: pallet.unit,
-        lote: pallet.lot || currentReception.lote || '',
-        observaciones: '',
+        lote: pallet.lot || currentReception.lote || "",
+        observaciones: "",
         proveedor: currentReception.proveedor,
         proveedorLogistico: currentReception.proveedorLogistico,
-        completed: pallet.status === 'ACTIVE' || pallet.status === 'RECEIVED',
+        completed: pallet.status === "ACTIVE" || pallet.status === "RECEIVED",
       }));
     }
     if (conversionesTablaBase.length === 0) return [];
 
-    const ocNumber = currentReception.ocFolio.replace('OC-', '');
+    const ocNumber = currentReception.ocFolio.replace("OC-", "");
     const fechaHoy =
-      new Date().toLocaleDateString('es-MX', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        timeZone: 'America/Mexico_City',
+      new Date().toLocaleDateString("es-MX", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        timeZone: "America/Mexico_City",
       }) +
-      ` · ${new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Mexico_City' })}`;
+      ` · ${new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Mexico_City" })}`;
 
     let numero = 1;
     return conversionesTablaBase.flatMap((conv: ConversionesTablaItem) =>
       Array.from({ length: conv.tarimas ?? 0 }, () => ({
         id: buildTarimaQR(ocNumber, numero++),
         numero: numero - 1,
-        total: conversionesTablaBase.reduce((a, b: ConversionesTablaItem) => a + (b.tarimas ?? 0), 0),
+        total: conversionesTablaBase.reduce(
+          (a, b: ConversionesTablaItem) => a + (b.tarimas ?? 0),
+          0,
+        ),
         ocFolio: currentReception.ocFolio,
         fechaRecepcion: fechaHoy,
-        producto: 'producto' in conv ? conv.producto : '',
-        productId: 'productId' in conv ? conv.productId : undefined,
-        codigo: 'codigo' in conv ? conv.codigo : '',
-        caducidad: currentReception.caducidad || '',
-        cajas: 'cajas' in conv && 'tarimas' in conv ? Math.ceil(conv.cajas / conv.tarimas) : 0,
-        unidadesPorCaja: 'piezasPorCaja' in conv ? conv.piezasPorCaja : 1,
-        unidad: 'unidad' in conv ? conv.unidad : 'cajas',
-        lote: currentReception.lote || '',
-        observaciones: '',
+        producto: "producto" in conv ? conv.producto : "",
+        productId: "productId" in conv ? conv.productId : undefined,
+        codigo: "codigo" in conv ? conv.codigo : "",
+        caducidad: currentReception.caducidad || "",
+        cajas: "cajas" in conv && "tarimas" in conv ? Math.ceil(conv.cajas / conv.tarimas) : 0,
+        unidadesPorCaja: "piezasPorCaja" in conv ? conv.piezasPorCaja : 1,
+        unidad: "unidad" in conv ? conv.unidad : "cajas",
+        lote: currentReception.lote || "",
+        observaciones: "",
         proveedor: currentReception.proveedor,
         proveedorLogistico: currentReception.proveedorLogistico,
         completed: false,
-      }))
+      })),
     );
   });
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAdminModal, setShowAdminModal] = useState(false);
-  const [manualPalletId, setManualPalletId] = useState('');
+  const [manualPalletId, setManualPalletId] = useState("");
   const [isValidatingManualId, setIsValidatingManualId] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -284,7 +292,9 @@ export default function CapturaTarima() {
     if (currentReception?.ocFolio) {
       const canonicalPlan = currentReception.plannedPallets;
       if (!shouldReadLocalPalletCache(Boolean(canonicalPlan?.length), useFirestore)) {
-        setCurrentIndex(getFirstIncompletePalletIndex((canonicalPlan || []) as Array<{ status?: string }>));
+        setCurrentIndex(
+          getFirstIncompletePalletIndex((canonicalPlan || []) as Array<{ status?: string }>),
+        );
         return;
       }
       const saved = localStorage.getItem(`recepcion_${currentReception.ocFolio}_tarimas`);
@@ -298,7 +308,7 @@ export default function CapturaTarima() {
             setCurrentIndex(firstIncomplete >= 0 ? firstIncomplete : parsed.length - 1);
           }
         } catch (e) {
-          console.error('Error loading saved tarimas:', e);
+          console.error("Error loading saved tarimas:", e);
         }
       }
     }
@@ -311,14 +321,14 @@ export default function CapturaTarima() {
     try {
       await fsServices.receptions.confirmReception(
         currentReception.receptionId,
-        'user',
+        "user",
         `op-${Date.now()}-confirm`,
       );
       onFinish();
     } catch (error) {
-      console.error('Reception confirmation retry failed:', error);
+      console.error("Reception confirmation retry failed:", error);
       setConfirmationError(
-        'No se pudo confirmar; el progreso de tarimas quedó guardado. Reintentá.',
+        "No se pudo confirmar; el progreso de tarimas quedó guardado. Reintentá.",
       );
     } finally {
       setIsSaving(false);
@@ -328,64 +338,77 @@ export default function CapturaTarima() {
   // ============================================
   // QR Scanner Integration (useQrScanner hook)
   // ============================================
-  const handleScannedCode = useCallback(async (code: string) => {
-    if (handlingScanRef.current) return;
-    handlingScanRef.current = true;
-    const parsed = parseTarimaQR(code);
-    if (!parsed) {
-      alert(`Código QR inválido: ${code}\nFormato esperado: TQR-24891-001`);
-      handlingScanRef.current = false;
-      return;
-    }
-
-    const tarimaIndex = tarimasList.findIndex((pallet) => pallet.id === code);
-    const tarimaNum = String(parsed.tarimaIndex).padStart(3, '0');
-
-    if (tarimaIndex < 0) {
-      alert(`Tarima ${tarimaNum} no existe en esta recepción (total: ${tarimasList.length})`);
-      handlingScanRef.current = false;
-      return;
-    }
-
-    if (tarimasList[tarimaIndex].completed) {
-      alert(`El código ${tarimaNum} ya está activo y asociado a una tarima.`);
-      handlingScanRef.current = false;
-      return;
-    }
-    try {
-      if (useFirestore) {
-        if (!fsServices || !currentReception?.receptionId) {
-          throw new Error('Reception backend is not ready');
-        }
-        const validated = await fsServices.receptions.validatePalletScan(
-          currentReception.receptionId,
-          code,
-          almacenActivo?.id || WAREHOUSE_IDS.NORTH,
-        );
-        setTarimasList((prev) =>
-          prev.map((pallet, index) =>
-            index === tarimaIndex
-              ? {
-                  ...pallet,
-                  lote: validated.lot ?? pallet.lote,
-                  caducidad: validated.expiryDate ?? pallet.caducidad,
-                }
-              : pallet,
-          ),
-        );
+  const handleScannedCode = useCallback(
+    async (code: string) => {
+      if (handlingScanRef.current) return;
+      handlingScanRef.current = true;
+      const parsed = parseTarimaQR(code);
+      if (!parsed) {
+        alert(`Código QR inválido: ${code}\nFormato esperado: TQR-24891-001`);
+        handlingScanRef.current = false;
+        return;
       }
-      setScannedQrCode(code);
-      setManualPalletId('');
-      setCurrentIndex(tarimaIndex);
-      stopScanning();
-      setCaptureError(null);
-    } catch (error) {
-      console.error('Reception QR validation failed:', error);
-      alert('Este QR no está disponible para esta recepción o ya fue activado.');
-    } finally {
-      handlingScanRef.current = false;
-    }
-  }, [tarimasList, useFirestore, fsServices, currentReception?.receptionId, almacenActivo?.id, setScannedQrCode, setCurrentIndex, stopScanning, setCaptureError]);
+
+      const tarimaIndex = tarimasList.findIndex((pallet) => pallet.id === code);
+      const tarimaNum = String(parsed.tarimaIndex).padStart(3, "0");
+
+      if (tarimaIndex < 0) {
+        alert(`Tarima ${tarimaNum} no existe en esta recepción (total: ${tarimasList.length})`);
+        handlingScanRef.current = false;
+        return;
+      }
+
+      if (tarimasList[tarimaIndex].completed) {
+        alert(`El código ${tarimaNum} ya está activo y asociado a una tarima.`);
+        handlingScanRef.current = false;
+        return;
+      }
+      try {
+        if (useFirestore) {
+          if (!fsServices || !currentReception?.receptionId) {
+            throw new Error("Reception backend is not ready");
+          }
+          const validated = await fsServices.receptions.validatePalletScan(
+            currentReception.receptionId,
+            code,
+            almacenActivo?.id || WAREHOUSE_IDS.NORTH,
+          );
+          setTarimasList((prev) =>
+            prev.map((pallet, index) =>
+              index === tarimaIndex
+                ? {
+                    ...pallet,
+                    lote: validated.lot ?? pallet.lote,
+                    caducidad: validated.expiryDate ?? pallet.caducidad,
+                  }
+                : pallet,
+            ),
+          );
+        }
+        setScannedQrCode(code);
+        setManualPalletId("");
+        setCurrentIndex(tarimaIndex);
+        stopScanning();
+        setCaptureError(null);
+      } catch (error) {
+        console.error("Reception QR validation failed:", error);
+        alert("Este QR no está disponible para esta recepción o ya fue activado.");
+      } finally {
+        handlingScanRef.current = false;
+      }
+    },
+    [
+      tarimasList,
+      useFirestore,
+      fsServices,
+      currentReception?.receptionId,
+      almacenActivo?.id,
+      setScannedQrCode,
+      setCurrentIndex,
+      stopScanning,
+      setCaptureError,
+    ],
+  );
 
   async function handleManualPalletValidation() {
     const palletId = manualPalletId.trim();
@@ -401,7 +424,7 @@ export default function CapturaTarima() {
   async function persistCaptureCheckpoint(pallet: TarimaData) {
     if (!useFirestore) return;
     if (!fsServices || !currentReception?.receptionId) {
-      setCaptureError('La conexión de recepción todavía no está lista; el avance no se guardó.');
+      setCaptureError("La conexión de recepción todavía no está lista; el avance no se guardó.");
       return;
     }
     try {
@@ -414,9 +437,9 @@ export default function CapturaTarima() {
       );
       setCaptureError(null);
     } catch (error) {
-      console.error('Pallet capture checkpoint failed:', error);
+      console.error("Pallet capture checkpoint failed:", error);
       setCaptureError(
-        'No se pudo guardar el avance de esta tarima. Revisá la conexión y reintentá.',
+        "No se pudo guardar el avance de esta tarima. Revisá la conexión y reintentá.",
       );
     }
   }
@@ -424,7 +447,7 @@ export default function CapturaTarima() {
   async function handleSaveTarima() {
     if (!currentTarima) return;
     if (useFirestore && lastResult !== currentTarima.id) {
-      alert('Escaneá el QR de esta tarima antes de activar su registro.');
+      alert("Escaneá el QR de esta tarima antes de activar su registro.");
       return;
     }
 
@@ -432,11 +455,11 @@ export default function CapturaTarima() {
     const lotToSave = currentTarima.lote.trim() || autoLote.trim();
     const expiryToSave = currentTarima.caducidad || autoCaducidad;
     if (!lotToSave) {
-      alert('El lote es obligatorio');
+      alert("El lote es obligatorio");
       return;
     }
     if (!expiryToSave.trim()) {
-      alert('La fecha de caducidad es obligatoria');
+      alert("La fecha de caducidad es obligatoria");
       return;
     }
 
@@ -454,9 +477,7 @@ export default function CapturaTarima() {
       };
 
       setTarimasList((prev) =>
-        prev.map((pallet, index) =>
-          index === currentIndex ? updatedTarima : pallet,
-        ),
+        prev.map((pallet, index) => (index === currentIndex ? updatedTarima : pallet)),
       );
 
       // Persist to Firestore
@@ -484,23 +505,23 @@ export default function CapturaTarima() {
 
       // Move to next or complete
       if (isLastTarima) {
-        transition('completed');
-        navigate('completada');
+        transition("completed");
+        navigate("completada");
       } else {
         setCurrentIndex((prev) => prev + 1);
         setScannedQrCode(null);
       }
     } catch (error) {
-      console.error('Save tarima failed:', error);
-      setCaptureError('No se pudo guardar la tarima. Reintentá.');
+      console.error("Save tarima failed:", error);
+      setCaptureError("No se pudo guardar la tarima. Reintentá.");
     } finally {
       setIsSaving(false);
     }
   }
 
   // Auto-fill lote/caducidad from previous tarima
-  const autoLote = tarimasList[currentIndex]?.lote || '';
-  const autoCaducidad = tarimasList[currentIndex]?.caducidad || '';
+  const autoLote = tarimasList[currentIndex]?.lote || "";
+  const autoCaducidad = tarimasList[currentIndex]?.caducidad || "";
 
   // ============================================
   // Derived state for render
@@ -545,12 +566,16 @@ export default function CapturaTarima() {
           <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
             <div
               className="h-full bg-[#16343f] transition-all duration-300"
-              style={{ width: `${((currentIndex + (currentTarima?.completed ? 1 : 0)) / tarimasList.length) * 100}%` }}
+              style={{
+                width: `${((currentIndex + (currentTarima?.completed ? 1 : 0)) / tarimasList.length) * 100}%`,
+              }}
             />
           </div>
           <div className="flex justify-between text-xs text-gray-500 mt-1">
             <span>0%</span>
-            <span>{completedCount}/{tarimasList.length}</span>
+            <span>
+              {completedCount}/{tarimasList.length}
+            </span>
             <span>100%</span>
           </div>
         </div>
@@ -561,12 +586,14 @@ export default function CapturaTarima() {
         <Panel className="mb-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-semibold text-gray-900">{currentTarima.producto}</h3>
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-              currentTarima.completed
-                ? 'bg-green-100 text-green-800'
-                : 'bg-amber-100 text-amber-800'
-            }`}>
-              {currentTarima.completed ? 'Completada' : 'Pendiente'}
+            <span
+              className={`px-3 py-1 rounded-full text-sm font-medium ${
+                currentTarima.completed
+                  ? "bg-green-100 text-green-800"
+                  : "bg-amber-100 text-amber-800"
+              }`}
+            >
+              {currentTarima.completed ? "Completada" : "Pendiente"}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
@@ -592,18 +619,16 @@ export default function CapturaTarima() {
         {/* QR Scanner */}
         <Panel className="mb-4">
           <div className="relative aspect-video bg-gray-100 rounded-xl overflow-hidden">
-            <video
-              ref={qrReaderRef}
-              className="w-full h-full object-cover"
-              playsInline
-              muted
-            />
+            <video ref={qrReaderRef} className="w-full h-full object-cover" playsInline muted />
             {scanError && (
               <div className="absolute inset-0 flex items-center justify-center bg-red-50 p-4">
                 <div className="text-center">
                   <p className="text-red-700 mb-2">{scanError}</p>
                   <button
-                    onClick={() => { clearScannerError(); startScanning(handleScannedCode); }}
+                    onClick={() => {
+                      clearScannerError();
+                      startScanning(handleScannedCode);
+                    }}
                     className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                   >
                     Reintentar
@@ -630,7 +655,7 @@ export default function CapturaTarima() {
                 disabled={isSaving}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
               >
-                {isSaving ? 'Guardando...' : 'Guardar y siguiente'}
+                {isSaving ? "Guardando..." : "Guardar y siguiente"}
               </button>
             </div>
           )}
@@ -653,7 +678,7 @@ export default function CapturaTarima() {
               disabled={isValidatingManualId || !manualPalletId.trim()}
               className="px-6 py-3 bg-[#16343f] text-white rounded-lg hover:bg-[#1e4456] disabled:opacity-50 transition-colors font-medium"
             >
-              {isValidatingManualId ? 'Validando...' : 'Validar'}
+              {isValidatingManualId ? "Validando..." : "Validar"}
             </button>
           </div>
         </Panel>
@@ -666,7 +691,11 @@ export default function CapturaTarima() {
               <input
                 type="text"
                 value={currentTarima.lote}
-                onChange={(e) => setTarimasList((prev) => prev.map((p, i) => i === currentIndex ? { ...p, lote: e.target.value } : p))}
+                onChange={(e) =>
+                  setTarimasList((prev) =>
+                    prev.map((p, i) => (i === currentIndex ? { ...p, lote: e.target.value } : p)),
+                  )
+                }
                 placeholder="LT-2026-001"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#16343f] focus:border-transparent"
                 autoComplete="off"
@@ -677,7 +706,13 @@ export default function CapturaTarima() {
               <input
                 type="date"
                 value={currentTarima.caducidad}
-                onChange={(e) => setTarimasList((prev) => prev.map((p, i) => i === currentIndex ? { ...p, caducidad: e.target.value } : p))}
+                onChange={(e) =>
+                  setTarimasList((prev) =>
+                    prev.map((p, i) =>
+                      i === currentIndex ? { ...p, caducidad: e.target.value } : p,
+                    ),
+                  )
+                }
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#16343f] focus:border-transparent"
               />
             </div>
@@ -685,7 +720,13 @@ export default function CapturaTarima() {
               <label className="block text-sm text-gray-500 mb-1">Observaciones</label>
               <textarea
                 value={currentTarima.observaciones}
-                onChange={(e) => setTarimasList((prev) => prev.map((p, i) => i === currentIndex ? { ...p, observaciones: e.target.value } : p))}
+                onChange={(e) =>
+                  setTarimasList((prev) =>
+                    prev.map((p, i) =>
+                      i === currentIndex ? { ...p, observaciones: e.target.value } : p,
+                    ),
+                  )
+                }
                 rows={2}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#16343f] focus:border-transparent"
                 placeholder="Observaciones opcionales..."
@@ -700,7 +741,9 @@ export default function CapturaTarima() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-amber-900">¿Necesitás una tarima extra?</p>
-                <p className="text-sm text-amber-700">Solo para administradores (clave: 01603485)</p>
+                <p className="text-sm text-amber-700">
+                  Solo para administradores (clave: 01603485)
+                </p>
               </div>
               <button
                 onClick={() => setShowAdminModal(true)}
@@ -714,12 +757,18 @@ export default function CapturaTarima() {
 
         {/* Error Display */}
         {captureError && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm" role="alert">
+          <div
+            className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"
+            role="alert"
+          >
             {captureError}
           </div>
         )}
         {confirmationError && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm" role="alert">
+          <div
+            className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"
+            role="alert"
+          >
             {confirmationError}
             <button
               onClick={retryReceptionConfirmation}
@@ -756,13 +805,15 @@ export default function CapturaTarima() {
       {showAdminModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Agregar tarima extra (Admin)</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Agregar tarima extra (Admin)
+            </h3>
             <input
               type="password"
               placeholder="Clave de administrador"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-[#16343f] focus:border-transparent"
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && e.currentTarget.value === '01603485') {
+                if (e.key === "Enter" && e.currentTarget.value === "01603485") {
                   // Add extra tarima logic here
                   setShowAdminModal(false);
                 }
@@ -775,9 +826,7 @@ export default function CapturaTarima() {
               >
                 Cancelar
               </button>
-              <button
-                className="flex-1 py-3 px-4 bg-[#16343f] text-white rounded-lg hover:bg-[#1e4456] transition-colors"
-              >
+              <button className="flex-1 py-3 px-4 bg-[#16343f] text-white rounded-lg hover:bg-[#1e4456] transition-colors">
                 Confirmar
               </button>
             </div>

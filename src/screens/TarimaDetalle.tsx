@@ -82,11 +82,7 @@ export default function TarimaDetalle({
   // ============================================
   // New Architecture Hooks
   // ============================================
-  const {
-    currentReception: ctxCurrentReception,
-    navigate,
-    transition,
-  } = useReceptionFlow();
+  const { currentReception: ctxCurrentReception, navigate, transition } = useReceptionFlow();
 
   const {
     catalogoProductos,

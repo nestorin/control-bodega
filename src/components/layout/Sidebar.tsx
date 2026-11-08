@@ -5,11 +5,11 @@
  * Presentational only - receives data via UIContext and props.
  */
 
-import { memo } from 'react';
-import { useUIContext } from '@/context';
-import { navItems } from '@/config/navigation';
-import { NavIcon } from './NavIcon';
-import type { Screen, NavItem } from '@/types';
+import { memo } from "react";
+import { useUIContext } from "@/context";
+import { navItems } from "@/config/navigation";
+import { NavIcon } from "./NavIcon";
+import type { Screen, NavItem } from "@/types";
 
 interface SidebarProps {
   currentScreen: Screen;
@@ -40,11 +40,9 @@ export const Sidebar = memo(function Sidebar({
             key={item.id}
             onClick={() => onNavigate(item.screen, item.id)}
             className={`relative w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200 ${
-              isActive
-                ? 'bg-amber-50 scale-110'
-                : 'hover:bg-gray-50'
+              isActive ? "bg-amber-50 scale-110" : "hover:bg-gray-50"
             }`}
-            aria-current={isActive ? 'page' : undefined}
+            aria-current={isActive ? "page" : undefined}
             aria-label={item.label}
           >
             <NavIcon icon={item.icon} active={isActive} size={24} />
@@ -58,6 +56,6 @@ export const Sidebar = memo(function Sidebar({
   );
 });
 
-Sidebar.displayName = 'Sidebar';
+Sidebar.displayName = "Sidebar";
 
 export default Sidebar;

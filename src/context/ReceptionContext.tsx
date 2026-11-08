@@ -5,14 +5,7 @@
  * Coordinates the reception workflow lifecycle across all screens.
  */
 
-import {
-  createContext,
-  useContext,
-  useReducer,
-  useCallback,
-  useMemo,
-  ReactNode,
-} from 'react';
+import { createContext, useContext, useReducer, useCallback, useMemo, ReactNode } from "react";
 import type {
   ReceptionData,
   ReceptionSessionPhase,
@@ -20,7 +13,7 @@ import type {
   Tarima,
   Screen,
   NavItem,
-} from '@/types';
+} from "@/types";
 
 // ============================================
 // State & Action Types
@@ -40,15 +33,15 @@ interface ReceptionState {
 }
 
 type ReceptionAction =
-  | { type: 'SET_CURRENT_RECEPTION'; payload: ReceptionData | null }
-  | { type: 'TRANSITION'; payload: ReceptionSessionPhase }
-  | { type: 'NAVIGATE'; payload: { screen: Screen; nav?: NavItem } }
-  | { type: 'EDIT_RECEPTION'; payload: { id: string; data: ReceptionData } }
-  | { type: 'CANCEL_EDIT' }
-  | { type: 'SET_SCANNED_QR'; payload: string | null }
-  | { type: 'SET_SELECTED_EVIDENCIA'; payload: EvidenciaData | null }
-  | { type: 'SET_TARIMA_ACTUAL'; payload: Tarima | null }
-  | { type: 'RESET_ALL' };
+  | { type: "SET_CURRENT_RECEPTION"; payload: ReceptionData | null }
+  | { type: "TRANSITION"; payload: ReceptionSessionPhase }
+  | { type: "NAVIGATE"; payload: { screen: Screen; nav?: NavItem } }
+  | { type: "EDIT_RECEPTION"; payload: { id: string; data: ReceptionData } }
+  | { type: "CANCEL_EDIT" }
+  | { type: "SET_SCANNED_QR"; payload: string | null }
+  | { type: "SET_SELECTED_EVIDENCIA"; payload: EvidenciaData | null }
+  | { type: "SET_TARIMA_ACTUAL"; payload: Tarima | null }
+  | { type: "RESET_ALL" };
 
 // ============================================
 // Initial State
@@ -56,14 +49,14 @@ type ReceptionAction =
 
 const defaultInitialState: ReceptionState = {
   currentReception: null,
-  sessionState: 'idle',
+  sessionState: "idle",
   editId: null,
   editReceptionData: null,
   scannedQrCode: null,
   selectedEvidencia: null,
   tarimaActual: null,
-  currentScreen: 'home',
-  activeNav: 'home',
+  currentScreen: "home",
+  activeNav: "home",
 };
 
 // ============================================
@@ -72,29 +65,29 @@ const defaultInitialState: ReceptionState = {
 
 function receptionReducer(state: ReceptionState, action: ReceptionAction): ReceptionState {
   switch (action.type) {
-    case 'SET_CURRENT_RECEPTION':
+    case "SET_CURRENT_RECEPTION":
       return {
         ...state,
         currentReception: action.payload,
         // Reset session state when new reception starts
-        sessionState: action.payload ? 'planning' : 'idle',
+        sessionState: action.payload ? "planning" : "idle",
       };
 
-    case 'TRANSITION': {
+    case "TRANSITION": {
       // Validate state transitions
       const validTransitions: Record<ReceptionSessionPhase, ReceptionSessionPhase[]> = {
-        idle: ['planning', 'editing'],
-        planning: ['evidence', 'pallets', 'idle'],
-        evidence: ['pallets', 'planning', 'idle'],
-        pallets: ['completed', 'evidence', 'idle'],
-        completed: ['idle', 'editing'],
-        editing: ['pallets', 'completed', 'idle'],
+        idle: ["planning", "editing"],
+        planning: ["evidence", "pallets", "idle"],
+        evidence: ["pallets", "planning", "idle"],
+        pallets: ["completed", "evidence", "idle"],
+        completed: ["idle", "editing"],
+        editing: ["pallets", "completed", "idle"],
       };
 
       const allowed = validTransitions[state.sessionState] ?? [];
       if (!allowed.includes(action.payload)) {
         console.warn(
-          `[ReceptionContext] Invalid transition: ${state.sessionState} -> ${action.payload}`
+          `[ReceptionContext] Invalid transition: ${state.sessionState} -> ${action.payload}`,
         );
         return state;
       }
@@ -105,7 +98,7 @@ function receptionReducer(state: ReceptionState, action: ReceptionAction): Recep
       };
     }
 
-    case 'NAVIGATE': {
+    case "NAVIGATE": {
       const { screen, nav } = action.payload;
       return {
         ...state,
@@ -114,41 +107,41 @@ function receptionReducer(state: ReceptionState, action: ReceptionAction): Recep
       };
     }
 
-    case 'EDIT_RECEPTION':
+    case "EDIT_RECEPTION":
       return {
         ...state,
         editId: action.payload.id,
         editReceptionData: action.payload.data,
-        sessionState: 'editing',
+        sessionState: "editing",
       };
 
-    case 'CANCEL_EDIT':
+    case "CANCEL_EDIT":
       return {
         ...state,
         editId: null,
         editReceptionData: null,
-        sessionState: 'idle',
+        sessionState: "idle",
       };
 
-    case 'SET_SCANNED_QR':
+    case "SET_SCANNED_QR":
       return {
         ...state,
         scannedQrCode: action.payload,
       };
 
-    case 'SET_SELECTED_EVIDENCIA':
+    case "SET_SELECTED_EVIDENCIA":
       return {
         ...state,
         selectedEvidencia: action.payload,
       };
 
-    case 'SET_TARIMA_ACTUAL':
+    case "SET_TARIMA_ACTUAL":
       return {
         ...state,
         tarimaActual: action.payload,
       };
 
-    case 'RESET_ALL':
+    case "RESET_ALL":
       return defaultInitialState;
 
     default:
@@ -187,39 +180,39 @@ export function ReceptionProvider({ children, initialState }: ReceptionProviderP
   });
 
   const setCurrentReception = useCallback((data: ReceptionData | null) => {
-    dispatch({ type: 'SET_CURRENT_RECEPTION', payload: data });
+    dispatch({ type: "SET_CURRENT_RECEPTION", payload: data });
   }, []);
 
   const transition = useCallback((phase: ReceptionSessionPhase) => {
-    dispatch({ type: 'TRANSITION', payload: phase });
+    dispatch({ type: "TRANSITION", payload: phase });
   }, []);
 
   const navigate = useCallback((screen: Screen, nav?: NavItem) => {
-    dispatch({ type: 'NAVIGATE', payload: { screen, nav } });
+    dispatch({ type: "NAVIGATE", payload: { screen, nav } });
   }, []);
 
   const editReception = useCallback((id: string, data: ReceptionData) => {
-    dispatch({ type: 'EDIT_RECEPTION', payload: { id, data } });
+    dispatch({ type: "EDIT_RECEPTION", payload: { id, data } });
   }, []);
 
   const cancelEdit = useCallback(() => {
-    dispatch({ type: 'CANCEL_EDIT' });
+    dispatch({ type: "CANCEL_EDIT" });
   }, []);
 
   const setScannedQrCode = useCallback((code: string | null) => {
-    dispatch({ type: 'SET_SCANNED_QR', payload: code });
+    dispatch({ type: "SET_SCANNED_QR", payload: code });
   }, []);
 
   const setSelectedEvidencia = useCallback((item: EvidenciaData | null) => {
-    dispatch({ type: 'SET_SELECTED_EVIDENCIA', payload: item });
+    dispatch({ type: "SET_SELECTED_EVIDENCIA", payload: item });
   }, []);
 
   const setTarimaActual = useCallback((pallet: Tarima | null) => {
-    dispatch({ type: 'SET_TARIMA_ACTUAL', payload: pallet });
+    dispatch({ type: "SET_TARIMA_ACTUAL", payload: pallet });
   }, []);
 
   const resetAll = useCallback(() => {
-    dispatch({ type: 'RESET_ALL' });
+    dispatch({ type: "RESET_ALL" });
   }, []);
 
   const value = useMemo<ReceptionContextValue>(
@@ -246,7 +239,7 @@ export function ReceptionProvider({ children, initialState }: ReceptionProviderP
       setSelectedEvidencia,
       setTarimaActual,
       resetAll,
-    ]
+    ],
   );
 
   return <ReceptionContext.Provider value={value}>{children}</ReceptionContext.Provider>;
@@ -259,7 +252,7 @@ export function ReceptionProvider({ children, initialState }: ReceptionProviderP
 export function useReceptionContext(): ReceptionContextValue {
   const context = useContext(ReceptionContext);
   if (!context) {
-    throw new Error('useReceptionContext must be used within a ReceptionProvider');
+    throw new Error("useReceptionContext must be used within a ReceptionProvider");
   }
   return context;
 }

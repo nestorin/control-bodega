@@ -11,35 +11,35 @@
 
 /** All possible screen identifiers in the application */
 export type Screen =
-  | 'home'
-  | 'programacion-recepcion'
-  | 'captura-evidencia'
-  | 'nueva-step1'
-  | 'nueva-step2'
-  | 'captura-tarima'
-  | 'completada'
-  | 'recepciones'
-  | 'tarima-detalle'
-  | 'impresion'
-  | 'escanear-qr'
-  | 'editar-recepcion'
-  | 'evidencias'
-  | 'evidencia-detalle'
-  | 'lotes-caducidades'
-  | 'embarques'
-  | 'configuracion'
-  | 'login'
-  | 'register';
+  | "home"
+  | "programacion-recepcion"
+  | "captura-evidencia"
+  | "nueva-step1"
+  | "nueva-step2"
+  | "captura-tarima"
+  | "completada"
+  | "recepciones"
+  | "tarima-detalle"
+  | "impresion"
+  | "escanear-qr"
+  | "editar-recepcion"
+  | "evidencias"
+  | "evidencia-detalle"
+  | "lotes-caducidades"
+  | "embarques"
+  | "configuracion"
+  | "login"
+  | "register";
 
 /** Navigation item identifiers (subset of screens shown in nav) */
 export type NavItem =
-  | 'home'
-  | 'recepciones'
-  | 'embarques'
-  | 'qr'
-  | 'evidencias'
-  | 'lotes'
-  | 'configuracion';
+  | "home"
+  | "recepciones"
+  | "embarques"
+  | "qr"
+  | "evidencias"
+  | "lotes"
+  | "configuracion";
 
 /** Navigation entry for sidebar/bottom nav rendering */
 export interface NavEntry {
@@ -65,12 +65,12 @@ export interface HeaderConfig {
 
 /** Phase of the reception workflow session */
 export type ReceptionSessionPhase =
-  | 'idle'
-  | 'planning'
-  | 'evidence'
-  | 'pallets'
-  | 'completed'
-  | 'editing';
+  | "idle"
+  | "planning"
+  | "evidence"
+  | "pallets"
+  | "completed"
+  | "editing";
 
 /** Session data for the reception workflow */
 export interface ReceptionSessionData {
@@ -116,7 +116,7 @@ export interface ReceptionProducto {
   cantidad: number;
   precio: number;
   importe: number;
-  estadoMatch: 'confirmado' | 'sugerido' | 'manual';
+  estadoMatch: "confirmado" | "sugerido" | "manual";
 }
 
 /** Planned reception pallet from Firestore */
@@ -196,7 +196,7 @@ import type {
   Embarque,
   EmbarqueStatus,
   EmbarqueWithProgress,
-} from './embarque';
+} from "./embarque";
 
 export type {
   Tarima,
@@ -206,7 +206,7 @@ export type {
   Embarque,
   EmbarqueStatus,
   EmbarqueWithProgress,
-} from './embarque';
+} from "./embarque";
 
 // ============================================
 // Catalog Types
@@ -218,7 +218,7 @@ export interface Producto {
   nombre: string;
   sku: string;
   categoria: string;
-  unidad: 'cajas' | 'piezas' | 'kg';
+  unidad: "cajas" | "piezas" | "kg";
   activo: boolean;
   codigosProveedor?: string[];
 }
@@ -230,7 +230,7 @@ export interface Proveedor {
   contacto: string;
   telefono: string;
   email: string;
-  tipo: 'mercancia' | 'logistica';
+  tipo: "mercancia" | "logistica";
 }
 
 /** Conversion catalog item */
@@ -297,9 +297,9 @@ export interface ConversionTableRow {
 // ============================================
 // Canonical definitions live in @/types/domain — re-exported here so that
 // consumers importing from '@/types' keep a single source of truth.
-import type { OcrProduct, OcrParsed, OcrResponse } from './domain';
+import type { OcrProduct, OcrParsed, OcrResponse } from "./domain";
 
-export type { OcrProduct, OcrParsed, OcrResponse } from './domain';
+export type { OcrProduct, OcrParsed, OcrResponse } from "./domain";
 
 // ============================================
 // Validation Types
@@ -316,4 +316,4 @@ export interface ValidationResult {
 // ============================================
 // Canonical definitions live in @/types/embarque — re-exported here so that
 // consumers importing from '@/types' keep a single source of truth.
-export { SOFT_RESERVATION_HOURS, SOFT_RESERVATION_MS } from './embarque';
+export { SOFT_RESERVATION_HOURS, SOFT_RESERVATION_MS } from "./embarque";

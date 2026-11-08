@@ -5,13 +5,13 @@
 
 // ─── Catalog Types ────────────────────────────────────────────────────────────
 
-export type CatalogType = 'products' | 'suppliers' | 'conversions' | 'warehouses';
+export type CatalogType = "products" | "suppliers" | "conversions" | "warehouses";
 
 export interface ProductCsvRow {
   nombre: string;
   sku: string;
   categoria?: string;
-  unidad: 'cajas' | 'piezas' | 'kg';
+  unidad: "cajas" | "piezas" | "kg";
   codigosProveedor?: string; // comma-separated
 }
 
@@ -20,7 +20,7 @@ export interface SupplierCsvRow {
   contacto?: string;
   telefono?: string;
   email?: string;
-  tipo: 'mercancia' | 'logistica';
+  tipo: "mercancia" | "logistica";
 }
 
 export interface ConversionCsvRow {
@@ -41,13 +41,13 @@ export type CsvRow = ProductCsvRow | SupplierCsvRow | ConversionCsvRow | Warehou
 // ─── Validation ────────────────────────────────────────────────────────────────
 
 export type ValidationCode =
-  | 'MISSING_REQUIRED'
-  | 'INVALID_TYPE'
-  | 'DUPLICATE_SKU'
-  | 'DUPLICATE_WAREHOUSE'
-  | 'UNKNOWN_PRODUCT'
-  | 'INVALID_ENUM'
-  | 'DUPLICATE_IN_FILE';
+  | "MISSING_REQUIRED"
+  | "INVALID_TYPE"
+  | "DUPLICATE_SKU"
+  | "DUPLICATE_WAREHOUSE"
+  | "UNKNOWN_PRODUCT"
+  | "INVALID_ENUM"
+  | "DUPLICATE_IN_FILE";
 
 export interface ValidationError {
   code: ValidationCode;
@@ -85,7 +85,7 @@ export interface ImportLog {
   totalRows: number;
   validRows: number;
   invalidRows: number;
-  status: 'preview' | 'committed' | 'failed';
+  status: "preview" | "committed" | "failed";
   errors: Array<{
     row: number;
     code: ValidationCode;
@@ -164,7 +164,7 @@ export interface UseCsvImportReturn {
   isCommitting: boolean;
   importLog: ImportLog | null;
   selectedType: CatalogType;
-  
+
   // Actions
   parseFile: (file: File, type: CatalogType) => Promise<void>;
   commitImport: () => Promise<void>;
@@ -179,7 +179,7 @@ export interface UseInventoryGridReturn {
   isLoading: boolean;
   error: Error | null;
   filters: GridFilters;
-  
+
   // Actions
   setFilters: (filters: Partial<GridFilters>) => void;
   exportCsv: () => void;
@@ -198,27 +198,55 @@ export interface UseImportLogReturn {
 // ─── Template Headers ──────────────────────────────────────────────────────────
 
 export const TEMPLATE_HEADERS: Record<CatalogType, string[]> = {
-  products: ['nombre', 'sku', 'categoria', 'unidad', 'codigosProveedor'],
-  suppliers: ['nombre', 'contacto', 'telefono', 'email', 'tipo'],
-  conversions: ['producto', 'piezasPorCaja', 'cajasPorTarima', 'pesoKgCaja'],
-  warehouses: ['nombre', 'ubicacion', 'responsable'],
+  products: ["nombre", "sku", "categoria", "unidad", "codigosProveedor"],
+  suppliers: ["nombre", "contacto", "telefono", "email", "tipo"],
+  conversions: ["producto", "piezasPorCaja", "cajasPorTarima", "pesoKgCaja"],
+  warehouses: ["nombre", "ubicacion", "responsable"],
 };
 
 export const TEMPLATE_EXAMPLES: Record<CatalogType, CsvRow[]> = {
   products: [
-    { nombre: 'AGUA MINERAL 600 ML', sku: 'AGU-600', categoria: 'Bebidas', unidad: 'cajas', codigosProveedor: 'AGU600,AGUA-600ML' },
-    { nombre: 'COCA COLA 600ML', sku: 'COC-600', categoria: 'Bebidas', unidad: 'cajas', codigosProveedor: 'COC600' },
+    {
+      nombre: "AGUA MINERAL 600 ML",
+      sku: "AGU-600",
+      categoria: "Bebidas",
+      unidad: "cajas",
+      codigosProveedor: "AGU600,AGUA-600ML",
+    },
+    {
+      nombre: "COCA COLA 600ML",
+      sku: "COC-600",
+      categoria: "Bebidas",
+      unidad: "cajas",
+      codigosProveedor: "COC600",
+    },
   ],
   suppliers: [
-    { nombre: 'COCA COLA FEMSA', contacto: 'Juan Pérez', telefono: '55-1234-5678', email: 'juan@cocacola.com', tipo: 'mercancia' },
-    { nombre: 'TRANSPORTES NORTE', contacto: 'María García', telefono: '55-8765-4321', email: 'maria@transportesnorte.com', tipo: 'logistica' },
+    {
+      nombre: "COCA COLA FEMSA",
+      contacto: "Juan Pérez",
+      telefono: "55-1234-5678",
+      email: "juan@cocacola.com",
+      tipo: "mercancia",
+    },
+    {
+      nombre: "TRANSPORTES NORTE",
+      contacto: "María García",
+      telefono: "55-8765-4321",
+      email: "maria@transportesnorte.com",
+      tipo: "logistica",
+    },
   ],
   conversions: [
-    { producto: 'AGUA MINERAL 600 ML', piezasPorCaja: 24, cajasPorTarima: 84, pesoKgCaja: 15.5 },
-    { producto: 'COCA COLA 600ML', piezasPorCaja: 24, cajasPorTarima: 84, pesoKgCaja: 16.0 },
+    { producto: "AGUA MINERAL 600 ML", piezasPorCaja: 24, cajasPorTarima: 84, pesoKgCaja: 15.5 },
+    { producto: "COCA COLA 600ML", piezasPorCaja: 24, cajasPorTarima: 84, pesoKgCaja: 16.0 },
   ],
   warehouses: [
-    { nombre: 'Bodega Norte', ubicacion: 'Av. Insurgentes 123, CDMX', responsable: 'Carlos López' },
-    { nombre: 'Bodega Sur', ubicacion: 'Calzada de Tlalpan 456, CDMX', responsable: 'Ana Martínez' },
+    { nombre: "Bodega Norte", ubicacion: "Av. Insurgentes 123, CDMX", responsable: "Carlos López" },
+    {
+      nombre: "Bodega Sur",
+      ubicacion: "Calzada de Tlalpan 456, CDMX",
+      responsable: "Ana Martínez",
+    },
   ],
 };

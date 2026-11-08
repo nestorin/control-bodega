@@ -5,9 +5,9 @@
  * Delegates to InventoryContext with negative stock prevention.
  */
 
-import { useCallback } from 'react';
-import { useInventoryContext } from '@/context';
-import type { Producto, Almacen } from '@/types';
+import { useCallback } from "react";
+import { useInventoryContext } from "@/context";
+import type { Producto, Almacen } from "@/types";
 
 // ============================================
 // Hook Return Type
@@ -23,11 +23,11 @@ interface UseInventoryReturn {
   activarAlmacen: (almacen: Almacen) => void;
   aumentarInventario: (
     almacenId: string,
-    productos: Array<{ productoId: string; cajas: number }>
+    productos: Array<{ productoId: string; cajas: number }>,
   ) => void;
   reducirInventario: (
     almacenId: string,
-    productos: Array<{ productoId: string; cajas: number }>
+    productos: Array<{ productoId: string; cajas: number }>,
   ) => void;
 
   // Getters
@@ -54,14 +54,14 @@ export function useInventory(): UseInventoryReturn {
     (almacenId: string, productos: Producto[]) => {
       ctxInicializarInventarioAlmacen(almacenId, productos);
     },
-    [ctxInicializarInventarioAlmacen]
+    [ctxInicializarInventarioAlmacen],
   );
 
   const activarAlmacen = useCallback(
     (almacen: Almacen) => {
       ctxHandleActivarAlmacen(almacen);
     },
-    [ctxHandleActivarAlmacen]
+    [ctxHandleActivarAlmacen],
   );
 
   const aumentarInventario = useCallback(
@@ -69,11 +69,11 @@ export function useInventory(): UseInventoryReturn {
       // Validation: ensure positive cajas
       const validProductos = productos.filter((p) => p.cajas > 0);
       if (validProductos.length !== productos.length) {
-        console.warn('[useInventory] Some products had non-positive cajas, filtering them out');
+        console.warn("[useInventory] Some products had non-positive cajas, filtering them out");
       }
       ctxAumentarInventario(almacenId, validProductos);
     },
-    [ctxAumentarInventario]
+    [ctxAumentarInventario],
   );
 
   const reducirInventario = useCallback(
@@ -81,12 +81,12 @@ export function useInventory(): UseInventoryReturn {
       // Validation: ensure positive cajas
       const validProductos = productos.filter((p) => p.cajas > 0);
       if (validProductos.length !== productos.length) {
-        console.warn('[useInventory] Some products had non-positive cajas, filtering them out');
+        console.warn("[useInventory] Some products had non-positive cajas, filtering them out");
       }
       // The reducer already prevents negative stock with Math.max(0, ...)
       ctxReducirInventario(almacenId, validProductos);
     },
-    [ctxReducirInventario]
+    [ctxReducirInventario],
   );
 
   return {

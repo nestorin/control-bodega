@@ -6,43 +6,34 @@
  * - useQrScanner for QR scanning (Phase 6)
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { BrowserMultiFormatReader } from '@zxing/browser';
-import { useReceptionFlow } from '@/hooks/useReceptionFlow';
-import { useQrScanner } from '@/hooks/useQrScanner';
+import { useEffect, useRef, useState } from "react";
+import { BrowserMultiFormatReader } from "@zxing/browser";
+import { useReceptionFlow } from "@/hooks/useReceptionFlow";
+import { useQrScanner } from "@/hooks/useQrScanner";
 
 export default function EscanearQR() {
   // ============================================
   // New Architecture Hooks
   // ============================================
-  const {
-    navigate,
-    setScannedQrCode: ctxSetScannedQrCode,
-  } = useReceptionFlow();
+  const { navigate, setScannedQrCode: ctxSetScannedQrCode } = useReceptionFlow();
 
   // Use the Phase 6 QR scanner hook
-  const {
-    qrReaderRef,
-    isScanning,
-    scanError,
-    lastResult,
-    startScanning,
-    stopScanning,
-  } = useQrScanner();
+  const { qrReaderRef, isScanning, scanError, lastResult, startScanning, stopScanning } =
+    useQrScanner();
 
   // Legacy callbacks replaced by navigation
   const onFound = (id: string) => {
     // Store scanned QR in context, then navigate to captura-tarima
     ctxSetScannedQrCode(id);
-    navigate('captura-tarima');
+    navigate("captura-tarima");
   };
 
   const onClose = () => {
-    navigate('home');
+    navigate("home");
   };
 
   // Manual input state
-  const [manualId, setManualId] = useState('');
+  const [manualId, setManualId] = useState("");
   const [showManualError, setShowManualError] = useState(false);
 
   function handleManual(e: React.FormEvent) {
@@ -75,29 +66,29 @@ export default function EscanearQR() {
   return (
     <div
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '28px',
-        padding: '40px 28px',
-        height: '100%',
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "28px",
+        padding: "40px 28px",
+        height: "100%",
       }}
     >
       <div
         style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '6px',
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "6px",
         }}
       >
         <p
           style={{
-            fontFamily: 'Inter, sans-serif',
-            fontSize: '22px',
+            fontFamily: "Inter, sans-serif",
+            fontSize: "22px",
             fontWeight: 800,
-            color: '#172126',
+            color: "#172126",
             margin: 0,
           }}
         >
@@ -105,10 +96,10 @@ export default function EscanearQR() {
         </p>
         <p
           style={{
-            fontFamily: 'Inter, sans-serif',
-            fontSize: '14px',
+            fontFamily: "Inter, sans-serif",
+            fontSize: "14px",
             fontWeight: 400,
-            color: '#607078',
+            color: "#607078",
             margin: 0,
           }}
         >
@@ -119,21 +110,21 @@ export default function EscanearQR() {
       {/* Camera viewfinder */}
       <div
         style={{
-          position: 'relative',
-          width: 'min(320px, calc(100vw - 40px))',
-          aspectRatio: '1 / 1',
-          borderRadius: '20px',
-          overflow: 'hidden',
-          background: '#172126',
+          position: "relative",
+          width: "min(320px, calc(100vw - 40px))",
+          aspectRatio: "1 / 1",
+          borderRadius: "20px",
+          overflow: "hidden",
+          background: "#172126",
         }}
       >
         <video
           ref={qrReaderRef}
           style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            display: scanError ? 'none' : 'block',
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: scanError ? "none" : "block",
           }}
           muted
           playsInline
@@ -147,35 +138,35 @@ export default function EscanearQR() {
               {
                 top: 16,
                 left: 16,
-                borderTop: '3px solid #f2b84b',
-                borderLeft: '3px solid #f2b84b',
+                borderTop: "3px solid #f2b84b",
+                borderLeft: "3px solid #f2b84b",
               },
               {
                 top: 16,
                 right: 16,
-                borderTop: '3px solid #f2b84b',
-                borderRight: '3px solid #f2b84b',
+                borderTop: "3px solid #f2b84b",
+                borderRight: "3px solid #f2b84b",
               },
               {
                 bottom: 16,
                 left: 16,
-                borderBottom: '3px solid #f2b84b',
-                borderLeft: '3px solid #f2b84b',
+                borderBottom: "3px solid #f2b84b",
+                borderLeft: "3px solid #f2b84b",
               },
               {
                 bottom: 16,
                 right: 16,
-                borderBottom: '3px solid #f2b84b',
-                borderRight: '3px solid #f2b84b',
+                borderBottom: "3px solid #f2b84b",
+                borderRight: "3px solid #f2b84b",
               },
             ].map((style, i) => (
               <div
                 key={i}
                 style={{
-                  position: 'absolute',
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '3px',
+                  position: "absolute",
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "3px",
                   ...style,
                 }}
               />
@@ -183,13 +174,13 @@ export default function EscanearQR() {
             {/* Scan line animation */}
             <div
               style={{
-                position: 'absolute',
-                left: '10%',
-                right: '10%',
-                height: '2px',
-                background: 'rgba(242,184,75,0.7)',
-                borderRadius: '1px',
-                animation: 'scanline 2s ease-in-out infinite',
+                position: "absolute",
+                left: "10%",
+                right: "10%",
+                height: "2px",
+                background: "rgba(242,184,75,0.7)",
+                borderRadius: "1px",
+                animation: "scanline 2s ease-in-out infinite",
               }}
             />
           </>
@@ -198,13 +189,13 @@ export default function EscanearQR() {
         {scanError && (
           <div
             style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
-              gap: '12px',
-              padding: '24px',
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
+              gap: "12px",
+              padding: "24px",
             }}
           >
             <svg
@@ -222,11 +213,11 @@ export default function EscanearQR() {
             </svg>
             <p
               style={{
-                fontFamily: 'Inter, sans-serif',
-                fontSize: '12px',
+                fontFamily: "Inter, sans-serif",
+                fontSize: "12px",
                 fontWeight: 400,
-                color: '#b9c9cf',
-                textAlign: 'center',
+                color: "#b9c9cf",
+                textAlign: "center",
                 margin: 0,
               }}
             >
@@ -239,56 +230,56 @@ export default function EscanearQR() {
       {/* Manual fallback */}
       <div
         style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '10px',
-          width: '100%',
-          maxWidth: '320px',
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "10px",
+          width: "100%",
+          maxWidth: "320px",
         }}
       >
         <p
           style={{
-            fontFamily: 'Inter, sans-serif',
-            fontSize: '12px',
+            fontFamily: "Inter, sans-serif",
+            fontSize: "12px",
             fontWeight: 400,
-            color: '#607078',
+            color: "#607078",
             margin: 0,
           }}
         >
           ¿No funciona la cámara? Ingresa el ID manualmente
         </p>
-        <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: '8px', width: '100%' }}>
+        <form onSubmit={handleManualSubmit} style={{ display: "flex", gap: "8px", width: "100%" }}>
           <input
             value={manualId}
             onChange={(e) => handleManualChange(e.target.value)}
             placeholder="TQR-24891-003"
             style={{
               flex: 1,
-              height: '44px',
-              padding: '0 14px',
-              borderRadius: '10px',
-              border: showManualError ? '1px solid #d9534f' : '1px solid #dce4e7',
-              fontFamily: 'Inter, sans-serif',
-              fontSize: '14px',
+              height: "44px",
+              padding: "0 14px",
+              borderRadius: "10px",
+              border: showManualError ? "1px solid #d9534f" : "1px solid #dce4e7",
+              fontFamily: "Inter, sans-serif",
+              fontSize: "14px",
               fontWeight: 600,
-              color: '#172126',
-              outline: 'none',
+              color: "#172126",
+              outline: "none",
             }}
           />
           <button
             type="submit"
             style={{
-              height: '44px',
-              padding: '0 18px',
-              borderRadius: '10px',
-              background: '#16343f',
-              border: 'none',
-              fontFamily: 'Inter, sans-serif',
-              fontSize: '13px',
+              height: "44px",
+              padding: "0 18px",
+              borderRadius: "10px",
+              background: "#16343f",
+              border: "none",
+              fontFamily: "Inter, sans-serif",
+              fontSize: "13px",
               fontWeight: 700,
-              color: 'white',
-              cursor: 'pointer',
+              color: "white",
+              cursor: "pointer",
             }}
           >
             Buscar
@@ -297,12 +288,12 @@ export default function EscanearQR() {
         {showManualError && (
           <p
             style={{
-              fontFamily: 'Inter, sans-serif',
-              fontSize: '11px',
+              fontFamily: "Inter, sans-serif",
+              fontSize: "11px",
               fontWeight: 400,
-              color: '#d9534f',
+              color: "#d9534f",
               margin: 0,
-              textAlign: 'center',
+              textAlign: "center",
             }}
           >
             Formato inválido. Ej: TQR-24891-003
@@ -313,16 +304,16 @@ export default function EscanearQR() {
       <button
         onClick={onClose}
         style={{
-          height: '44px',
-          padding: '0 24px',
-          borderRadius: '12px',
-          border: '1px solid #dce4e7',
-          background: 'white',
-          fontFamily: 'Inter, sans-serif',
-          fontSize: '14px',
+          height: "44px",
+          padding: "0 24px",
+          borderRadius: "12px",
+          border: "1px solid #dce4e7",
+          background: "white",
+          fontFamily: "Inter, sans-serif",
+          fontSize: "14px",
           fontWeight: 700,
-          color: '#172126',
-          cursor: 'pointer',
+          color: "#172126",
+          cursor: "pointer",
         }}
       >
         Cancelar

@@ -6,11 +6,11 @@
  * Auto-closes on navigation.
  */
 
-import { memo } from 'react';
-import { useUIContext } from '@/context';
-import { navItems } from '@/config/navigation';
-import { NavIcon } from './NavIcon';
-import type { Screen, NavItem } from '@/types';
+import { memo } from "react";
+import { useUIContext } from "@/context";
+import { navItems } from "@/config/navigation";
+import { NavIcon } from "./NavIcon";
+import type { Screen, NavItem } from "@/types";
 
 interface BottomNavProps {
   currentScreen: Screen;
@@ -48,10 +48,10 @@ export const BottomNav = memo(function BottomNav({
               onClick={() => handleNavigate(item.screen, item.id)}
               className={`relative flex flex-col items-center gap-1 p-2 rounded-lg transition-all duration-200 ${
                 isActive
-                  ? 'text-amber-600 bg-amber-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  ? "text-amber-600 bg-amber-50"
+                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
               }`}
-              aria-current={isActive ? 'page' : undefined}
+              aria-current={isActive ? "page" : undefined}
               aria-label={item.label}
             >
               <NavIcon icon={item.icon} active={isActive} size={24} />
@@ -64,6 +64,6 @@ export const BottomNav = memo(function BottomNav({
   );
 });
 
-BottomNav.displayName = 'BottomNav';
+BottomNav.displayName = "BottomNav";
 
 export default BottomNav;

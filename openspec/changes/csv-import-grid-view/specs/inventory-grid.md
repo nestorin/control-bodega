@@ -1,16 +1,19 @@
 # Specification: Inventory Grid View
 
 ## Overview
+
 Monthly dashboard showing boxes received per product, with row/column totals and grand total. Filterable by warehouse and year.
 
 ## User Stories
 
 ### US-1: View Grid
+
 **As a** warehouse manager
 **I want to** see a grid of products × months with box counts
 **So that** I can track monthly reception trends
 
 **Acceptance Criteria:**
+
 - Rows: All active products (from catalog)
 - Columns: 12 months (Jan–Dec) for selected year
 - Cells: Sum of `cajas` received per product per month
@@ -20,32 +23,38 @@ Monthly dashboard showing boxes received per product, with row/column totals and
 - Empty cells show `—` (not 0)
 
 ### US-2: Filter by Warehouse & Year
+
 **As a** manager
 **I want to** filter the grid by warehouse and year
 **So that** I can analyze specific scenarios
 
 **Acceptance Criteria:**
+
 - Warehouse dropdown: all warehouses user has access to
 - Year dropdown: 2020–current+1
 - Grid updates instantly on filter change
 - URL syncs filters (shareable link)
 
 ### US-3: Drill-down to Receptions
+
 **As an** auditor
 **I want to** click a cell and see the receptions that contributed
 **So that** I can verify the numbers
 
 **Acceptance Criteria:**
+
 - Cell click → modal with reception list for that product+month
 - Columns: date, folio, supplier, cajas, tarimas
 - Link to reception detail
 
 ### US-4: Export Grid
+
 **As a** manager
 **I want to** export the grid to CSV/PDF
 **So that** I can share with leadership
 
 **Acceptance Criteria:**
+
 - CSV: same structure as grid (products × months + totals)
 - PDF: landscape, fitted to page, includes filters in header
 - Filename: `inventario-grid-{warehouse}-{year}.csv`
@@ -53,6 +62,7 @@ Monthly dashboard showing boxes received per product, with row/column totals and
 ## Data Model
 
 ### Monthly Aggregation Document
+
 ```typescript
 interface InventoryMonthly {
   id: string; // `${warehouseId}_${productId}_${year}_${month}` (1-12)
@@ -68,6 +78,7 @@ interface InventoryMonthly {
 ```
 
 ### Aggregation Trigger
+
 - On reception create/edit: increment `InventoryMonthly` for each line
 - On reception delete: decrement
 - Uses Firestore transactions for atomicity
@@ -75,18 +86,20 @@ interface InventoryMonthly {
 ## Grid Computation
 
 ### Query Strategy
+
 ```typescript
 // Single query per grid load
 const q = query(
   collection(db, `organizations/${orgId}/inventoryMonthly`),
-  where('warehouseId', '==', warehouseId),
-  where('year', '==', year)
+  where("warehouseId", "==", warehouseId),
+  where("year", "==", year),
 );
 // 12 * productCount docs max (e.g., 12 * 200 = 2,400 docs)
 // Transform to grid in memory
 ```
 
 ### Grid Structure
+
 ```
                     |  Ene  |  Feb  |  Mar  | ... |  Dic  | Total |
 --------------------|-------|-------|-------|-----|-------|-------|
@@ -98,11 +111,13 @@ Total               |  200  |  195  |  200  | ... |  240  | 2,400 |
 ```
 
 ### Sorting
+
 - Default: Product nombre A-Z
 - Click column header: sort by that month (desc/asc)
 - Click "Total" column: sort by annual total
 
 ### Virtualization
+
 - TanStack Table v8 with `@tanstack/react-virtual`
 - Row height: 44px
 - Overscan: 10 rows
@@ -111,6 +126,7 @@ Total               |  200  |  195  |  200  | ... |  240  | 2,400 |
 ## UI/UX
 
 ### Grid Tab Layout (Inventario screen)
+
 ```
 +------------------------------------------------------------------+
 | Inventario tabs: [Lista] [Movimientos] [Grid]                    |
@@ -132,35 +148,41 @@ Total               |  200  |  195  |  200  | ... |  240  | 2,400 |
 ```
 
 ### Cell Interaction
+
 - Hover: highlight row + column
 - Click cell → modal with reception breakdown
 - Right-click → copy value
 
 ### Responsive
+
 - Desktop: full grid
 - Tablet: horizontal scroll, sticky first column
 - Mobile: card view per product (month chips)
 
 ## Security
+
 - Read access: `canQuery` + warehouse access
 - No write access from grid (read-only)
 - Aggregation writes via backend triggers only
 
 ## Performance Targets
-| Metric | Target |
-|--------|--------|
+
+| Metric                   | Target  |
+| ------------------------ | ------- |
 | Grid load (200 products) | < 800ms |
-| Filter change re-render | < 200ms |
-| Scroll 100 rows | 60fps |
-| Export CSV (200×12) | < 500ms |
+| Filter change re-render  | < 200ms |
+| Scroll 100 rows          | 60fps   |
+| Export CSV (200×12)      | < 500ms |
 
 ## Testing
+
 - Unit: aggregation logic, grid transform
 - Integration: filter + query + render
 - E2E: create receptions → verify grid updates
 - Load: 500 products × 12 months
 
 ## Dependencies
+
 - `@tanstack/react-table` v8
 - `@tanstack/react-virtual` v3
 - `jspdf` + `jspdf-autotable` for PDF export

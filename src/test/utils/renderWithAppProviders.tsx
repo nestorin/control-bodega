@@ -9,16 +9,16 @@
  * useReceptionFlow calls useNavigate(), so a Router is required as well.
  */
 
-import type { ReactElement, ReactNode } from 'react';
-import { render, type RenderOptions, type RenderResult } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { ReceptionProvider } from '@/context/ReceptionContext';
-import { CatalogosProvider } from '@/context/CatalogosContext';
-import { InventoryProvider } from '@/context/InventoryContext';
-import { UIProvider } from '@/context/UIContext';
-import type { ReceptionData } from '@/types';
+import type { ReactElement, ReactNode } from "react";
+import { render, type RenderOptions, type RenderResult } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { ReceptionProvider } from "@/context/ReceptionContext";
+import { CatalogosProvider } from "@/context/CatalogosContext";
+import { InventoryProvider } from "@/context/InventoryContext";
+import { UIProvider } from "@/context/UIContext";
+import type { ReceptionData } from "@/types";
 
-interface RenderWithAppProvidersOptions extends Omit<RenderOptions, 'wrapper'> {
+interface RenderWithAppProvidersOptions extends Omit<RenderOptions, "wrapper"> {
   /** Initial reception state seeded into ReceptionProvider. */
   initialReceptionState?: Record<string, unknown>;
   /** Reception payload seeded into ReceptionProvider as currentReception. */
@@ -41,7 +41,7 @@ export function renderWithAppProviders(
   ui: ReactElement,
   options: RenderWithAppProvidersOptions = {},
 ): RenderResult {
-  const { canQuery = false, initialEntries = ['/'], ...renderOptions } = options;
+  const { canQuery = false, initialEntries = ["/"], ...renderOptions } = options;
 
   const wrapper = ({ children }: { children: ReactNode }) => (
     <MemoryRouter initialEntries={initialEntries}>
