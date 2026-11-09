@@ -53,7 +53,7 @@ export default function NuevaRecepcionStep2() {
   } = useCatalogos();
 
   const { closeSidebarOnMobile, isMobile } = useUIContext();
-  
+
   // Get reception data from context
   const currentReception = ctxCurrentReception;
   const onBackLegacy = () => navigate("nueva-step1");

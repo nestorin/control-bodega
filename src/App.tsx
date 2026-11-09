@@ -1387,30 +1387,14 @@ function AppLayout() {
 
           {screen === "nueva-step2" && <NuevaRecepcionStep2 />}
 
-          {screen === "captura-tarima" && (
-                      <CapturaTarima />
-                    )}
-          {screen === "completada" && (
-                      <RecepcionCompletada />
-                    )}
-          {screen === "impresion" && (
-                      <ImpresionEtiquetas />
-                    )}
-          {screen === "recepciones" && (
-                      <Recepciones />
-                    )}
-          {screen === "escanear-qr" && (
-                      <EscanearQR />
-                    )}
-          {screen === "editar-recepcion" && (
-                      <EditarRecepcion />
-                    )}
-          {screen === "tarima-detalle" && (
-                      <TarimaDetalle />
-                    )}
-          {screen === "evidencias" && (
-                      <Evidencias />
-                    )}
+          {screen === "captura-tarima" && <CapturaTarima />}
+          {screen === "completada" && <RecepcionCompletada />}
+          {screen === "impresion" && <ImpresionEtiquetas />}
+          {screen === "recepciones" && <Recepciones />}
+          {screen === "escanear-qr" && <EscanearQR />}
+          {screen === "editar-recepcion" && <EditarRecepcion />}
+          {screen === "tarima-detalle" && <TarimaDetalle />}
+          {screen === "evidencias" && <Evidencias />}
           {screen === "evidencia-detalle" && selectedEvidencia && <EvidenciaDetalle />}
           {screen === "lotes-caducidades" && <LotesCaducidades />}
           {screen === "embarques" && (

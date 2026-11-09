@@ -816,9 +816,9 @@ export default function Recepciones() {
               aria-label={`Abrir recepción ${rec.displayId || rec.id}`}
               className="flex items-center justify-between px-4 md:px-5 py-3 md:py-4 w-full hover:shadow-[0px_12px_20px_rgba(22,52,63,0.12)] transition-shadow touch-target cursor-pointer"
               onClick={() => {
-              const { navigate } = useReceptionFlow();
-              navigate("editar-recepcion", "recepciones");
-            }}
+                const { navigate } = useReceptionFlow();
+                navigate("editar-recepcion", "recepciones");
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();

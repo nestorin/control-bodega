@@ -58,7 +58,8 @@ export default function EditarRecepcion() {
   const { user, canQuery } = useAuthorization();
   const navigate = useNavigate();
 
-  const { catalogoProveedores, catalogoProductos, catalogosLoading, catalogosError } = useCatalogos();
+  const { catalogoProveedores, catalogoProductos, catalogosLoading, catalogosError } =
+    useCatalogos();
   const { editReceptionData } = useReceptionFlow();
 
   const recId = editReceptionData?.receptionId;
