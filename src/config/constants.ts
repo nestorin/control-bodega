@@ -20,6 +20,7 @@ export const ASSETS = {
   SCAN_QR_CODE_NAV: `${ASSET_PATH_PREFIX}/ba9e1.svg`,
   AVATAR: `${ASSET_PATH_PREFIX}/35fee.svg`,
   INDICADOR: `${ASSET_PATH_PREFIX}/08d70.svg`,
+  ETIQUETADO_NAV: `${ASSET_PATH_PREFIX}/4cca0.svg`,
 } as const;
 
 // ============================================

@@ -69,18 +69,6 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
     catalogosError,
   } = useCatalogos();
 
-  // ============================================
-  // Legacy Props Fallback (for migration period)
-  // ============================================
-  const recId = editId;
-  const onBackLegacy = () => {
-    ctxCancelReception();
-    navigate('recepciones');
-  };
-  const onSaveLegacy = () => {
-    navigate('recepciones');
-  };
-
   const services = useMemo(() => (db ? createFirestoreServices(db, ORG_ID) : null), []);
   const [reception, setReception] = useState<ReceptionDoc | null>(null);
   const [supplierId, setSupplierId] = useState('');
@@ -308,7 +296,7 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
         reception.version,
       );
       setReception(updated);
-      onSaveLegacy();
+      onSave();
     } catch (saveError) {
       setError(receptionErrorMessage(saveError));
     } finally {
@@ -329,7 +317,7 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
         <p role="alert" className="text-red-700">
           {error || 'No se pudo cargar la recepción.'}
         </p>
-        <button type="button" className="mt-4 rounded-lg border px-4 py-2" onClick={onBackLegacy}>
+        <button type="button" className="mt-4 rounded-lg border px-4 py-2" onClick={onBack}>
           Volver
         </button>
       </section>
@@ -587,7 +575,7 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
           <button
             type="button"
             className="min-h-11 rounded-lg border border-[#dce4e7] px-5 font-bold text-[#16343f]"
-            onClick={onBackLegacy}
+            onClick={onBack}
           >
             Volver
           </button>

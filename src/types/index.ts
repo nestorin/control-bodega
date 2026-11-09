@@ -28,6 +28,7 @@ export type Screen =
   | "lotes-caducidades"
   | "embarques"
   | "configuracion"
+  | "etiquetado"
   | "login"
   | "register";
 
@@ -39,7 +40,8 @@ export type NavItem =
   | "qr"
   | "evidencias"
   | "lotes"
-  | "configuracion";
+  | "configuracion"
+  | "etiquetado";
 
 /** Navigation entry for sidebar/bottom nav rendering */
 export interface NavEntry {

@@ -96,6 +96,12 @@ export const navItems: readonly NavEntry[] = [
     screen: 'configuracion',
     icon: 'configuracion',
   },
+  {
+    id: 'etiquetado',
+    label: 'Etiquetado',
+    screen: 'etiquetado',
+    icon: 'etiquetado',
+  },
 ] as const;
 
 /** Mapping from NavItem id to asset icon */
@@ -113,6 +119,8 @@ export function getNavIconAsset(iconId: NavItem): string {
       return ASSETS.SCAN_QR_CODE_NAV;
     case 'configuracion':
       return ASSETS.INDICADOR;
+    case 'etiquetado':
+      return ASSETS.ETIQUETADO_NAV || ASSETS.PACKAGE;
     default:
       return ASSETS.WAREHOUSE_NAV;
   }
