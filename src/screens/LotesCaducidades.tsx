@@ -96,6 +96,8 @@ export default function LotesCaducidades() {
   const importInputRef = useRef<HTMLInputElement>(null);
   const [importPreview, setImportPreview] = useState<InventoryImportPreview | null>(null);
   const [importFileName, setImportFileName] = useState("");
+  const [importBuffer, setImportBuffer] = useState<ArrayBuffer | null>(null);
+  const [importWarehouseId, setImportWarehouseId] = useState<string>(WAREHOUSE_IDS.NORTH);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
 
@@ -237,10 +239,21 @@ export default function LotesCaducidades() {
     setImportError(null);
     setImportFileName(file.name);
     try {
-      setImportPreview(parseInventoryImport(await file.arrayBuffer(), file.name));
+      const buffer = await file.arrayBuffer();
+      setImportBuffer(buffer);
+      setImportPreview(parseInventoryImport(buffer, file.name, importWarehouseId));
     } catch {
       setImportPreview(null);
+      setImportBuffer(null);
       setImportError("No se pudo leer el archivo. Usa XLS, XLSX o CSV.");
+    }
+  };
+
+  const handleImportWarehouseChange = (newWarehouseId: string) => {
+    if (!newWarehouseId) return;
+    setImportWarehouseId(newWarehouseId);
+    if (importBuffer && importFileName) {
+      setImportPreview(parseInventoryImport(importBuffer, importFileName, newWarehouseId));
     }
   };
 
@@ -248,6 +261,7 @@ export default function LotesCaducidades() {
     if (mode === "DISCARD") {
       setImportPreview(null);
       setImportFileName("");
+      setImportBuffer(null);
       return;
     }
     if (!importPreview || !fsServices || !user) return;
@@ -263,6 +277,7 @@ export default function LotesCaducidades() {
       );
       setImportPreview(null);
       setImportFileName("");
+      setImportBuffer(null);
       await loadLotes();
     } catch (err) {
       setImportError(err instanceof Error ? err.message : "No se pudo importar el inventario.");
@@ -502,7 +517,7 @@ export default function LotesCaducidades() {
                   <tr key={row.rowNumber}>
                     <td>{row.rowNumber}</td>
                     <td>{row.warehouseId}</td>
-                    <td>{row.productId}</td>
+                    <td>{row.productName || row.productId}</td>
                     <td className="text-right">{row.quantity}</td>
                   </tr>
                 ))}
@@ -607,20 +622,8 @@ export default function LotesCaducidades() {
           {importPreview && (
             <select
               aria-label="Almacén destino para importación"
-              value={importPreview.validRows[0]?.warehouseId || WAREHOUSE_IDS.NORTH}
-              onChange={(e) => {
-                const newWarehouseId = e.target.value;
-                if (importPreview && newWarehouseId) {
-                  const updatedRows = importPreview.validRows.map((r) => ({
-                    ...r,
-                    warehouseId: newWarehouseId,
-                  }));
-                  setImportPreview({
-                    ...importPreview,
-                    validRows: updatedRows,
-                  });
-                }
-              }}
+              value={importWarehouseId}
+              onChange={(e) => handleImportWarehouseChange(e.target.value)}
               className="px-3 py-2 bg-[#f4f7f8] border border-[#dce4e7] rounded-[10px] text-[12px] focus:border-[#f2b84b] focus:outline-none focus:ring-1 focus:ring-[#f2b84b]"
               style={{ fontFamily: "'Inter',sans-serif", minWidth: "200px" }}
             >
