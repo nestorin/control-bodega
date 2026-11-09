@@ -314,19 +314,19 @@ export default function EvidenciaDetalle() {
     setDownloadError(null);
     try {
       const blob = await generateEvidencePdf({
-        evidenceId: draft.evidenceId || draft.id,
-        receptionId: draft.receptionId || draft.id,
-        date: [draft.fecha, draft.hora].filter(Boolean).join(" "),
-        item: draft.item,
-        supplier: draft.proveedor,
-        logisticsProvider: draft.proveedorLogistico,
-        purchaseOrderNumber: draft.purchaseOrderNumber || draft.ocFolio,
-        lot: draft.lote,
-        expiryDate: draft.caducidad,
-        receivedPalletCount: draft.tarimas,
+        evidenceId: draft?.evidenceId || draft?.id,
+        receptionId: draft?.receptionId || draft?.id,
+        date: [draft?.fecha, draft?.hora].filter(Boolean).join(" "),
+        item: draft?.item,
+        supplier: draft?.proveedor,
+        logisticsProvider: draft?.proveedorLogistico,
+        purchaseOrderNumber: draft?.purchaseOrderNumber || draft?.ocFolio,
+        lot: draft?.lote,
+        expiryDate: draft?.caducidad,
+        receivedPalletCount: draft?.tarimas,
         trailerPhoto,
         productPhoto,
-        pallets: draft.pallets || [],
+        pallets: draft?.pallets || [],
       });
       downloadBlob(
         blob,
@@ -376,7 +376,7 @@ export default function EvidenciaDetalle() {
             </p>
             <div
               className="flex gap-[6px] items-center px-3 py-[6px] rounded-full shrink-0"
-              style={{ backgroundColor: draft.bg }}
+              style={{ backgroundColor: draft?.bg }}
             >
               <img alt="" className="size-[7px]" src={draft.img} />
               <p
@@ -384,10 +384,10 @@ export default function EvidenciaDetalle() {
                 style={{
                   fontFamily: "'Inter', sans-serif",
                   fontWeight: 700,
-                  color: draft.color,
+                  color: draft?.color,
                 }}
               >
-                {draft.estado}
+                {draft?.estado}
               </p>
             </div>
           </div>
@@ -428,7 +428,7 @@ export default function EvidenciaDetalle() {
             />
           </div>
 
-          {draft.documento && (
+          {draft?.documento && (
             <div className="rounded-xl border border-[#dce4e7] bg-[#f4f7f8] p-3">
               <p className="text-xs font-bold text-[#607078]">Orden de compra o factura</p>
               <button
@@ -780,14 +780,17 @@ export default function EvidenciaDetalle() {
               </>
             ) : (
               <>
-                <InfoRow label="Ítem recibido" value={draft.item} />
-                <InfoRow label="Proveedor de mercancía" value={draft.proveedor} />
-                <InfoRow label="Proveedor logístico" value={draft.proveedorLogistico} />
-                <InfoRow label="Orden de compra" value={draft.ocFolio} />
-                <InfoRow label="Lote" value={draft.lote} />
-                <InfoRow label="Tarimas recibidas" value={`${draft.tarimas} tarimas`} />
-                <InfoRow label="Caducidad del producto" value={draft.caducidad} />
-                <InfoRow label="Fecha de recepción" value={`${draft.fecha} · ${draft.hora}`} />
+                <InfoRow label="Ítem recibido" value={draft?.item ?? ""} />
+                <InfoRow label="Proveedor de mercancía" value={draft?.proveedor ?? ""} />
+                <InfoRow label="Proveedor logístico" value={draft?.proveedorLogistico ?? ""} />
+                <InfoRow label="Orden de compra" value={draft?.ocFolio ?? ""} />
+                <InfoRow label="Lote" value={draft?.lote ?? ""} />
+                <InfoRow label="Tarimas recibidas" value={`${draft?.tarimas ?? 0} tarimas`} />
+                <InfoRow label="Caducidad del producto" value={draft?.caducidad ?? ""} />
+                <InfoRow
+                  label="Fecha de recepción"
+                  value={`${draft?.fecha ?? ""} · ${draft?.hora ?? ""}`}
+                />
               </>
             )}
           </div>
