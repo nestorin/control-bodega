@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "exepa-almacen-staging",
+    "site": "exepa-almacen-safe",
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "headers": [
