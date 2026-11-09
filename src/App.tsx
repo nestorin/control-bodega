@@ -1,6 +1,7 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
+import { ReceptionProvider } from "@/context/ReceptionContext";
 import { useAuthorization } from "@/hooks/useAuthorization";
 import {
   CANONICAL_WAREHOUSE_IDS,
@@ -81,7 +82,12 @@ type Screen =
   | "evidencia-detalle"
   | "lotes-caducidades"
   | "embarques"
-  | "configuracion";
+  | "configuracion"
+  | "etiquetado-dashboard"
+  | "etiquetado-nuevo"
+  | "etiquetado-entregar"
+  | "etiquetado-recibir"
+  | "etiquetado-conciliar";
 type NavItem =
   | "home"
   | "recepciones"
@@ -89,7 +95,8 @@ type NavItem =
   | "qr"
   | "evidencias"
   | "lotes"
-  | "configuracion";
+  | "configuracion"
+  | "etiquetado";
 
 interface HeaderConfig {
   subtitle: string;
@@ -100,7 +107,8 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
+        <ReceptionProvider>
+          <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
           <Route
@@ -153,6 +161,7 @@ export default function App() {
             }
           />
         </Routes>
+      </ReceptionProvider>
       </AuthProvider>
     </BrowserRouter>
   );
@@ -436,7 +445,7 @@ function AppLayout() {
       services.products.getAll({ orderBy: ["name", "asc"] }),
       services.suppliers.getAll({ orderBy: ["code", "asc"] }),
       services.conversions.getAll({ orderBy: ["productName", "asc"] }),
-      services.warehouses.getAll({ orderBy: ["code", "asc"] }),
+      services.warehouses.getCanonical(),
     ]).then(([products, suppliers, conversions, warehouses]) => {
       if (!active) return;
       const failed = [products, suppliers, conversions, warehouses].filter(
@@ -795,6 +804,26 @@ function AppLayout() {
       subtitle: "NUEVA RECEPCIÓN",
       title: "Programación de recepción",
     },
+    "etiquetado-dashboard": {
+      subtitle: "ETIQUETADO",
+      title: "Dashboard",
+    },
+    "etiquetado-nuevo": {
+      subtitle: "ETIQUETADO",
+      title: "Nueva orden",
+    },
+    "etiquetado-entregar": {
+      subtitle: "ETIQUETADO",
+      title: "Entregar tarimas",
+    },
+    "etiquetado-recibir": {
+      subtitle: "ETIQUETADO",
+      title: "Recibir devoluciones",
+    },
+    "etiquetado-conciliar": {
+      subtitle: "ETIQUETADO",
+      title: "Conciliar",
+    },
   };
 
   const header = headerConfig[screen];
@@ -849,6 +878,12 @@ function AppLayout() {
       label: "Config.",
       screen: "configuracion" as Screen,
       icon: "configuracion",
+    },
+    {
+      id: "etiquetado" as NavItem,
+      label: "Etiquetado",
+      screen: "etiquetado-dashboard" as Screen,
+      icon: "etiquetado",
     },
   ] as const;
 
@@ -947,6 +982,22 @@ function AppLayout() {
           >
             <circle cx="12" cy="12" r="3" />
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        );
+      case "etiquetado":
+        return (
+          <svg
+            width={size}
+            height={size}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke={iconColor}
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M17.5 19H9a7 7 0 0 1-7-7V6.5a2.5 2.5 0 0 1 5 0v6h7.5" />
+            <polyline points="22 2 17 2 17 7 22 7" />
           </svg>
         );
       default:

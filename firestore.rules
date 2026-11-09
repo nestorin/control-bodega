@@ -42,13 +42,21 @@ service cloud.firestore {
       return warehouseId is string && warehouseId in ['wh_tehuacan_1', 'wh_tehuacan_2'];
     }
 
+    function isUserCreatedWarehouseId(warehouseId) {
+      return warehouseId is string && warehouseId.matches('^ALM-\\d{3}$');
+    }
+
+    function isValidWarehouseId(warehouseId) {
+      return isCanonicalWarehouseId(warehouseId) || isUserCreatedWarehouseId(warehouseId);
+    }
+
     // Check warehouse access (null warehouseId = access to all)
     function canAccessWarehouse(orgId, warehouseId) {
       let membership = getUserMembership(orgId);
-      return isCanonicalWarehouseId(warehouseId) && isMemberOf(orgId) && (
+      return isValidWarehouseId(warehouseId) && isMemberOf(orgId) && (
         membership.data.role in ['SUPER_ADMIN', 'ADMIN'] ||
         (membership.data.warehouseId != null &&
-          isCanonicalWarehouseId(membership.data.warehouseId) &&
+          isValidWarehouseId(membership.data.warehouseId) &&
           membership.data.warehouseId == warehouseId) ||
         (membership.data.warehouseIds is list &&
           membership.data.warehouseIds.hasAny([warehouseId]))
@@ -120,17 +128,17 @@ service cloud.firestore {
 
       // ===== WAREHOUSES =====
       match /warehouses/{warehouseId} {
-        allow read: if isCanonicalWarehouseId(warehouseId) && isMemberOf(orgId);
-        allow create: if isCanonicalWarehouseId(warehouseId) &&
+        allow read: if isValidWarehouseId(warehouseId) && isMemberOf(orgId);
+        allow create: if isValidWarehouseId(warehouseId) &&
           isOrgAdmin(orgId) &&
           request.resource.data.id == warehouseId &&
           request.resource.data.organizationId == orgId;
-        allow update: if isCanonicalWarehouseId(warehouseId) &&
+        allow update: if isValidWarehouseId(warehouseId) &&
           isOrgAdmin(orgId) &&
           resource.data.id == warehouseId &&
           request.resource.data.id == resource.data.id &&
           request.resource.data.organizationId == orgId;
-        allow delete: if isCanonicalWarehouseId(warehouseId) && isOrgAdmin(orgId);
+        allow delete: if isValidWarehouseId(warehouseId) && isOrgAdmin(orgId);
       }
 
       // ===== USERS (MEMBERSHIPS) =====
@@ -389,11 +397,11 @@ service cloud.firestore {
       // for a warehouse/product pair. They contain no business inventory data.
       match /inventory_locks/{lockId} {
         allow read: if isMemberOf(orgId) &&
-          isCanonicalWarehouseId(resource.data.warehouseId);
+          isValidWarehouseId(resource.data.warehouseId);
         allow create: if isSupervisorOrAdmin(orgId) &&
-          isCanonicalWarehouseId(request.resource.data.warehouseId);
+          isValidWarehouseId(request.resource.data.warehouseId);
         allow update: if isSupervisorOrAdmin(orgId) &&
-          isCanonicalWarehouseId(resource.data.warehouseId) &&
+          isValidWarehouseId(resource.data.warehouseId) &&
           warehouseAssignmentUnchanged();
         allow delete: if isOrgAdmin(orgId);
       }
@@ -402,7 +410,7 @@ service cloud.firestore {
       match /inventory/{inventoryId} {
         allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId);
         allow create: if isSupervisorOrAdmin(orgId) &&
-          isCanonicalWarehouseId(request.resource.data.warehouseId);
+          isValidWarehouseId(request.resource.data.warehouseId);
         allow update: if isSupervisorOrAdmin(orgId) &&
           canAccessWarehouse(orgId, resource.data.warehouseId) &&
           warehouseAssignmentUnchanged();
