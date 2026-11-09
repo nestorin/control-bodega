@@ -21,16 +21,9 @@ import { useReceptionFlow } from "@/hooks/useReceptionFlow";
 import { QRCodeSVG } from "qrcode.react";
 import type { Producto, Proveedor } from "./Configuracion";
 import { ReceptionProductCard } from "./ProgramacionRecepcion";
+import { useNavigate } from "react-router-dom";
 
 const ORG_ID = "org_exepa_001";
-
-interface Props {
-  recId: string;
-  suppliers: Proveedor[];
-  products: Producto[];
-  onBack: () => void;
-  onSave: () => void;
-}
 
 interface EditableProductLine {
   lineIndex: number;
@@ -62,11 +55,14 @@ function receptionErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "No se pudo cargar la recepción.";
 }
 
-export default function EditarRecepcion({ recId, suppliers, products, onBack, onSave }: Props) {
+export default function EditarRecepcion() {
   const { user, canQuery } = useAuthorization();
+  const navigate = useNavigate();
 
   const { catalogoProveedores, catalogosLoading, catalogosError } = useCatalogos();
   const { editReceptionData } = useReceptionFlow();
+
+  const recId = editReceptionData?.receptionId;
 
   const services = useMemo(() => (db ? createFirestoreServices(db, ORG_ID) : null), []);
   const [reception, setReception] = useState<ReceptionDoc | null>(null);
@@ -173,7 +169,8 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
         setProductLines(Array.from(linesMap.values()).sort((a, b) => a.lineIndex - b.lineIndex));
       })
       .catch((loadError) => {
-        if (active) setError(receptionErrorMessage(loadError));
+        if (!active) return;
+        setError(receptionErrorMessage(loadError));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -182,48 +179,12 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
     return () => {
       active = false;
     };
-  }, [canQuery, recId, services, merchandiseSuppliers, editReceptionData]);
+  }, [recId, canQuery, services, catalogosLoading, editReceptionData, merchandiseSuppliers]);
 
-  const editable = reception ? isEditableDraft(reception) : false;
-  const totalPallets =
-    reception?.plannedPallets?.length ?? productLines.reduce((sum, l) => sum + l.pallets, 0);
-
-  function handleProductQuantityChange(lineIndex: number, quantity: number) {
-    setProductLines((prev) =>
-      prev.map((line) =>
-        line.lineIndex === lineIndex ? { ...line, quantity: Math.max(1, quantity) } : line,
-      ),
-    );
-  }
-
-  function handleProductUnitChange(lineIndex: number, unit: string) {
-    setProductLines((prev) =>
-      prev.map((line) => (line.lineIndex === lineIndex ? { ...line, unit } : line)),
-    );
-  }
-
-  function handleAddProductLine() {
-    const nextLineIndex =
-      productLines.length > 0 ? Math.max(...productLines.map((l) => l.lineIndex)) + 1 : 0;
-    setProductLines((prev) => [
-      ...prev,
-      {
-        lineIndex: nextLineIndex,
-        productId: "",
-        productName: "",
-        quantity: 1,
-        unit: "cajas",
-        pallets: 1,
-      },
-    ]);
-  }
-
-  function handleRemoveProductLine(lineIndex: number) {
-    setProductLines((prev) => prev.filter((line) => line.lineIndex !== lineIndex));
-  }
+  const editable = isEditableDraft(reception!);
 
   async function handleSave() {
-    if (!reception || !editable || !services || !user?.uid) return;
+    if (!reception || !services || !user) return;
     setSaving(true);
     setError(null);
     try {
@@ -240,56 +201,32 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
       }
 
       // Build lines from productLines
-      const lines = productLines.map((line) => ({
-        productId: line.productId,
-        quantity: line.quantity,
-        unit: line.unit,
-        lot: undefined,
-        palletsCreated: 0,
-      }));
-
-      const groupedLines = new Map<
-        number,
-        { productId: string; quantity: number; unit: string; palletsCreated: number }
-      >();
-      for (const line of productLines) {
-        const existing = groupedLines.get(line.lineIndex) ?? {
-          productId: line.productId,
-          quantity: 0,
-          unit: line.unit,
-          palletsCreated: 0,
-        };
-        existing.quantity += line.quantity;
-        groupedLines.set(line.lineIndex, existing);
-      }
-
-      const plannedPallets: PlannedReceptionPalletDraft[] = productLines.map((line) => ({
-        palletNumber: line.pallets,
+      const lines: PlannedReceptionPalletDraft[] = productLines.map((line) => ({
         lineIndex: line.lineIndex,
         productId: line.productId,
         productName: line.productName,
         quantity: line.quantity,
         unit: line.unit,
+        status: "PLANNED" as const,
+        activated: false,
       }));
 
-      const operationId = `op-edit-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      // Create edit data for the reception
       const editData: ReceptionCreateInput = {
+        hasOC: reception.hasOC ?? true,
+        ocFolio: reception.ocFolio,
+        tarimas: reception.tarimas,
+        supplierId: supplierRecord.id,
+        supplierName: supplierRecord.nombre,
+        logisticsProvider: logisticsProvider || reception.logisticsProvider,
         warehouseId: reception.warehouseId,
-        supplierId,
-        purchaseOrderId: reception.purchaseOrderId,
-        purchaseOrderNumber: reception.purchaseOrderNumber,
-        folio: reception.folio || reception.purchaseOrderNumber || reception.id,
-        scheduledDate: reception.scheduledDate,
-        supplierCode: supplierRecord.code,
-        supplierName: supplierRecord.name,
-        logisticsProvider: logisticsProvider.trim(),
-        productName: productLines.map((l) => l.productName).join(", "),
-        palletCount: plannedPallets.length,
-        plannedPallets,
-        status: "DRAFT",
-        operationId,
-        actorUserId: user.uid,
+        fechaRecepcion: reception.fechaRecepcion,
+        lote: reception.lote,
+        caducidad: reception.caducidad,
       };
+
+      // Generate operation ID if needed
+      const operationId = reception.operationId || `op-${Date.now()}`;
 
       const updated = await services.receptions.editReception(
         reception.id,
@@ -300,12 +237,46 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
         reception.version,
       );
       setReception(updated);
-      onSave();
+      navigate("recepciones");
     } catch (saveError) {
       setError(receptionErrorMessage(saveError));
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleAddProductLine() {
+    const nextIndex = productLines.length > 0 ? Math.max(...productLines.map((l) => l.lineIndex)) + 1 : 0;
+    setProductLines((prev) => [
+      ...prev,
+      {
+        lineIndex: nextIndex,
+        productId: "",
+        productName: "",
+        quantity: 0,
+        unit: "",
+        pallets: 0,
+      },
+    ]);
+  }
+
+  function handleRemoveProductLine(lineIndex: number) {
+    setProductLines((prev) => prev.filter((line) => line.lineIndex !== lineIndex));
+  }
+
+  function handleProductSelect(lineIndex: number, product: Producto) {
+    setProductLines((prev) =>
+      prev.map((current) =>
+        current.lineIndex === lineIndex
+          ? {
+              ...current,
+              productName: product.nombre,
+              productId: product.id,
+              unit: product.unidad,
+            }
+          : current,
+      ),
+    );
   }
 
   if (loading) {
@@ -321,7 +292,7 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
         <p role="alert" className="text-red-700">
           {error || "No se pudo cargar la recepción."}
         </p>
-        <button type="button" className="mt-4 rounded-lg border px-4 py-2" onClick={onBack}>
+        <button type="button" className="mt-4 rounded-lg border px-4 py-2" onClick={() => navigate("recepciones")}>
           Volver
         </button>
       </section>
@@ -345,255 +316,132 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
           </span>
         </header>
 
-        {!editable && (
-          <div className="rounded-xl border border-[#f2d49a] bg-[#fff8e8] px-4 py-3 text-sm text-[#76551f]">
-            Esta recepción no se puede editar: solo se permiten cambios en borradores que todavía no
-            iniciaron la captura de tarimas.
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm text-[#607078]">
+            <span className="font-bold">Proveedor:</span>
+            <span>{reception.supplierName}</span>
           </div>
-        )}
-        {error && (
-          <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </p>
-        )}
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-xl bg-[#f4f7f8] p-4">
-            <p className="text-xs font-bold uppercase text-[#607078]">Orden de compra</p>
-            <p className="mt-1 font-semibold text-[#172126]">
-              {reception.purchaseOrderNumber || "—"}
-            </p>
+          <div className="flex items-center gap-2 text-sm text-[#607078]">
+            <span className="font-bold">Proveedor logístico:</span>
+            <span>{reception.logisticsProvider || "Sin proveedor logístico"}</span>
           </div>
-          <div className="rounded-xl bg-[#f4f7f8] p-4">
-            <p className="text-xs font-bold uppercase text-[#607078]">Total de tarimas</p>
-            <p className="mt-1 font-semibold text-[#172126]">{totalPallets}</p>
-            <p className="mt-1 text-xs text-[#607078]">
-              Calculado del plan de tarimas para mantener cantidades y QR sincronizados.
-            </p>
+          <div className="flex items-center gap-2 text-sm text-[#607078]">
+            <span className="font-bold">Tarimas:</span>
+            <span>{reception.tarimas}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-[#607078]">
+            <span className="font-bold">Fecha:</span>
+            <span>{reception.fechaRecepcion || "—"}</span>
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="flex flex-col gap-2 text-sm font-semibold text-[#607078]">
-            Proveedor de mercancía
-            {editable ? (
-              <select
-                className="min-h-11 rounded-lg border border-[#dce4e7] px-3 text-[#172126]"
-                value={supplierId}
-                onChange={(event) => setSupplierId(event.target.value)}
-              >
-                <option value="">Seleccionar proveedor</option>
-                {reception.supplierId &&
-                  !merchandiseSuppliers.some(
-                    (supplier) => supplier.id === reception.supplierId,
-                  ) && (
-                    <option value={reception.supplierId}>
-                      {reception.supplierName || reception.supplierCode || "Proveedor actual"}
-                    </option>
-                  )}
-                {merchandiseSuppliers.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.nombre}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="min-h-11 rounded-lg bg-[#f4f7f8] px-3 py-3 text-[#172126]">
-                {reception.supplierName || reception.supplierCode || "Sin proveedor"}
-              </span>
-            )}
-          </label>
-          <label className="flex flex-col gap-2 text-sm font-semibold text-[#607078]">
-            Proveedor logístico
-            {editable ? (
-              <select
-                className="min-h-11 rounded-lg border border-[#dce4e7] px-3 text-[#172126]"
-                value={logisticsProvider}
-                onChange={(event) => setLogisticsProvider(event.target.value)}
-              >
-                <option value="">Sin proveedor logístico</option>
-                {logisticsProvider &&
-                  !logisticsSuppliers.some((supplier) => supplier.nombre === logisticsProvider) && (
-                    <option value={logisticsProvider}>{logisticsProvider}</option>
-                  )}
-                {logisticsSuppliers.map((supplier) => (
-                  <option key={supplier.id} value={supplier.nombre}>
-                    {supplier.nombre}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="min-h-11 rounded-lg bg-[#f4f7f8] px-3 py-3 text-[#172126]">
-                {reception.logisticsProvider || "Sin proveedor logístico"}
-              </span>
-            )}
-          </label>
-        </div>
-
-        <div>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-bold text-[#172126]">Productos programados</h2>
-            {editable && (
-              <button
-                type="button"
-                onClick={handleAddProductLine}
-                className="text-sm text-[#3276a8] hover:underline"
-              >
-                + Agregar producto
-              </button>
-            )}
-          </div>
-          {productLines.length ? (
-            <div className="grid gap-3 md:grid-cols-2">
-              {productLines.map((line) =>
-                editable ? (
-                  <ReceptionProductCard
-                    key={line.lineIndex}
-                    number={line.lineIndex + 1}
-                    inputId={`edit-product-${line.lineIndex}`}
-                    inputAriaLabel={`Producto línea ${line.lineIndex + 1}`}
-                    value={line.productName}
-                    onChange={(value) =>
-                      setProductLines((prev) =>
-                        prev.map((current) =>
-                          current.lineIndex === line.lineIndex
-                            ? { ...current, productName: value, productId: "" }
-                            : current,
-                        ),
-                      )
-                    }
-                    onSelect={(product) =>
-                      setProductLines((prev) =>
-                        prev.map((current) =>
-                          current.lineIndex === line.lineIndex
-                            ? {
-                                ...current,
-                                productName: product.nombre,
-                                productId: product.id,
-                                unit: product.unidad,
-                              }
-                            : current,
-                        ),
-                      )
-                    }
-                    catalogos={products}
-                    onRemove={() => handleRemoveProductLine(line.lineIndex)}
-                  >
-                    <div className="grid grid-cols-2 gap-3">
-                      <label className="grid min-w-0 gap-1 text-xs font-bold uppercase tracking-wide text-[#607078]">
-                        Cantidad
-                        <input
-                          type="number"
-                          min="1"
-                          value={line.quantity}
-                          onChange={(event) =>
-                            handleProductQuantityChange(
-                              line.lineIndex,
-                              parseInt(event.target.value) || 1,
-                            )
-                          }
-                          className="min-h-11 w-full min-w-0 rounded-lg border border-[#dce4e7] bg-white px-3 text-[13px] text-[#172126]"
-                          inputMode="numeric"
-                        />
-                      </label>
-                      <label className="grid min-w-0 gap-1 text-xs font-bold uppercase tracking-wide text-[#607078]">
-                        Unidad
-                        <select
-                          value={line.unit}
-                          onChange={(event) =>
-                            handleProductUnitChange(line.lineIndex, event.target.value)
-                          }
-                          className="min-h-11 w-full min-w-0 rounded-lg border border-[#dce4e7] bg-white px-3 text-[13px] text-[#172126]"
-                        >
-                          <option value="cajas">Cajas</option>
-                          <option value="piezas">Piezas</option>
-                          <option value="unidades">Unidades</option>
-                          <option value="pallets">Pallets</option>
-                        </select>
-                      </label>
+        {editable && (
+          <section className="rounded-xl border border-[#dce4e7] bg-[#f8fafb] p-4">
+            <h2 className="mb-3 text-lg font-bold text-[#172126]">Líneas de producto</h2>
+            <div className="space-y-3">
+              {productLines.map((line) => (
+                <ReceptionProductCard
+                  key={line.lineIndex}
+                  line={line}
+                  catalogos={catalogoProductos}
+                  onRemove={() => handleRemoveProductLine(line.lineIndex)}
+                >
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-medium text-[#607078]">Producto</label>
+                      <select
+                        value={line.productId}
+                        onChange={(e) => {
+                          const product = catalogoProductos.find((p) => p.id === e.target.value);
+                          if (product) handleProductSelect(line.lineIndex, product);
+                        }}
+                        className="rounded-lg border border-[#dce4e7] bg-white px-3 py-2 text-sm focus:border-[#3276a8] focus:outline-none"
+                      >
+                        <option value="">Seleccionar producto</option>
+                        {catalogoProductos.map((product) => (
+                          <option key={product.id} value={product.id}>
+                            {product.nombre} ({product.codigo})
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    <p className="text-sm text-[#607078]">
-                      Línea {line.lineIndex + 1} · {line.pallets} tarimas
-                    </p>
-                  </ReceptionProductCard>
-                ) : (
-                  <div
-                    key={line.lineIndex}
-                    className="min-w-0 rounded-2xl border border-[#dce4e7] bg-[#fbfcfc] p-4 shadow-sm sm:p-5"
-                  >
-                    <p className="break-words font-semibold text-[#172126]">{line.productName}</p>
-                    <p className="mt-1 text-sm text-[#607078]">
-                      {line.quantity} {line.unit} · {line.pallets} tarimas
-                    </p>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-medium text-[#607078]">Cantidad</label>
+                      <input
+                        type="number"
+                        value={line.quantity}
+                        onChange={(e) =>
+                          setProductLines((prev) =>
+                            prev.map((current) =>
+                              current.lineIndex === line.lineIndex
+                                ? { ...current, quantity: parseInt(e.target.value) || 0 }
+                                : current,
+                            ),
+                          )
+                        }
+                        min="0"
+                        className="rounded-lg border border-[#dce4e7] bg-white px-3 py-2 text-sm focus:border-[#3276a8] focus:outline-none"
+                      />
+                    </div>
                   </div>
-                ),
+                </ReceptionProductCard>
+              ))}
+              {editable && (
+                <button
+                  type="button"
+                  onClick={handleAddProductLine}
+                  className="flex items-center gap-2 w-full rounded-lg border-2 border-dashed border-[#dce4e7] bg-white py-2 text-sm font-medium text-[#3276a8] hover:bg-[#f4f7f8]"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  Agregar línea de producto
+                </button>
               )}
             </div>
-          ) : (
-            <p className="rounded-xl bg-[#f4f7f8] p-4 text-sm text-[#607078]">
-              Esta recepción no tiene un plan detallado de tarimas.
-              {editable && " Agregá productos usando el botón de arriba."}
-            </p>
-          )}
-        </div>
+          </section>
+        )}
 
-        <div>
-          <h2 className="mb-3 text-base font-bold text-[#172126]">Tarimas y códigos QR</h2>
-          {reception.plannedPallets && reception.plannedPallets.length ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {reception.plannedPallets.map((pallet) => (
-                <article
-                  key={pallet.qrIdentifier}
-                  className="flex min-w-0 items-center gap-3 rounded-xl border border-[#edf1f3] p-3"
-                >
-                  <QRCodeSVG
-                    value={pallet.qrIdentifier}
-                    size={76}
-                    level="H"
-                    marginSize={2}
-                    title={`Código QR ${pallet.qrIdentifier}`}
-                    className="shrink-0"
-                  />
-                  <div className="min-w-0">
-                    <p className="font-bold text-[#172126]">
-                      Tarima {pallet.palletNumber} · {pallet.status}
-                    </p>
-                    <p className="truncate text-sm text-[#607078]">
-                      {pallet.productName} · {pallet.quantity} {pallet.unit}
-                    </p>
-                    <p className="break-all text-xs font-semibold text-[#3276a8]">
-                      {pallet.qrIdentifier}
-                    </p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p className="rounded-xl bg-[#f4f7f8] p-4 text-sm text-[#607078]">
-              Esta recepción no tiene códigos QR disponibles en su plan.
-            </p>
-          )}
-        </div>
-
-        <footer className="flex flex-wrap justify-between gap-3 border-t border-[#edf1f3] pt-4">
+        <div className="flex flex-col md:flex-row gap-3 justify-end pt-4 border-t border-[#dce4e7]">
           <button
             type="button"
-            className="min-h-11 rounded-lg border border-[#dce4e7] px-5 font-bold text-[#16343f]"
-            onClick={onBack}
+            onClick={() => navigate("recepciones")}
+            className="flex items-center gap-2 min-h-11 rounded-lg border border-[#dce4e7] bg-white px-5 py-2 text-sm font-semibold text-[#172126] hover:bg-[#f8fafb]"
           >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
             Volver
           </button>
           {editable && (
             <button
               type="button"
-              className="min-h-11 rounded-lg bg-[#16343f] px-5 font-bold text-white disabled:opacity-60"
+              onClick={handleSave}
               disabled={saving}
-              onClick={() => void handleSave()}
+              className="flex items-center gap-2 min-h-11 rounded-lg bg-[#3276a8] px-5 py-2 text-sm font-semibold text-white hover:bg-[#2a6291] disabled:opacity-50"
             >
-              {saving ? "Guardando…" : "Guardar cambios"}
+              {saving ? (
+                <>
+                  <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                    <path d="M12 2a10 10 0 0 1 10 10" strokeOpacity="1" />
+                  </svg>
+                  Guardando…
+                </>
+              ) : (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                  </svg>
+                  Guardar cambios
+                </>
+              )}
             </button>
           )}
-        </footer>
+        </div>
       </section>
     </div>
   );
