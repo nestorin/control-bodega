@@ -21,16 +21,32 @@ export interface InventoryImportPreview {
   mappings: Record<string, string>;
 }
 
-const productNameAliases = ["articulo", "artículo", "producto", "product", "productname", "nombre", "descripcion", "descripción"];
+const productNameAliases = [
+  "articulo",
+  "artículo",
+  "producto",
+  "product",
+  "productname",
+  "nombre",
+  "descripcion",
+  "descripción",
+];
 const warehouseAliases = ["almacen", "almacén", "warehouse", "warehouseid", "bodega", "sucursal"];
-const quantityAliases = ["existencia", "cantidad", "cajas", "quantity", "stock", "cantidad_disponible"];
+const quantityAliases = [
+  "existencia",
+  "cantidad",
+  "cajas",
+  "quantity",
+  "stock",
+  "cantidad_disponible",
+];
 
 const aliases: Record<string, string> = {
   productid: "productId",
   sku: "productId",
-  ...Object.fromEntries(productNameAliases.map(a => [a, "productName"])),
-  ...Object.fromEntries(warehouseAliases.map(a => [a, "warehouseId"])),
-  ...Object.fromEntries(quantityAliases.map(a => [a, "quantity"])),
+  ...Object.fromEntries(productNameAliases.map((a) => [a, "productName"])),
+  ...Object.fromEntries(warehouseAliases.map((a) => [a, "warehouseId"])),
+  ...Object.fromEntries(quantityAliases.map((a) => [a, "quantity"])),
 };
 
 function normalizeHeader(value: unknown): string {
@@ -90,14 +106,14 @@ export function parseInventoryImport(
       mappings: {},
     };
   }
-  
+
   // Detect headers and build mappings
   const firstRow = rows[0] || {};
   const rawHeaders = Object.keys(firstRow);
   const mappings: Record<string, string> = {};
   const headersDetected: string[] = [];
-  
-  rawHeaders.forEach(header => {
+
+  rawHeaders.forEach((header) => {
     const normalized = normalizeHeader(header);
     const alias = aliases[normalized];
     if (alias) {
@@ -108,11 +124,11 @@ export function parseInventoryImport(
 
   const validRows: InventoryImportRow[] = [];
   const errors: InventoryImportPreview["errors"] = [];
-  
+
   rows.forEach((raw, index) => {
     const rowNumber = index + 2;
     const mapped: Record<string, unknown> = {};
-    
+
     Object.entries(raw).forEach(([key, value]) => {
       const alias = mappings[key];
       if (alias) mapped[alias] = value;
@@ -141,7 +157,8 @@ export function parseInventoryImport(
     if (!productName) {
       errors.push({
         rowNumber: index + 2,
-        message: "No se pudo identificar el nombre del producto (campo Articulo/Producto requerido).",
+        message:
+          "No se pudo identificar el nombre del producto (campo Articulo/Producto requerido).",
       });
       return;
     }
@@ -162,14 +179,14 @@ export function parseInventoryImport(
       return;
     }
 
-    validRows.push({ 
-      rowNumber: index + 2, 
-      productName, 
-      warehouseId: whId, 
-      quantity: qty 
+    validRows.push({
+      rowNumber: index + 2,
+      productName,
+      warehouseId: whId,
+      quantity: qty,
     });
   });
-  
+
   return { validRows, errors, headersDetected, mappings };
 }
 

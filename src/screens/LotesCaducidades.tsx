@@ -611,10 +611,13 @@ export default function LotesCaducidades() {
               onChange={(e) => {
                 const newWarehouseId = e.target.value;
                 if (importPreview && newWarehouseId) {
-                  const updatedRows = importPreview.validRows.map(r => ({ ...r, warehouseId: newWarehouseId }));
+                  const updatedRows = importPreview.validRows.map((r) => ({
+                    ...r,
+                    warehouseId: newWarehouseId,
+                  }));
                   setImportPreview({
                     ...importPreview,
-                    validRows: updatedRows
+                    validRows: updatedRows,
                   });
                 }
               }}

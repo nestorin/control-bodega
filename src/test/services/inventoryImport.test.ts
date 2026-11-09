@@ -13,7 +13,11 @@ describe("inventory import", () => {
       ]),
       "Inventory",
     );
-    const preview = parseInventoryImport(XLSX.write(workbook, { type: "array", bookType: "xlsx" }), "test.xlsx", "wh-1");
+    const preview = parseInventoryImport(
+      XLSX.write(workbook, { type: "array", bookType: "xlsx" }),
+      "test.xlsx",
+      "wh-1",
+    );
     expect(preview.validRows).toHaveLength(1);
     expect(preview.errors).toHaveLength(1);
   });
@@ -29,7 +33,11 @@ describe("inventory import", () => {
       ]),
       "Inventory",
     );
-    const preview = parseInventoryImport(XLSX.write(workbook, { type: "array", bookType: "xlsx" }), "test.xlsx", "wh-1");
+    const preview = parseInventoryImport(
+      XLSX.write(workbook, { type: "array", bookType: "xlsx" }),
+      "test.xlsx",
+      "wh-1",
+    );
     expect(preview.validRows).toEqual([
       { rowNumber: 2, productName: "p-1", warehouseId: "wh-1", quantity: 0 },
       { rowNumber: 4, productName: "p-2", warehouseId: "wh-1", quantity: 0 },
