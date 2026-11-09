@@ -1381,134 +1381,10 @@ function AppLayout() {
               }}
             />
           )}
-          {screen === "captura-evidencia" && (
-            <CapturaEvidencia
-              onBack={() => navigate("home", "home")}
-              currentReception={currentReception}
-              receptionId={currentReception?.receptionId}
-              onContinue={(evidence) => {
-                setCurrentReception((prev) =>
-                  prev
-                    ? {
-                        ...prev,
-                        evidencePhotos: {
-                          trailer: evidence.photos[0] || undefined,
-                          product: evidence.photos[1] || undefined,
-                          documentation: undefined,
-                        },
-                        proveedor: evidence.form.proveedor,
-                        // The logistics provider comes from the scheduled reception.
-                        // Evidence item data must never overwrite it.
-                        proveedorLogistico: prev.proveedorLogistico || "Sin proveedor logístico",
-                        lote: evidence.form.lote,
-                        caducidad: evidence.form.caducidad,
-                      }
-                    : {
-                        ocFolio: "OC-24891",
-                        tarimas: parseInt(evidence.form.tarimas) || 20,
-                        proveedor: evidence.form.proveedor,
-                        proveedorLogistico: "Sin proveedor logístico",
-                        warehouseId: profile?.warehouseId ?? undefined,
-                        lote: evidence.form.lote,
-                        caducidad: evidence.form.caducidad,
-                        productos: [],
-                        evidencePhotos: {
-                          trailer: evidence.photos[0] || undefined,
-                          product: evidence.photos[1] || undefined,
-                          documentation: undefined,
-                        },
-                      },
-                );
-                if (receptionSession.session.phase === "EVIDENCE") {
-                  receptionSession.transition("PALLETS");
-                }
-                navigate("captura-tarima");
-              }}
-            />
-          )}
-          {screen === "nueva-step1" && (
-            <NuevaRecepcionStep1
-              onBack={() => {
-                setCurrentReception(null);
-                navigate("home", "home");
-              }}
-              initialData={
-                currentReception?.receptionId
-                  ? {
-                      hasOC: currentReception.hasOC ?? true,
-                      ocFolio: currentReception.ocFolio,
-                      tarimas: String(currentReception.tarimas),
-                      proveedor: currentReception.proveedor,
-                      proveedorLogistico: currentReception.proveedorLogistico,
-                      receptionId: currentReception.receptionId,
-                      productos: currentReception.productos.map((product) => ({
-                        ...product,
-                        importe: product.importe,
-                      })),
-                      conversionesTabla: currentReception.conversionesTabla,
-                    }
-                  : undefined
-              }
-              onContinue={(data) => {
-                setCurrentReception((prev) => ({
-                  ...prev,
-                  hasOC: data.hasOC,
-                  ocFolio: data.ocFolio,
-                  tarimas: parseInt(data.tarimas) || 20,
-                  proveedor: data.proveedor,
-                  proveedorLogistico: data.proveedorLogistico,
-                  receptionId: data.receptionId,
-                  productos: (data.productos ?? []).map((product) => ({
-                    ...product,
-                    precio: 0,
-                    estadoMatch: product.estadoMatch,
-                  })),
-                  conversionesTabla: data.conversionesTabla,
-                  lote: prev?.lote,
-                  caducidad: prev?.caducidad,
-                }));
-                navigate("nueva-step2");
-              }}
-              catalogos={{
-                proveedores: catalogoProveedores,
-                productos: catalogoProductos,
-              }}
-              catalogosStatus={{
-                loading: catalogosLoading,
-                error: catalogosError,
-              }}
-            />
-          )}
+          {screen === "captura-evidencia" && <CapturaEvidencia />}
+          {screen === "nueva-step1" && <NuevaRecepcionStep1 />}
 
-          {screen === "nueva-step2" && (
-            <NuevaRecepcionStep2
-              onBack={() => navigate("nueva-step1")}
-              onContinue={() => navigate("captura-tarima")}
-              initialData={
-                currentReception
-                  ? {
-                      hasOC: true,
-                      ocFolio: currentReception.ocFolio,
-                      tarimas: currentReception.tarimas.toString(),
-                      proveedor: currentReception.proveedor,
-                      proveedorLogistico: currentReception.proveedorLogistico,
-                      productos: currentReception.productos.map((product) => ({
-                        ...product,
-                      })),
-                    }
-                  : undefined
-              }
-              catalogos={{
-                proveedores: catalogoProveedores,
-                productos: catalogoProductos,
-              }}
-              catalogosStatus={{
-                loading: catalogosLoading,
-                error: catalogosError,
-              }}
-              conversiones={catalogoConversiones}
-            />
-          )}
+          {screen === "nueva-step2" && <NuevaRecepcionStep2 />}
 
           {screen === "captura-tarima" && (
             <CapturaTarima
@@ -1618,12 +1494,7 @@ function AppLayout() {
               }}
             />
           )}
-          {screen === "evidencia-detalle" && selectedEvidencia && (
-            <EvidenciaDetalle
-              evidencia={selectedEvidencia}
-              onBack={() => navigate("evidencias", "evidencias")}
-            />
-          )}
+          {screen === "evidencia-detalle" && selectedEvidencia && <EvidenciaDetalle />}
           {screen === "lotes-caducidades" && <LotesCaducidades />}
           {screen === "embarques" && (
             <Embarques
