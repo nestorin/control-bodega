@@ -5,9 +5,9 @@
  * Presentational only - receives icon ID, active state, and size.
  */
 
-import { memo } from 'react';
-import { renderNavIcon } from '@/config/navigation';
-import type { NavItem } from '@/types';
+import { memo } from "react";
+import { renderNavIcon } from "@/config/navigation";
+import type { NavItem } from "@/types";
 
 interface NavIconProps {
   icon: NavItem;
@@ -19,6 +19,6 @@ export const NavIcon = memo(function NavIcon({ icon, active = false, size = 22 }
   return <>{renderNavIcon(icon, active, size)}</>;
 });
 
-NavIcon.displayName = 'NavIcon';
+NavIcon.displayName = "NavIcon";
 
 export default NavIcon;

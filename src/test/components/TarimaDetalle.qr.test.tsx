@@ -1,11 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import '@testing-library/jest-dom';
-import { ReceptionProvider } from '@/context/ReceptionContext';
-import { CatalogosProvider } from '@/context/CatalogosContext';
-import { InventoryProvider } from '@/context/InventoryContext';
-import { UIProvider } from '@/context/UIContext';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import "@testing-library/jest-dom";
+import { ReceptionProvider } from "@/context/ReceptionContext";
+import { CatalogosProvider } from "@/context/CatalogosContext";
+import { InventoryProvider } from "@/context/InventoryContext";
+import { UIProvider } from "@/context/UIContext";
 
 // Mock the firestore services
 const mockPallets = { getByQR: vi.fn() };
@@ -13,7 +13,7 @@ const mockProducts = { getById: vi.fn() };
 const mockSuppliers = { getById: vi.fn() };
 const mockReceptions = { getById: vi.fn() };
 
-vi.mock('@/services/firestore', () => ({
+vi.mock("@/services/firestore", () => ({
   createFirestoreServices: vi.fn(() => ({
     pallets: mockPallets,
     products: mockProducts,
@@ -28,23 +28,21 @@ vi.mock('@/services/firestore', () => ({
   })),
 }));
 
-import TarimaDetalle from '@/screens/TarimaDetalle';
+import TarimaDetalle from "@/screens/TarimaDetalle";
 
 const renderWithProviders = (ui: React.ReactElement, initialReceptionState = {}) => {
   return render(
     <ReceptionProvider initialState={initialReceptionState}>
       <CatalogosProvider canQuery={true}>
         <InventoryProvider>
-          <UIProvider>
-            {ui}
-          </UIProvider>
+          <UIProvider>{ui}</UIProvider>
         </InventoryProvider>
       </CatalogosProvider>
-    </ReceptionProvider>
+    </ReceptionProvider>,
   );
 };
 
-describe('TarimaDetalle QR Component', () => {
+describe("TarimaDetalle QR Component", () => {
   const mockOnBack = vi.fn();
 
   beforeEach(() => {
@@ -55,125 +53,125 @@ describe('TarimaDetalle QR Component', () => {
     mockReceptions.getById.mockReset();
   });
 
-  it('shows loading state when fetching', async () => {
+  it("shows loading state when fetching", async () => {
     mockPallets.getByQR.mockImplementation(() => new Promise(() => {}));
 
     renderWithProviders(<TarimaDetalle onBack={mockOnBack} qrCode="TQR-24891-003" />, {});
 
     await waitFor(() => {
-      expect(screen.getByText('Cargando tarima…')).toBeInTheDocument();
+      expect(screen.getByText("Cargando tarima…")).toBeInTheDocument();
     });
   });
 
-  it('renders detail when QR found with product and supplier join', async () => {
+  it("renders detail when QR found with product and supplier join", async () => {
     mockPallets.getByQR.mockResolvedValue({
-      qrIdentifier: 'TQR-24891-003',
-      productId: 'prod_1',
-      lot: 'LOTE-2024-001',
+      qrIdentifier: "TQR-24891-003",
+      productId: "prod_1",
+      lot: "LOTE-2024-001",
       quantity: 40,
-      unit: 'cajas',
-      expiryDate: { toDate: () => new Date('2027-03-15') },
-      status: 'RECEIVED',
-      createdAt: { toDate: () => new Date('2026-09-19') },
-      receptionId: 'rec_1',
+      unit: "cajas",
+      expiryDate: { toDate: () => new Date("2027-03-15") },
+      status: "RECEIVED",
+      createdAt: { toDate: () => new Date("2026-09-19") },
+      receptionId: "rec_1",
     });
 
     mockProducts.getById.mockResolvedValue({
-      name: 'Manzana Gala',
-      sku: 'MANZ-GALA-1KG',
+      name: "Manzana Gala",
+      sku: "MANZ-GALA-1KG",
     });
 
     mockReceptions.getById.mockResolvedValue({
-      supplierId: 'sup_1',
-      purchaseOrderId: 'PO-123',
+      supplierId: "sup_1",
+      purchaseOrderId: "PO-123",
     });
 
     mockSuppliers.getById.mockResolvedValue({
-      name: 'Distribuidora del Norte',
-      code: 'PROV-001',
+      name: "Distribuidora del Norte",
+      code: "PROV-001",
     });
 
     renderWithProviders(<TarimaDetalle onBack={mockOnBack} qrCode="TQR-24891-003" />, {});
 
     await waitFor(() => {
       expect(
-        screen.getByText((content: string) => content.includes('Manzana Gala')),
+        screen.getByText((content: string) => content.includes("Manzana Gala")),
       ).toBeInTheDocument();
       expect(
-        screen.getByText((content: string) => content.includes('LOTE-2024-001')),
+        screen.getByText((content: string) => content.includes("LOTE-2024-001")),
       ).toBeInTheDocument();
       expect(
-        screen.getByText((content: string) => content.includes('Distribuidora del Norte')),
+        screen.getByText((content: string) => content.includes("Distribuidora del Norte")),
       ).toBeInTheDocument();
     });
   });
 
-  it('shows not-found state when QR returns null', async () => {
+  it("shows not-found state when QR returns null", async () => {
     mockPallets.getByQR.mockResolvedValue(null);
 
     renderWithProviders(<TarimaDetalle onBack={mockOnBack} qrCode="TQR-NOTFOUND-999" />, {});
 
     await waitFor(() => {
-      expect(screen.getByText('Tarima no encontrada')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /volver al escáner/i })).toBeInTheDocument();
+      expect(screen.getByText("Tarima no encontrada")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /volver al escáner/i })).toBeInTheDocument();
     });
   });
 
-  it('shows error state and retry button on failure', async () => {
-    mockPallets.getByQR.mockRejectedValue(new Error('Network error'));
+  it("shows error state and retry button on failure", async () => {
+    mockPallets.getByQR.mockRejectedValue(new Error("Network error"));
 
     renderWithProviders(<TarimaDetalle onBack={mockOnBack} qrCode="TQR-24891-003" />, {});
 
     await waitFor(() => {
       expect(
-        screen.getByText((content: string) => content.includes('Error al cargar')),
+        screen.getByText((content: string) => content.includes("Error al cargar")),
       ).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /reintentar/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /reintentar/i })).toBeInTheDocument();
     });
 
     // Click retry
     mockPallets.getByQR.mockResolvedValueOnce({
-      qrIdentifier: 'TQR-24891-003',
-      productId: 'prod_1',
-      lot: 'LOTE-2024-001',
+      qrIdentifier: "TQR-24891-003",
+      productId: "prod_1",
+      lot: "LOTE-2024-001",
       quantity: 40,
-      unit: 'cajas',
-      expiryDate: { toDate: () => new Date('2027-03-15') },
-      status: 'RECEIVED',
-      createdAt: { toDate: () => new Date('2026-09-19') },
-      receptionId: 'rec_1',
+      unit: "cajas",
+      expiryDate: { toDate: () => new Date("2027-03-15") },
+      status: "RECEIVED",
+      createdAt: { toDate: () => new Date("2026-09-19") },
+      receptionId: "rec_1",
     });
     mockProducts.getById.mockResolvedValue({
-      name: 'Manzana Gala',
-      sku: 'MANZ-GALA-1KG',
+      name: "Manzana Gala",
+      sku: "MANZ-GALA-1KG",
     });
     mockSuppliers.getById.mockResolvedValue({
-      name: 'Distribuidora del Norte',
-      code: 'PROV-001',
+      name: "Distribuidora del Norte",
+      code: "PROV-001",
     });
 
-    await userEvent.click(screen.getByRole('button', { name: /reintentar/i }));
+    await userEvent.click(screen.getByRole("button", { name: /reintentar/i }));
 
     await waitFor(() => {
       expect(
-        screen.getByText((content: string) => content.includes('Manzana Gala')),
+        screen.getByText((content: string) => content.includes("Manzana Gala")),
       ).toBeInTheDocument();
     });
   });
 
-  it('opens the reception reference without navigating back', async () => {
+  it("opens the reception reference without navigating back", async () => {
     const onViewReference = vi.fn();
     const onBack = vi.fn();
 
     const initialState = {
       currentReception: {
-        ocFolio: 'OC-24891',
-        receptionId: 'reception-1',
+        ocFolio: "OC-24891",
+        receptionId: "reception-1",
         tarimas: 12,
-        proveedor: 'Distribuidora del Norte',
-        proveedorLogistico: 'Logística Veloz',
+        proveedor: "Distribuidora del Norte",
+        proveedorLogistico: "Logística Veloz",
       },
-      sessionState: 'planning',
+      sessionState: "planning",
     };
 
     renderWithProviders(
@@ -181,41 +179,41 @@ describe('TarimaDetalle QR Component', () => {
         onBack={onBack}
         onViewReference={onViewReference}
         currentReception={{
-          ocFolio: 'OC-24891',
-          receptionId: 'reception-1',
+          ocFolio: "OC-24891",
+          receptionId: "reception-1",
           tarimas: 12,
-          proveedor: 'Distribuidora del Norte',
-          proveedorLogistico: 'Logística Veloz',
+          proveedor: "Distribuidora del Norte",
+          proveedorLogistico: "Logística Veloz",
         }}
       />,
-      initialState
+      initialState,
     );
 
-    await userEvent.click(screen.getByRole('button', { name: /ver referencia/i }));
+    await userEvent.click(screen.getByRole("button", { name: /ver referencia/i }));
 
     expect(onViewReference).toHaveBeenCalledWith({
-      recId: 'reception-1',
+      recId: "reception-1",
       tarimas: 12,
-      proveedor: 'Distribuidora del Norte',
-      proveedorLogistico: 'Logística Veloz',
+      proveedor: "Distribuidora del Norte",
+      proveedorLogistico: "Logística Veloz",
     });
     expect(onBack).not.toHaveBeenCalled();
   });
 
-  it('uses legacy mode when no qrCode prop', () => {
+  it("uses legacy mode when no qrCode prop", () => {
     const initialState = {
-      currentReception: { ocFolio: 'OC-24891', tarimas: 20 },
+      currentReception: { ocFolio: "OC-24891", tarimas: 20 },
     };
 
     renderWithProviders(
-      <TarimaDetalle onBack={mockOnBack} currentReception={{ ocFolio: 'OC-24891', tarimas: 20 }} />,
-      initialState
+      <TarimaDetalle onBack={mockOnBack} currentReception={{ ocFolio: "OC-24891", tarimas: 20 }} />,
+      initialState,
     );
 
     // In legacy mode, the TARIMA label shows "TARIMA 03 / 09:42" (from receptionFolio time)
     // Text is split across elements, use function matcher
     expect(
-      screen.getByText((content) => content.includes('TARIMA') && content.includes('03')),
+      screen.getByText((content) => content.includes("TARIMA") && content.includes("03")),
     ).toBeInTheDocument();
   });
 });

@@ -5,11 +5,11 @@
  * Delegates to ReceptionContext, adds validation before navigation.
  */
 
-import { useCallback } from 'react';
-import { useReceptionContext } from '@/context';
-import { useUIContext } from '@/context';
-import { useNavigate } from 'react-router-dom';
-import type { Screen, NavItem, ReceptionData, EvidenciaData, Tarima } from '@/types';
+import { useCallback } from "react";
+import { useReceptionContext } from "@/context";
+import { useUIContext } from "@/context";
+import { useNavigate } from "react-router-dom";
+import type { Screen, NavItem, ReceptionData, EvidenciaData, Tarima } from "@/types";
 
 // ============================================
 // Hook Return Type
@@ -18,7 +18,7 @@ import type { Screen, NavItem, ReceptionData, EvidenciaData, Tarima } from '@/ty
 interface UseReceptionFlowReturn {
   // State (from context)
   currentReception: ReceptionData | null;
-  sessionState: ReturnType<typeof useReceptionContext>['sessionState'];
+  sessionState: ReturnType<typeof useReceptionContext>["sessionState"];
   editId: string | null;
   editReceptionData: ReceptionData | null;
   scannedQrCode: string | null;
@@ -37,7 +37,7 @@ interface UseReceptionFlowReturn {
   viewTarimaDetalle: (tarima: Tarima) => void;
   cancelReception: () => void;
   setCurrentReception: (data: ReceptionData | null) => void;
-  transition: (phase: ReturnType<typeof useReceptionContext>['sessionState']) => void;
+  transition: (phase: ReturnType<typeof useReceptionContext>["sessionState"]) => void;
   setScannedQrCode: (code: string | null) => void;
   setSelectedEvidencia: (item: EvidenciaData | null) => void;
   setTarimaActual: (pallet: Tarima | null) => void;
@@ -81,68 +81,68 @@ export function useReceptionFlow(): UseReceptionFlowReturn {
       // Note: Active nav update is handled by UIContext or screen components
       // The nav parameter is kept for API compatibility
     },
-    [navigate, closeSidebarOnMobile]
+    [navigate, closeSidebarOnMobile],
   );
 
   // Start a new reception (from NuevaRecepcionStep1/Step2)
   const startNewReception = useCallback(
     (data: ReceptionData) => {
       setCurrentReception(data);
-      transition('planning');
-      navigateWithSidebar('nueva-step1');
+      transition("planning");
+      navigateWithSidebar("nueva-step1");
     },
-    [setCurrentReception, transition, navigateWithSidebar]
+    [setCurrentReception, transition, navigateWithSidebar],
   );
 
   // Continue from Step 1 to Evidence capture
   const continueToEvidence = useCallback(() => {
     if (!currentReception) {
-      console.warn('[useReceptionFlow] Cannot continue to evidence: no current reception');
+      console.warn("[useReceptionFlow] Cannot continue to evidence: no current reception");
       return;
     }
-    transition('evidence');
-    navigateWithSidebar('captura-evidencia');
+    transition("evidence");
+    navigateWithSidebar("captura-evidencia");
   }, [currentReception, transition, navigateWithSidebar]);
 
   // Continue from Evidence to Pallet capture
   const continueToPallets = useCallback(() => {
     if (!currentReception) {
-      console.warn('[useReceptionFlow] Cannot continue to pallets: no current reception');
+      console.warn("[useReceptionFlow] Cannot continue to pallets: no current reception");
       return;
     }
-    transition('pallets');
-    navigateWithSidebar('captura-tarima');
+    transition("pallets");
+    navigateWithSidebar("captura-tarima");
   }, [currentReception, transition, navigateWithSidebar]);
 
   // Complete the reception (from Completada or CapturaTarima)
   const completeReception = useCallback(() => {
-    transition('completed');
-    navigateWithSidebar('completada');
+    transition("completed");
+    navigateWithSidebar("completada");
   }, [transition, navigateWithSidebar]);
 
   // Edit an existing reception
   const editReception = useCallback(
     (id: string, data: ReceptionData) => {
       ctxEditReception(id, data);
-      navigateWithSidebar('editar-recepcion');
+      navigateWithSidebar("editar-recepcion");
     },
-    [ctxEditReception, navigateWithSidebar]
+    [ctxEditReception, navigateWithSidebar],
   );
 
   // View tarima detail (from CapturaTarima or QR scan)
   const viewTarimaDetalle = useCallback(
     (tarima: Tarima) => {
       ctxSetTarimaActual(tarima);
-      navigateWithSidebar('tarima-detalle', 'qr');
+      navigateWithSidebar("tarima-detalle", "qr");
     },
-    [ctxSetTarimaActual, navigateWithSidebar]
+    [ctxSetTarimaActual, navigateWithSidebar],
   );
 
   // Cancel current reception flow
   const cancelReception = useCallback(() => {
     ctxCancelEdit();
     ctxResetAll();
-    navigateWithSidebar('home');
+    navigateWithSidebar("home");
   }, [ctxCancelEdit, ctxResetAll, navigateWithSidebar]);
 
   return {

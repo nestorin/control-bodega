@@ -5,11 +5,8 @@
  * Extracted from App.tsx to enable Layout components to consume via UIContext.
  */
 
-import type { Screen, NavItem, HeaderConfig } from '@/types';
-import {
-  ASSETS,
-  CANONICAL_WAREHOUSE_IDS,
-} from '@/config/constants';
+import type { Screen, NavItem, HeaderConfig } from "@/types";
+import { ASSETS, CANONICAL_WAREHOUSE_IDS } from "@/config/constants";
 
 // ============================================
 // Screen Order (for keyboard navigation, etc.)
@@ -17,25 +14,25 @@ import {
 
 /** Ordered list of screens for sequential navigation */
 export const screenOrder: Screen[] = [
-  'home',
-  'programacion-recepcion',
-  'nueva-step1',
-  'nueva-step2',
-  'captura-evidencia',
-  'captura-tarima',
-  'completada',
-  'recepciones',
-  'tarima-detalle',
-  'impresion',
-  'escanear-qr',
-  'editar-recepcion',
-  'evidencias',
-  'evidencia-detalle',
-  'lotes-caducidades',
-  'embarques',
-  'configuracion',
-  'login',
-  'register',
+  "home",
+  "programacion-recepcion",
+  "nueva-step1",
+  "nueva-step2",
+  "captura-evidencia",
+  "captura-tarima",
+  "completada",
+  "recepciones",
+  "tarima-detalle",
+  "impresion",
+  "escanear-qr",
+  "editar-recepcion",
+  "evidencias",
+  "evidencia-detalle",
+  "lotes-caducidades",
+  "embarques",
+  "configuracion",
+  "login",
+  "register",
 ];
 
 // ============================================
@@ -55,71 +52,71 @@ export interface NavEntry {
 /** Navigation items displayed in sidebar (desktop) and bottom nav (mobile) */
 export const navItems: readonly NavEntry[] = [
   {
-    id: 'home',
-    label: 'Inicio',
-    screen: 'home',
-    icon: 'home',
+    id: "home",
+    label: "Inicio",
+    screen: "home",
+    icon: "home",
   },
   {
-    id: 'recepciones',
-    label: 'Recepciones',
-    screen: 'recepciones',
-    icon: 'recepciones',
+    id: "recepciones",
+    label: "Recepciones",
+    screen: "recepciones",
+    icon: "recepciones",
   },
   {
-    id: 'embarques',
-    label: 'Embarques',
-    screen: 'embarques',
-    icon: 'embarques',
+    id: "embarques",
+    label: "Embarques",
+    screen: "embarques",
+    icon: "embarques",
   },
   {
-    id: 'qr',
-    label: 'Escanear QR',
-    screen: 'escanear-qr',
-    icon: 'qr',
+    id: "qr",
+    label: "Escanear QR",
+    screen: "escanear-qr",
+    icon: "qr",
   },
   {
-    id: 'evidencias',
-    label: 'Evidencias',
-    screen: 'evidencias',
-    icon: 'evidencias',
+    id: "evidencias",
+    label: "Evidencias",
+    screen: "evidencias",
+    icon: "evidencias",
   },
   {
-    id: 'lotes',
-    label: 'Inventario',
-    screen: 'lotes-caducidades',
-    icon: 'lotes',
+    id: "lotes",
+    label: "Inventario",
+    screen: "lotes-caducidades",
+    icon: "lotes",
   },
   {
-    id: 'configuracion',
-    label: 'Config.',
-    screen: 'configuracion',
-    icon: 'configuracion',
+    id: "configuracion",
+    label: "Config.",
+    screen: "configuracion",
+    icon: "configuracion",
   },
   {
-    id: 'etiquetado',
-    label: 'Etiquetado',
-    screen: 'etiquetado',
-    icon: 'etiquetado',
+    id: "etiquetado",
+    label: "Etiquetado",
+    screen: "etiquetado",
+    icon: "etiquetado",
   },
 ] as const;
 
 /** Mapping from NavItem id to asset icon */
 export function getNavIconAsset(iconId: NavItem): string {
   switch (iconId) {
-    case 'home':
+    case "home":
       return ASSETS.WAREHOUSE_NAV;
-    case 'recepciones':
-    case 'evidencias':
-    case 'lotes':
+    case "recepciones":
+    case "evidencias":
+    case "lotes":
       return ASSETS.CLIPBOARD_LIST_NAV;
-    case 'embarques':
+    case "embarques":
       return ASSETS.PACKAGE;
-    case 'qr':
+    case "qr":
       return ASSETS.SCAN_QR_CODE_NAV;
-    case 'configuracion':
+    case "configuracion":
       return ASSETS.INDICADOR;
-    case 'etiquetado':
+    case "etiquetado":
       return ASSETS.ETIQUETADO_NAV || ASSETS.PACKAGE;
     default:
       return ASSETS.WAREHOUSE_NAV;
@@ -131,89 +128,93 @@ export function getNavIconAsset(iconId: NavItem): string {
 // ============================================
 
 /** Dynamic header config factory - receives current reception state */
-export function createHeaderConfig(currentReception: {
-  ocFolio?: string;
-  tarimas?: number;
-} | null, tarimaPosition: number, tarimaTotal: number): Record<Screen, HeaderConfig> {
-  const folio = currentReception?.ocFolio ?? 'OC-24891';
+export function createHeaderConfig(
+  currentReception: {
+    ocFolio?: string;
+    tarimas?: number;
+  } | null,
+  tarimaPosition: number,
+  tarimaTotal: number,
+): Record<Screen, HeaderConfig> {
+  const folio = currentReception?.ocFolio ?? "OC-24891";
   const totalPallets = currentReception?.tarimas ?? 20;
 
   return {
     home: {
       subtitle: `TARIMA QR · ALMACÉN NORTE`,
-      title: 'Buenos días, Mariana',
+      title: "Buenos días, Mariana",
     },
-    'captura-evidencia': {
-      subtitle: 'NUEVA RECEPCIÓN',
-      title: 'Evidencia de mercancía',
+    "captura-evidencia": {
+      subtitle: "NUEVA RECEPCIÓN",
+      title: "Evidencia de mercancía",
     },
-    'nueva-step1': {
-      subtitle: 'NUEVA RECEPCIÓN',
-      title: 'Orden de compra',
+    "nueva-step1": {
+      subtitle: "NUEVA RECEPCIÓN",
+      title: "Orden de compra",
     },
-    'nueva-step2': {
-      subtitle: 'NUEVA RECEPCIÓN',
-      title: 'Detalles de recepción',
+    "nueva-step2": {
+      subtitle: "NUEVA RECEPCIÓN",
+      title: "Detalles de recepción",
     },
-    'captura-tarima': {
+    "captura-tarima": {
       subtitle: `RECEPCIÓN · ${folio}`,
-      title: 'Captura de tarima',
+      title: "Captura de tarima",
     },
     completada: {
       subtitle: `RECEPCIÓN · ${folio}`,
-      title: 'Recepción completada',
+      title: "Recepción completada",
     },
     recepciones: {
-      subtitle: 'HISTORIAL Y SEGUIMIENTO',
-      title: 'Recepciones',
+      subtitle: "HISTORIAL Y SEGUIMIENTO",
+      title: "Recepciones",
     },
-    'tarima-detalle': {
+    "tarima-detalle": {
       subtitle: `${folio} · DETALLE DE TARIMA`,
       title: `Tarima ${tarimaPosition} de ${tarimaTotal}`,
     },
     impresion: {
       subtitle: folio,
-      title: 'Impresión de etiquetas',
+      title: "Impresión de etiquetas",
     },
-    'escanear-qr': {
-      subtitle: 'TARIMA QR',
-      title: 'Escanear código',
+    "escanear-qr": {
+      subtitle: "TARIMA QR",
+      title: "Escanear código",
     },
-    'editar-recepcion': {
-      subtitle: 'RECEPCIONES',
-      title: 'Editar recepción',
+    "editar-recepcion": {
+      subtitle: "RECEPCIONES",
+      title: "Editar recepción",
     },
     evidencias: {
-      subtitle: 'HISTORIAL Y SEGUIMIENTO',
-      title: 'Evidencias',
+      subtitle: "HISTORIAL Y SEGUIMIENTO",
+      title: "Evidencias",
     },
-    'evidencia-detalle': {
-      subtitle: 'EVIDENCIAS',
-      title: 'Detalle de evidencia',
+    "evidencia-detalle": {
+      subtitle: "EVIDENCIAS",
+      title: "Detalle de evidencia",
     },
-    'lotes-caducidades': {
-      subtitle: 'CONTROL DE INVENTARIO',
-      title: 'Lotes y caducidades',
+    "lotes-caducidades": {
+      subtitle: "CONTROL DE INVENTARIO",
+      title: "Lotes y caducidades",
     },
     embarques: {
-      subtitle: 'CONTROL DE SALIDAS',
-      title: 'Embarques',
+      subtitle: "CONTROL DE SALIDAS",
+      title: "Embarques",
     },
     configuracion: {
-      subtitle: 'SISTEMA',
-      title: 'Configuración',
+      subtitle: "SISTEMA",
+      title: "Configuración",
     },
-    'programacion-recepcion': {
-      subtitle: 'NUEVA RECEPCIÓN',
-      title: 'Programación de recepción',
+    "programacion-recepcion": {
+      subtitle: "NUEVA RECEPCIÓN",
+      title: "Programación de recepción",
     },
     login: {
-      subtitle: '',
-      title: 'Iniciar sesión',
+      subtitle: "",
+      title: "Iniciar sesión",
     },
     register: {
-      subtitle: '',
-      title: 'Registro',
+      subtitle: "",
+      title: "Registro",
     },
   };
 }
@@ -223,26 +224,16 @@ export function createHeaderConfig(currentReception: {
 // ============================================
 
 /** Renders a navigation icon for sidebar/bottom nav */
-export function renderNavIcon(
-  iconId: NavItem,
-  active: boolean,
-  size = 22
-): React.ReactNode {
-  const iconColor = active ? '#f2b84b' : '#b9c9cf';
+export function renderNavIcon(iconId: NavItem, active: boolean, size = 22): React.ReactNode {
+  const iconColor = active ? "#f2b84b" : "#b9c9cf";
 
   switch (iconId) {
-    case 'home':
-      return (
-        <img
-          alt=""
-          className={`size-[${size}px]`}
-          src={ASSETS.WAREHOUSE_NAV}
-        />
-      );
+    case "home":
+      return <img alt="" className={`size-[${size}px]`} src={ASSETS.WAREHOUSE_NAV} />;
 
-    case 'recepciones':
-    case 'evidencias':
-    case 'lotes':
+    case "recepciones":
+    case "evidencias":
+    case "lotes":
       return (
         <svg
           width={size}
@@ -261,7 +252,7 @@ export function renderNavIcon(
         </svg>
       );
 
-    case 'embarques':
+    case "embarques":
       return (
         <svg
           width={size}
@@ -277,16 +268,10 @@ export function renderNavIcon(
         </svg>
       );
 
-    case 'qr':
-      return (
-        <img
-          alt=""
-          className={`size-[${size}px]`}
-          src={ASSETS.SCAN_QR_CODE_NAV}
-        />
-      );
+    case "qr":
+      return <img alt="" className={`size-[${size}px]`} src={ASSETS.SCAN_QR_CODE_NAV} />;
 
-    case 'configuracion':
+    case "configuracion":
       return (
         <svg
           width={size}
@@ -304,13 +289,7 @@ export function renderNavIcon(
       );
 
     default:
-      return (
-        <img
-          alt=""
-          className={`size-[${size}px]`}
-          src={ASSETS.WAREHOUSE_NAV}
-        />
-      );
+      return <img alt="" className={`size-[${size}px]`} src={ASSETS.WAREHOUSE_NAV} />;
   }
 }
 
@@ -321,59 +300,59 @@ export function renderNavIcon(
 /** Static header config for screens without dynamic content */
 export const staticHeaderConfig: Partial<Record<Screen, HeaderConfig>> = {
   home: {
-    subtitle: 'TARIMA QR · ALMACÉN NORTE',
-    title: 'Buenos días, Mariana',
+    subtitle: "TARIMA QR · ALMACÉN NORTE",
+    title: "Buenos días, Mariana",
   },
-  'captura-evidencia': {
-    subtitle: 'NUEVA RECEPCIÓN',
-    title: 'Evidencia de mercancía',
+  "captura-evidencia": {
+    subtitle: "NUEVA RECEPCIÓN",
+    title: "Evidencia de mercancía",
   },
-  'nueva-step1': {
-    subtitle: 'NUEVA RECEPCIÓN',
-    title: 'Orden de compra',
+  "nueva-step1": {
+    subtitle: "NUEVA RECEPCIÓN",
+    title: "Orden de compra",
   },
-  'nueva-step2': {
-    subtitle: 'NUEVA RECEPCIÓN',
-    title: 'Detalles de recepción',
+  "nueva-step2": {
+    subtitle: "NUEVA RECEPCIÓN",
+    title: "Detalles de recepción",
   },
-  'escanear-qr': {
-    subtitle: 'TARIMA QR',
-    title: 'Escanear código',
+  "escanear-qr": {
+    subtitle: "TARIMA QR",
+    title: "Escanear código",
   },
-  'editar-recepcion': {
-    subtitle: 'RECEPCIONES',
-    title: 'Editar recepción',
+  "editar-recepcion": {
+    subtitle: "RECEPCIONES",
+    title: "Editar recepción",
   },
   evidencias: {
-    subtitle: 'HISTORIAL Y SEGUIMIENTO',
-    title: 'Evidencias',
+    subtitle: "HISTORIAL Y SEGUIMIENTO",
+    title: "Evidencias",
   },
-  'evidencia-detalle': {
-    subtitle: 'EVIDENCIAS',
-    title: 'Detalle de evidencia',
+  "evidencia-detalle": {
+    subtitle: "EVIDENCIAS",
+    title: "Detalle de evidencia",
   },
-  'lotes-caducidades': {
-    subtitle: 'CONTROL DE INVENTARIO',
-    title: 'Lotes y caducidades',
+  "lotes-caducidades": {
+    subtitle: "CONTROL DE INVENTARIO",
+    title: "Lotes y caducidades",
   },
   embarques: {
-    subtitle: 'CONTROL DE SALIDAS',
-    title: 'Embarques',
+    subtitle: "CONTROL DE SALIDAS",
+    title: "Embarques",
   },
   configuracion: {
-    subtitle: 'SISTEMA',
-    title: 'Configuración',
+    subtitle: "SISTEMA",
+    title: "Configuración",
   },
-  'programacion-recepcion': {
-    subtitle: 'NUEVA RECEPCIÓN',
-    title: 'Programación de recepción',
+  "programacion-recepcion": {
+    subtitle: "NUEVA RECEPCIÓN",
+    title: "Programación de recepción",
   },
   login: {
-    subtitle: '',
-    title: 'Iniciar sesión',
+    subtitle: "",
+    title: "Iniciar sesión",
   },
   register: {
-    subtitle: '',
-    title: 'Registro',
+    subtitle: "",
+    title: "Registro",
   },
 };
