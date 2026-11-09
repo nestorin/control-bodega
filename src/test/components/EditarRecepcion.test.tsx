@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom";
 
 const mockServices = vi.hoisted(() => ({
   getReception: vi.fn(),
@@ -17,8 +18,11 @@ vi.mock("@/services/firestore", () => ({
     suppliers: { getById: mockServices.getSupplier },
   }),
 }));
+vi.mock("@/config/featureFlags", () => ({ isFeatureEnabled: () => true }));
 
-import EditarRecepcion from "@/screens/EditarRecepcion";
+import { renderWithAppProviders } from "../../test/utils/renderWithAppProviders";
+import EditarRecepcion from "../../screens/EditarRecepcion";
+import { editReception } from "../../services/firestore";
 
 const receptionDraft = {
   id: "reception-1",
@@ -114,7 +118,7 @@ describe("EditarRecepcion", () => {
 
   it("loads canonical data and persists allowed draft changes through edit_reception", async () => {
     const onSave = vi.fn();
-    render(
+    renderWithAppProviders(
       <EditarRecepcion
         recId="reception-1"
         suppliers={suppliers}
@@ -122,6 +126,9 @@ describe("EditarRecepcion", () => {
         onBack={vi.fn()}
         onSave={onSave}
       />,
+      {
+        editReceptionData: receptionDraft,
+      },
     );
 
     expect(await screen.findByRole("heading", { name: "REC-1001" })).toBeInTheDocument();
@@ -153,7 +160,7 @@ describe("EditarRecepcion", () => {
   });
 
   it("renders accurate in-progress reception data as read-only", async () => {
-    getReception.mockResolvedValue({
+    mockServices.getReception.mockResolvedValue({
       ...receptionDraft,
       status: "IN_PROGRESS",
       plannedPallets: receptionDraft.plannedPallets.map((pallet, index) => ({
@@ -163,7 +170,7 @@ describe("EditarRecepcion", () => {
       })),
     });
 
-    render(
+    renderWithAppProviders(
       <EditarRecepcion
         recId="reception-1"
         suppliers={suppliers}
@@ -171,6 +178,17 @@ describe("EditarRecepcion", () => {
         onBack={vi.fn()}
         onSave={vi.fn()}
       />,
+      {
+        editReceptionData: {
+          ...receptionDraft,
+          status: "IN_PROGRESS",
+          plannedPallets: receptionDraft.plannedPallets.map((pallet, index) => ({
+            ...pallet,
+            status: index === 0 ? "ACTIVE" : "PLANNED",
+            activated: index === 0,
+          })),
+        },
+      },
     );
 
     expect(await screen.findByText("Logística real")).toBeInTheDocument();
@@ -181,7 +199,7 @@ describe("EditarRecepcion", () => {
   });
 
   it("selects a preloaded catalog product and persists its canonical ID and unit", async () => {
-    render(
+    renderWithAppProviders(
       <EditarRecepcion
         recId="reception-1"
         suppliers={suppliers}
@@ -189,6 +207,9 @@ describe("EditarRecepcion", () => {
         onBack={vi.fn()}
         onSave={vi.fn()}
       />,
+      {
+        editReceptionData: receptionDraft,
+      },
     );
 
     const input = await screen.findByRole("textbox", { name: "Producto línea 1" });
@@ -210,7 +231,7 @@ describe("EditarRecepcion", () => {
   });
 
   it("does not save arbitrary product text without a catalog selection", async () => {
-    render(
+    renderWithAppProviders(
       <EditarRecepcion
         recId="reception-1"
         suppliers={suppliers}
@@ -218,6 +239,9 @@ describe("EditarRecepcion", () => {
         onBack={vi.fn()}
         onSave={vi.fn()}
       />,
+      {
+        editReceptionData: receptionDraft,
+      },
     );
 
     const input = await screen.findByRole("textbox", { name: "Producto línea 1" });

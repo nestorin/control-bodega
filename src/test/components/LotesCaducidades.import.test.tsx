@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom";
 
 const getByWarehouse = vi.hoisted(() => vi.fn());
 
@@ -16,8 +17,9 @@ vi.mock("@/services/firestore", () => ({
   }),
 }));
 
-import LotesCaducidades from "@/screens/LotesCaducidades";
-import { WAREHOUSE_IDS } from "@/config/warehouses";
+import { renderWithAppProviders } from "../../test/utils/renderWithAppProviders";
+import LotesCaducidades from "../../screens/LotesCaducidades";
+import { WAREHOUSE_IDS } from "../../config/warehouses";
 
 const CSV_CONTENT = [
   "Articulo,U. med.,Existencia,Ultimo costo,Valor total",
@@ -34,7 +36,7 @@ function uploadCsv() {
 describe("inventory CSV import", () => {
   it("parses rows without a warehouse column using the selected warehouse", async () => {
     getByWarehouse.mockResolvedValue([]);
-    render(<LotesCaducidades />);
+    renderWithAppProviders(<LotesCaducidades />);
 
     uploadCsv();
 
@@ -49,7 +51,7 @@ describe("inventory CSV import", () => {
 
   it("re-parses the stored file when the destination warehouse changes", async () => {
     getByWarehouse.mockResolvedValue([]);
-    render(<LotesCaducidades />);
+    renderWithAppProviders(<LotesCaducidades />);
 
     uploadCsv();
     await screen.findByText(/2 filas válidas/);

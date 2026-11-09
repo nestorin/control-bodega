@@ -17,6 +17,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuthorization } from "@/hooks/useAuthorization";
 import { useCatalogos } from "@/hooks/useCatalogos";
+import { useReceptionFlow } from "@/hooks/useReceptionFlow";
 import { QRCodeSVG } from "qrcode.react";
 import type { Producto, Proveedor } from "./Configuracion";
 import { ReceptionProductCard } from "./ProgramacionRecepcion";
@@ -65,6 +66,7 @@ export default function EditarRecepcion({ recId, suppliers, products, onBack, on
   const { user, canQuery } = useAuthorization();
 
   const { catalogoProveedores, catalogosLoading, catalogosError } = useCatalogos();
+  const { editReceptionData } = useReceptionFlow();
 
   const services = useMemo(() => (db ? createFirestoreServices(db, ORG_ID) : null), []);
   const [reception, setReception] = useState<ReceptionDoc | null>(null);

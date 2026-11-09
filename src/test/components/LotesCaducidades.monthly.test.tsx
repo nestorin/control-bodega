@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom";
 
 const getByWarehouse = vi.hoisted(() => vi.fn());
 
@@ -13,7 +14,8 @@ vi.mock("@/services/firestore", () => ({
   createFirestoreServices: () => ({ lotesCaducidades: { getByWarehouse } }),
 }));
 
-import LotesCaducidades from "@/screens/LotesCaducidades";
+import { renderWithAppProviders } from "../../test/utils/renderWithAppProviders";
+import LotesCaducidades from "../../screens/LotesCaducidades";
 
 describe("monthly inventory view", () => {
   it("renders monthly boxes and total without replacing the existing lot view", async () => {
@@ -37,7 +39,7 @@ describe("monthly inventory view", () => {
         monthKey: "Mar-27",
       },
     ]);
-    render(<LotesCaducidades />);
+    renderWithAppProviders(<LotesCaducidades />);
     expect(await screen.findByText("A1")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Por mes" }));

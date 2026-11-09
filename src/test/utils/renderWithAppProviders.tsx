@@ -23,6 +23,8 @@ interface RenderWithAppProvidersOptions extends Omit<RenderOptions, "wrapper"> {
   initialReceptionState?: Record<string, unknown>;
   /** Reception payload seeded into ReceptionProvider as currentReception. */
   currentReception?: ReceptionData | null;
+  /** Edit reception data for EditarRecepcion screen. */
+  editReceptionData?: ReceptionData | null;
   /** Whether CatalogosProvider is allowed to query Firestore. */
   canQuery?: boolean;
   /** Initial router entry. */
@@ -30,10 +32,11 @@ interface RenderWithAppProvidersOptions extends Omit<RenderOptions, "wrapper"> {
 }
 
 function buildInitialState(options: RenderWithAppProvidersOptions) {
-  const { currentReception, initialReceptionState } = options;
+  const { currentReception, initialReceptionState, editReceptionData } = options;
   return {
     ...(currentReception ? { currentReception } : {}),
     ...(initialReceptionState ?? {}),
+    ...(editReceptionData ? { editReceptionData } : {}),
   };
 }
 
