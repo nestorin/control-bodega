@@ -6,6 +6,7 @@ import { WAREHOUSE_IDS } from "@/config/warehouses";
 import { useAuthorization } from "@/hooks/useAuthorization";
 import { generateEvidencePdf, type EvidencePalletRow } from "@/services/evidencePdf";
 import { downloadBlob } from "@/services/pdfGenerator";
+import { useReceptionFlow } from "@/hooks/useReceptionFlow";
 
 const imgIndicador = "/assets/08d70.svg";
 const imgIndicadorRed = "/assets/9d6fd.svg";
@@ -314,11 +315,9 @@ function RowMenu({
   );
 }
 
-interface Props {
-  onSelect?: (ev: EvidenciaData) => void;
-}
+interface Props {}
 
-export default function Evidencias({ onSelect }: Props) {
+export default function Evidencias() {
   const { canQuery } = useAuthorization();
   const useFirestore = isFeatureEnabled("USE_FIRESTORE_EVIDENCIAS") && !!db && canQuery;
 
@@ -547,7 +546,11 @@ export default function Evidencias({ onSelect }: Props) {
         {listaFiltrada.map((ev) => (
           <div
             key={ev.id}
-            onClick={() => onSelect?.(ev)}
+            onClick={() => {
+              const { setSelectedEvidencia, navigate } = useReceptionFlow();
+              setSelectedEvidencia(ev);
+              navigate("evidencia-detalle", "evidencias");
+            }}
             className="bg-white shadow-[0px_8px_12px_rgba(22,52,63,0.08)] flex items-center justify-between px-5 py-4 rounded-[20px] w-full hover:shadow-[0px_12px_20px_rgba(22,52,63,0.12)] cursor-pointer transition-shadow"
           >
             <div className="flex flex-col gap-1 items-start flex-1 min-w-0">

@@ -884,20 +884,6 @@ function NuevaRecepcionStep1Form() {
   );
 }
 
-export default function NuevaRecepcionStep1({ ...props }: Props) {
-  if (props.catalogosStatus?.loading) {
-    return (
-      <div className="flex flex-col gap-4 p-6" style={{ fontFamily: "'Inter',sans-serif" }}>
-        <div
-          className="flex items-center gap-3 text-[#607078]"
-          style={{ fontFamily: "'Inter',sans-serif" }}
-        >
-          <div className="size-6 border-2 border-[#3276a8] border-t-transparent rounded-full animate-spin" />
-          <span className="text-base font-medium">Cargando catálogos…</span>
-        </div>
-      </div>
-    );
-  }
-
-  return <NuevaRecepcionStep1Form {...props} />;
+export default function NuevaRecepcionStep1() {
+  return <NuevaRecepcionStep1Form />;
 }

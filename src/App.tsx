@@ -1409,13 +1409,8 @@ function AppLayout() {
                       <TarimaDetalle />
                     )}
           {screen === "evidencias" && (
-            <Evidencias
-              onSelect={(ev) => {
-                setSelectedEvidencia(ev);
-                navigate("evidencia-detalle", "evidencias");
-              }}
-            />
-          )}
+                      <Evidencias />
+                    )}
           {screen === "evidencia-detalle" && selectedEvidencia && <EvidenciaDetalle />}
           {screen === "lotes-caducidades" && <LotesCaducidades />}
           {screen === "embarques" && (

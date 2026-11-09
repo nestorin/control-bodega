@@ -10,6 +10,7 @@ import { mapReceptionListItem } from "@/domains/reception/receptionLifecycle";
 import { QRCodeSVG } from "qrcode.react";
 import { downloadTarimaQrBatch } from "@/services/tarimaQrDownload";
 import "./Recepciones.css";
+import { useReceptionFlow } from "@/hooks/useReceptionFlow";
 
 const imgIndicador = "/assets/08d70.svg";
 const imgIndicadorRed = "/assets/9d6fd.svg";
@@ -468,15 +469,7 @@ function DeleteModal({
   );
 }
 
-export default function Recepciones({
-  onSelectTarima,
-  onEdit,
-  onResume,
-}: {
-  onSelectTarima: (recId: string) => void;
-  onEdit: (id: string) => void;
-  onResume?: (id: string) => void;
-}) {
+export default function Recepciones() {
   const { canQuery, canAccessWarehouse, hasAnyRole } = useAuthorization();
   const useFirestore = isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery;
   const canQueryNorthWarehouse = useFirestore && canAccessWarehouse(WAREHOUSE_IDS.NORTH);
@@ -822,11 +815,15 @@ export default function Recepciones({
               tabIndex={0}
               aria-label={`Abrir recepción ${rec.displayId || rec.id}`}
               className="flex items-center justify-between px-4 md:px-5 py-3 md:py-4 w-full hover:shadow-[0px_12px_20px_rgba(22,52,63,0.12)] transition-shadow touch-target cursor-pointer"
-              onClick={() => onSelectTarima(rec.id)}
+              onClick={() => {
+              const { navigate } = useReceptionFlow();
+              navigate("editar-recepcion", "recepciones");
+            }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  onSelectTarima(rec.id);
+                  const { navigate } = useReceptionFlow();
+                  navigate("editar-recepcion", "recepciones");
                 }
               }}
             >
@@ -901,14 +898,15 @@ export default function Recepciones({
                   backgroundColor={rec.bg}
                   labelColor={rec.color}
                 />
-                {rec.canResume && onResume && (
+                {rec.canResume && (
                   <button
                     type="button"
                     aria-label={`Reanudar recepción ${rec.displayId || rec.id}`}
                     className="text-xs font-bold text-[#3276a8] underline"
                     onClick={(event) => {
                       event.stopPropagation();
-                      onResume(rec.id);
+                      const { navigate } = useReceptionFlow();
+                      navigate("nueva-step1");
                     }}
                   >
                     Reanudar
@@ -916,7 +914,10 @@ export default function Recepciones({
                 )}
                 <RowMenu
                   canEdit={rec.estado === "Borrador"}
-                  onEdit={() => onEdit(rec.id)}
+                  onEdit={() => {
+                    const { navigate } = useReceptionFlow();
+                    navigate("editar-recepcion", "recepciones");
+                  }}
                   onPrint={() => void handleReceptionQrAction(rec.id, "print")}
                   onDownload={() => void handleReceptionQrAction(rec.id, "download")}
                   canManage={canManage}

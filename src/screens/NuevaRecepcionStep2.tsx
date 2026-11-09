@@ -35,42 +35,9 @@ type ReceptionOcrProduct = {
   estadoMatch: "confirmado" | "sugerido" | "manual";
 };
 
-interface Props {
-  onBack: () => void;
-  onContinue: () => void;
-  initialData?: {
-    hasOC: boolean;
-    ocFolio: string;
-    tarimas: string;
-    proveedor: string;
-    proveedorLogistico: string;
-    receptionId?: string;
-    productos?: ReceptionOcrProduct[];
-  };
-  conversiones?: Array<{
-    producto: string;
-    productId?: string | null;
-    piezasPorCaja: number;
-    cajasPorTarima: number;
-  }>;
-  catalogos: {
-    proveedores: Proveedor[];
-    productos: Producto[];
-  };
-  catalogosStatus?: {
-    loading: boolean;
-    error: Error | null;
-  };
-}
+interface Props {}
 
-export default function NuevaRecepcionStep2({
-  onBack,
-  onContinue,
-  initialData,
-  catalogos,
-  catalogosStatus,
-  conversiones = [],
-}: Props) {
+export default function NuevaRecepcionStep2() {
   // ============================================
   // New Architecture Hooks
   // ============================================
@@ -86,19 +53,10 @@ export default function NuevaRecepcionStep2({
   } = useCatalogos();
 
   const { closeSidebarOnMobile, isMobile } = useUIContext();
-
-  // ============================================
-  // Legacy Props Fallback (for migration period)
-  // ============================================
+  
+  // Get reception data from context
   const currentReception = ctxCurrentReception;
-  const onBackLegacy = onBack ?? (() => navigate("nueva-step1"));
-  const onContinueLegacy = onContinue;
-  const catalogosLegacy = catalogos ?? {
-    proveedores: catalogoProveedores,
-    productos: catalogoProductos,
-  };
-  const catalogosStatusLegacy = { loading: catalogosLoading, error: catalogosError };
-  const conversionesLegacy = conversiones ?? catalogoConversiones;
+  const onBackLegacy = () => navigate("nueva-step1");
 
   // Guard: don't render until catalogs are loaded (prevents empty logistics provider list)
   if (catalogosStatusLegacy.loading) {
