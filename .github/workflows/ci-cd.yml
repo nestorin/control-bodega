@@ -337,6 +337,7 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_RECAPTCHA_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_SITE_KEY }}
           VITE_FIRESTORE_RECEPCIONES: "true"
+          VITE_ENABLE_LABELING_UI: "true"
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
         run: pnpm build
 
