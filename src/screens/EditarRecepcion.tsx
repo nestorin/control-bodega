@@ -246,7 +246,8 @@ export default function EditarRecepcion() {
   }
 
   function handleAddProductLine() {
-    const nextIndex = productLines.length > 0 ? Math.max(...productLines.map((l) => l.lineIndex)) + 1 : 0;
+    const nextIndex =
+      productLines.length > 0 ? Math.max(...productLines.map((l) => l.lineIndex)) + 1 : 0;
     setProductLines((prev) => [
       ...prev,
       {
@@ -292,7 +293,11 @@ export default function EditarRecepcion() {
         <p role="alert" className="text-red-700">
           {error || "No se pudo cargar la recepción."}
         </p>
-        <button type="button" className="mt-4 rounded-lg border px-4 py-2" onClick={() => navigate("recepciones")}>
+        <button
+          type="button"
+          className="mt-4 rounded-lg border px-4 py-2"
+          onClick={() => navigate("recepciones")}
+        >
           Volver
         </button>
       </section>
@@ -392,7 +397,14 @@ export default function EditarRecepcion() {
                   onClick={handleAddProductLine}
                   className="flex items-center gap-2 w-full rounded-lg border-2 border-dashed border-[#dce4e7] bg-white py-2 text-sm font-medium text-[#3276a8] hover:bg-[#f4f7f8]"
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
                     <line x1="12" y1="5" x2="12" y2="19" />
                     <line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
@@ -409,7 +421,14 @@ export default function EditarRecepcion() {
             onClick={() => navigate("recepciones")}
             className="flex items-center gap-2 min-h-11 rounded-lg border border-[#dce4e7] bg-white px-5 py-2 text-sm font-semibold text-[#172126] hover:bg-[#f8fafb]"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <polyline points="15 18 9 12 15 6" />
             </svg>
             Volver
@@ -423,7 +442,15 @@ export default function EditarRecepcion() {
             >
               {saving ? (
                 <>
-                  <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg
+                    className="animate-spin"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
                     <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
                     <path d="M12 2a10 10 0 0 1 10 10" strokeOpacity="1" />
                   </svg>
@@ -431,7 +458,14 @@ export default function EditarRecepcion() {
                 </>
               ) : (
                 <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
                     <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
                     <polyline points="17 21 17 13 7 13 7 21" />
                     <polyline points="7 3 7 8 15 8" />
