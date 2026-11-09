@@ -5,6 +5,7 @@ import { db } from "@/lib/firebase";
 import { createFirestoreServices } from "@/services/firestore";
 import { useOfflineQueue } from "@/hooks/useFirestore";
 import { useAuthorization } from "@/hooks/useAuthorization";
+import { useReceptionFlow } from "@/hooks/useReceptionFlow";
 
 const assetPathPrefix = "/assets";
 const imgWarehouse = `${assetPathPrefix}/8c4fa.svg`;
@@ -16,21 +17,12 @@ const imgEye = `${assetPathPrefix}/13d24.svg`;
 
 const ORG_ID = "org_exepa_001";
 
-interface Props {
-  onHome: () => void;
-  onPrint: () => void;
-  currentReception: {
-    ocFolio: string;
-    tarimas: number;
-    proveedor: string;
-    proveedorLogistico: string;
-    receptionId?: string;
-  } | null;
-}
+interface Props {}
 
-export default function RecepcionCompletada({ onHome, onPrint, currentReception }: Props) {
+export default function RecepcionCompletada() {
   const { canQuery } = useAuthorization();
-  const useFirestore = isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery;
+  const { currentReception, navigate } = useReceptionFlow();
+  const { transition } = useReceptionFlow();
   const [tarimasCount, setTarimasCount] = useState(currentReception?.tarimas ?? 20);
   const [incidencias, setIncidencias] = useState(0);
   const [fsServices, setFsServices] = useState<ReturnType<typeof createFirestoreServices> | null>(
@@ -43,18 +35,18 @@ export default function RecepcionCompletada({ onHome, onPrint, currentReception 
 
   // Initialize Firestore services
   useEffect(() => {
-    if (useFirestore && db) {
+    if (canQuery && db) {
       const services = createFirestoreServices(db, ORG_ID);
       setFsServices(services);
       setFirestoreReady(true);
     }
-  }, [useFirestore]);
+  }, [canQuery, db]);
 
   // Load reception from Firestore if enabled
   const receptionId = currentReception?.receptionId;
   const docPath = receptionId ? `organizations/${ORG_ID}/receptions/${receptionId}` : null;
 
-  const observeReception = useFirestore && !!receptionId;
+  const observeReception = canQuery && !!receptionId;
   const {
     data: receptionDoc,
     loading,
@@ -68,7 +60,7 @@ export default function RecepcionCompletada({ onHome, onPrint, currentReception 
   const { data: pallets, loading: palletsLoading } = useCollection<any>(
     db,
     receptionId ? `organizations/${ORG_ID}/receptions/${receptionId}/pallets` : "",
-    { enabled: useFirestore && !!receptionId },
+    { enabled: canQuery && !!receptionId },
   );
 
   useEffect(() => {
@@ -86,7 +78,7 @@ export default function RecepcionCompletada({ onHome, onPrint, currentReception 
 
   // If reception is IN_PROGRESS but not yet CONFIRMED, allow confirming from here
   const canConfirm =
-    useFirestore &&
+    canQuery &&
     firestoreReady &&
     fsServices &&
     receptionId &&
@@ -110,6 +102,14 @@ export default function RecepcionCompletada({ onHome, onPrint, currentReception 
         });
       }
     }
+  }
+
+  function handlePrint() {
+    window.print();
+  }
+
+  function handleHome() {
+    navigate("home");
   }
 
   return (
@@ -243,7 +243,7 @@ export default function RecepcionCompletada({ onHome, onPrint, currentReception 
             </p>
           </button>
           <button
-            onClick={onPrint}
+            onClick={handlePrint}
             className="bg-white border border-[#dce4e7] flex gap-2 h-12 md:h-[52px] items-center justify-center px-5 rounded-[14px] cursor-pointer hover:bg-[#f8fafb] transition-colors w-full touch-target"
           >
             <img alt="" className="size-[18px]" src={imgPrinter} />
@@ -255,7 +255,7 @@ export default function RecepcionCompletada({ onHome, onPrint, currentReception 
             </p>
           </button>
           <button
-            onClick={onHome}
+            onClick={handleHome}
             className="bg-[#e7f0f2] border border-[#e7f0f2] flex gap-2 h-12 md:h-[52px] items-center justify-center px-5 rounded-[14px] cursor-pointer hover:bg-[#d6e5ea] transition-colors w-full touch-target"
           >
             <img alt="" className="size-[18px]" src={imgEye} />

@@ -27,27 +27,7 @@ interface Tarima {
   proveedorLogistico: string;
 }
 
-interface Props {
-  onClose: () => void;
-  currentReception?: {
-    ocFolio: string;
-    tarimas: number;
-  } | null;
-  conversionesTabla?: Array<{
-    productId: string;
-    productName: string;
-    originalUnit: string;
-    originalQuantity: number;
-    conversions: Array<{
-      unit: string;
-      quantity: number;
-      stickers: Array<{
-        qrPayload: string;
-        quantity: number;
-      }>;
-    }>;
-  }>;
-}
+interface Props {}
 
 function Etiqueta({
   tarima,
@@ -250,7 +230,7 @@ function Etiqueta({
   );
 }
 
-export default function ImpresionEtiquetas({ onClose }: Props) {
+export default function ImpresionEtiquetas() {
   // ============================================
   // New Architecture Hooks
   // ============================================
@@ -271,7 +251,7 @@ export default function ImpresionEtiquetas({ onClose }: Props) {
   // Legacy Props Fallback (for migration period)
   // ============================================
   const currentReception = ctxCurrentReception;
-  const onCloseLegacy = onClose ?? (() => navigate("home"));
+  const onCloseLegacy = () => navigate("home");
 
   const ocFolio = currentReception?.ocFolio ?? "OC-24891";
   const ocNumber = ocFolio.replace("OC-", "");

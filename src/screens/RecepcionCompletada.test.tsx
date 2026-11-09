@@ -16,24 +16,25 @@ vi.mock("@/hooks/useAuthorization", () => ({
   useAuthorization: () => ({ canQuery: firestoreHarness.enabled }),
 }));
 vi.mock("@/services/firestore", () => ({ createFirestoreServices: () => ({}) }));
+vi.mock("@/hooks/useReceptionFlow", () => ({
+  useReceptionFlow: () => ({
+    currentReception: {
+      ocFolio: "REC-2026-0001",
+      tarimas: 2,
+      proveedor: "El Florido",
+      proveedorLogistico: "Transportes Herrera",
+      receptionId: "reception-op-1",
+    },
+    navigate: vi.fn(),
+    transition: vi.fn(),
+  }),
+}));
 
 import RecepcionCompletada from "./RecepcionCompletada";
 
 describe("RecepcionCompletada without Firestore observation", () => {
   it("shows the local completion summary instead of waiting forever", () => {
-    render(
-      <RecepcionCompletada
-        onHome={vi.fn()}
-        onPrint={vi.fn()}
-        currentReception={{
-          ocFolio: "REC-2026-0001",
-          tarimas: 2,
-          proveedor: "El Florido",
-          proveedorLogistico: "Transportes Herrera",
-          receptionId: "reception-op-1",
-        }}
-      />,
-    );
+    render(<RecepcionCompletada />);
 
     expect(screen.getByText("Recepción completada")).toBeInTheDocument();
     expect(screen.queryByText("Cargando...")).not.toBeInTheDocument();
@@ -43,19 +44,7 @@ describe("RecepcionCompletada without Firestore observation", () => {
     firestoreHarness.enabled = true;
     firestoreHarness.loading = true;
 
-    render(
-      <RecepcionCompletada
-        onHome={vi.fn()}
-        onPrint={vi.fn()}
-        currentReception={{
-          ocFolio: "REC-2026-0001",
-          tarimas: 2,
-          proveedor: "El Florido",
-          proveedorLogistico: "Transportes Herrera",
-          receptionId: "reception-op-1",
-        }}
-      />,
-    );
+    render(<RecepcionCompletada />);
 
     expect(screen.getByText("Recepción completada")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("La recepción quedó registrada");

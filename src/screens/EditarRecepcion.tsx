@@ -20,7 +20,6 @@ import { useCatalogos } from "@/hooks/useCatalogos";
 import { useReceptionFlow } from "@/hooks/useReceptionFlow";
 import { QRCodeSVG } from "qrcode.react";
 import type { Producto, Proveedor } from "./Configuracion";
-import { ReceptionProductCard } from "./ProgramacionRecepcion";
 import { useNavigate } from "react-router-dom";
 
 const ORG_ID = "org_exepa_001";
@@ -59,7 +58,7 @@ export default function EditarRecepcion() {
   const { user, canQuery } = useAuthorization();
   const navigate = useNavigate();
 
-  const { catalogoProveedores, catalogosLoading, catalogosError } = useCatalogos();
+  const { catalogoProveedores, catalogoProductos, catalogosLoading, catalogosError } = useCatalogos();
   const { editReceptionData } = useReceptionFlow();
 
   const recId = editReceptionData?.receptionId;
@@ -209,20 +208,26 @@ export default function EditarRecepcion() {
         unit: line.unit,
         status: "PLANNED" as const,
         activated: false,
+        palletNumber: line.lineIndex + 1,
       }));
 
       // Create edit data for the reception
       const editData: ReceptionCreateInput = {
-        hasOC: reception.hasOC ?? true,
-        ocFolio: reception.ocFolio,
-        tarimas: reception.tarimas,
+        folio: reception.folio,
+        palletCount: reception.palletCount,
+        purchaseOrderId: reception.purchaseOrderId,
+        purchaseOrderNumber: reception.purchaseOrderNumber,
         supplierId: supplierRecord.id,
-        supplierName: supplierRecord.nombre,
+        supplierCode: reception.supplierCode,
+        supplierName: supplierRecord.name,
         logisticsProvider: logisticsProvider || reception.logisticsProvider,
+        productName: reception.productName,
+        status: "DRAFT" as const,
+        operationId: reception.operationId || `op-${Date.now()}`,
+        actorUserId: user.uid,
+        evidencePhotos: reception.evidencePhotos,
         warehouseId: reception.warehouseId,
-        fechaRecepcion: reception.fechaRecepcion,
-        lote: reception.lote,
-        caducidad: reception.caducidad,
+        scheduledDate: reception.scheduledDate,
       };
 
       // Generate operation ID if needed
@@ -231,7 +236,10 @@ export default function EditarRecepcion() {
       const updated = await services.receptions.editReception(
         reception.id,
         editData,
-        lines,
+        lines.map((line) => ({
+          ...line,
+          palletsCreated: 1,
+        })),
         user.uid,
         operationId,
         reception.version,
@@ -332,11 +340,11 @@ export default function EditarRecepcion() {
           </div>
           <div className="flex items-center gap-2 text-sm text-[#607078]">
             <span className="font-bold">Tarimas:</span>
-            <span>{reception.tarimas}</span>
+            <span>{reception.palletCount}</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-[#607078]">
             <span className="font-bold">Fecha:</span>
-            <span>{reception.fechaRecepcion || "—"}</span>
+            <span>{reception.scheduledDate || "—"}</span>
           </div>
         </div>
 
@@ -345,15 +353,43 @@ export default function EditarRecepcion() {
             <h2 className="mb-3 text-lg font-bold text-[#172126]">Líneas de producto</h2>
             <div className="space-y-3">
               {productLines.map((line) => (
-                <ReceptionProductCard
+                <div
                   key={line.lineIndex}
-                  line={line}
-                  catalogos={catalogoProductos}
-                  onRemove={() => handleRemoveProductLine(line.lineIndex)}
+                  className="rounded-2xl border border-[#dce4e7] bg-[#fbfcfc] p-4 shadow-sm"
                 >
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs font-medium text-[#607078]">Producto</label>
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-[#607078]">
+                      Producto {line.lineIndex + 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveProductLine(line.lineIndex)}
+                      className="touch-target flex size-11 shrink-0 items-center justify-center rounded-xl border border-[#f3d4d1] bg-white text-[#c0392b] hover:bg-[#fff4f3]"
+                      aria-label={`Eliminar producto ${line.lineIndex + 1}`}
+                    >
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-1 14H6L5 6" />
+                        <path d="M10 11v6" />
+                        <path d="M14 11v6" />
+                        <path d="M9 6V4h6v2" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[11px] font-bold uppercase tracking-wide text-[#607078]">
+                        Producto
+                      </label>
                       <select
                         value={line.productId}
                         onChange={(e) => {
@@ -365,7 +401,7 @@ export default function EditarRecepcion() {
                         <option value="">Seleccionar producto</option>
                         {catalogoProductos.map((product) => (
                           <option key={product.id} value={product.id}>
-                            {product.nombre} ({product.codigo})
+                            {product.nombre} ({product.sku})
                           </option>
                         ))}
                       </select>
@@ -389,7 +425,7 @@ export default function EditarRecepcion() {
                       />
                     </div>
                   </div>
-                </ReceptionProductCard>
+                </div>
               ))}
               {editable && (
                 <button

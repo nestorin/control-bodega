@@ -243,6 +243,16 @@ export default function EvidenciaDetalle() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<EvidenciaData | null>(ev ? ev : null);
+
+  // Early return if no evidence data
+  if (!draft) {
+    return (
+      <main className="mx-auto max-w-3xl p-6" role="status" aria-live="polite">
+        <h1 className="text-xl font-semibold">Evidencia no encontrada</h1>
+        <p className="mt-2 text-gray-600">No se pudo cargar la evidencia seleccionada.</p>
+      </main>
+    );
+  }
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
   // Sync draft with selectedEvidencia changes
@@ -312,21 +322,21 @@ export default function EvidenciaDetalle() {
   }
 
   async function downloadDocument() {
-    if (!storage || !draft.documento || !draft.receptionId) return;
+    if (!storage || !draft?.documento || !draft?.receptionId) return;
     setDownloadError(null);
     try {
-      const path = draft.documento;
-      if (
-        !/^organizations\/org_exepa_001\/warehouses\/[^/]+\/receptions\/[^/]+\/evidence\/documentation\.(pdf|jpg|png|webp)$/.test(
-          path,
-        ) ||
-        !path.includes(`/receptions/${draft.receptionId}/`)
-      ) {
-        throw new Error("Invalid evidence document path");
-      }
-      const blob = await getBlob(ref(storage, path));
-      const extension = path.split(".").pop() || "pdf";
-      downloadBlob(blob, `Documento-${draft.receptionId}.${extension}`);
+      const path = draft!.documento;
+            if (
+              !/^organizations\/org_exepa_001\/warehouses\/[^/]+\/receptions\/[^/]+\/evidence\/documentation\.(pdf|jpg|png|webp)$/.test(
+                  path,
+              ) ||
+              !path.includes(`/receptions/${draft!.receptionId}/`)
+            ) {
+              throw new Error("Invalid evidence document path");
+            }
+            const blob = await getBlob(ref(storage, path));
+            const extension = path.split(".").pop() || "pdf";
+            downloadBlob(blob, `Documento-${draft!.receptionId}.${extension}`);
     } catch (error) {
       console.error("Evidence document download failed:", error);
       setDownloadError("No se pudo descargar la orden de compra o factura.");

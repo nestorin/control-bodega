@@ -24,7 +24,8 @@ import ImpresionEtiquetas from "./screens/ImpresionEtiquetas";
 import EscanearQR from "./screens/EscanearQR";
 import EditarRecepcion from "./screens/EditarRecepcion";
 import Evidencias, { mapReceptionEvidence } from "./screens/Evidencias";
-import EvidenciaDetalle, { type EvidenciaData } from "./screens/EvidenciaDetalle";
+import EvidenciaDetalle from "./screens/EvidenciaDetalle";
+import type { EvidenciaData } from "./types";
 import LotesCaducidades from "./screens/LotesCaducidades";
 import Embarques from "./screens/Embarques";
 import Configuracion, {
@@ -1387,105 +1388,26 @@ function AppLayout() {
           {screen === "nueva-step2" && <NuevaRecepcionStep2 />}
 
           {screen === "captura-tarima" && (
-            <CapturaTarima
-              onBack={() => {
-                if (
-                  isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") &&
-                  db &&
-                  canQuery &&
-                  currentReception?.receptionId
-                ) {
-                  navigate("recepciones", "recepciones");
-                } else {
-                  navigate("nueva-step2");
-                }
-              }}
-              onFinish={() => {
-                if (receptionSession.session.data && receptionSession.session.phase === "PALLETS") {
-                  receptionSession.transition("CONFIRMED");
-                  receptionSession.transition("COMPLETED");
-                }
-                navigate("completada");
-              }}
-              almacenActivo={almacenActivo ?? null}
-              onAumentarInventario={aumentarInventario}
-              catalogos={{ productos: catalogoProductos }}
-              currentReception={currentReception}
-              conversionesTabla={currentReception?.conversionesTabla}
-            />
-          )}
+                      <CapturaTarima />
+                    )}
           {screen === "completada" && (
-            <RecepcionCompletada
-              onHome={() => {
-                receptionSession.endSession();
-                setCurrentReception(null);
-                navigate("home", "home");
-              }}
-              onPrint={() => navigate("impresion")}
-              currentReception={currentReception}
-            />
-          )}
+                      <RecepcionCompletada />
+                    )}
           {screen === "impresion" && (
-            <ImpresionEtiquetas
-              onClose={() => navigate("completada")}
-              currentReception={currentReception}
-              conversionesTabla={currentReception?.conversionesTabla}
-            />
-          )}
+                      <ImpresionEtiquetas />
+                    )}
           {screen === "recepciones" && (
-            <Recepciones
-              onResume={resumeReception}
-              onSelectTarima={(id) => {
-                setEditId(id);
-                navigate("editar-recepcion", "recepciones");
-              }}
-              onEdit={(id) => {
-                setEditId(id);
-                navigate("editar-recepcion", "recepciones");
-              }}
-            />
-          )}
+                      <Recepciones />
+                    )}
           {screen === "escanear-qr" && (
-            <EscanearQR
-              onFound={(qrCode) => {
-                setScannedQrCode(qrCode);
-                navigate("tarima-detalle", "qr");
-              }}
-              onClose={() => navigate("home", "home")}
-            />
-          )}
+                      <EscanearQR />
+                    )}
           {screen === "editar-recepcion" && (
-            <EditarRecepcion
-              recId={editId}
-              suppliers={catalogoProveedores}
-              products={catalogoProductos}
-              onBack={() => {
-                navigate("recepciones", "recepciones");
-              }}
-              onSave={() => navigate("recepciones", "recepciones")}
-            />
-          )}
+                      <EditarRecepcion />
+                    )}
           {screen === "tarima-detalle" && (
-            <TarimaDetalle
-              authorizedWarehouseIds={
-                profile && isGlobalMembershipRole(profile.role)
-                  ? [...CANONICAL_WAREHOUSE_IDS]
-                  : profile
-                    ? (normalizeMembershipWarehouses(profile) ?? [])
-                    : []
-              }
-              onBack={() => {
-                setScannedQrCode(null);
-                navigate("recepciones", "recepciones");
-              }}
-              onViewReference={(reference) => {
-                setEditId(reference.recId);
-                navigate("editar-recepcion", "recepciones");
-              }}
-              currentReception={currentReception}
-              qrCode={scannedQrCode ?? undefined}
-            />
-          )}
+                      <TarimaDetalle />
+                    )}
           {screen === "evidencias" && (
             <Evidencias
               onSelect={(ev) => {
