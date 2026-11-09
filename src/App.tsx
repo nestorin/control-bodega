@@ -109,59 +109,59 @@ export default function App() {
       <AuthProvider>
         <ReceptionProvider>
           <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/unauthorized" element={<Unauthorized />} />
-          <Route
-            path="/*"
-            element={
-              <ProtectedRoute>
-                <AppLayout />
-              </ProtectedRoute>
-            }
-          />
-          {/* Etiquetado Module Routes */}
-          <Route
-            path="/etiquetado"
-            element={
-              <LabelingRoute>
-                <EtiquetadoDashboard />
-              </LabelingRoute>
-            }
-          />
-          <Route
-            path="/etiquetado/nuevo"
-            element={
-              <LabelingRoute>
-                <NuevaEtiquetado />
-              </LabelingRoute>
-            }
-          />
-          <Route
-            path="/etiquetado/entregar"
-            element={
-              <LabelingRoute>
-                <EntregarEtiquetado />
-              </LabelingRoute>
-            }
-          />
-          <Route
-            path="/etiquetado/recibir"
-            element={
-              <LabelingRoute>
-                <RecibirEtiquetado />
-              </LabelingRoute>
-            }
-          />
-          <Route
-            path="/etiquetado/conciliar"
-            element={
-              <LabelingRoute>
-                <ConciliarEtiquetado />
-              </LabelingRoute>
-            }
-          />
-        </Routes>
-      </ReceptionProvider>
+            <Route path="/login" element={<Login />} />
+            <Route path="/unauthorized" element={<Unauthorized />} />
+            <Route
+              path="/*"
+              element={
+                <ProtectedRoute>
+                  <AppLayout />
+                </ProtectedRoute>
+              }
+            />
+            {/* Etiquetado Module Routes */}
+            <Route
+              path="/etiquetado"
+              element={
+                <LabelingRoute>
+                  <EtiquetadoDashboard />
+                </LabelingRoute>
+              }
+            />
+            <Route
+              path="/etiquetado/nuevo"
+              element={
+                <LabelingRoute>
+                  <NuevaEtiquetado />
+                </LabelingRoute>
+              }
+            />
+            <Route
+              path="/etiquetado/entregar"
+              element={
+                <LabelingRoute>
+                  <EntregarEtiquetado />
+                </LabelingRoute>
+              }
+            />
+            <Route
+              path="/etiquetado/recibir"
+              element={
+                <LabelingRoute>
+                  <RecibirEtiquetado />
+                </LabelingRoute>
+              }
+            />
+            <Route
+              path="/etiquetado/conciliar"
+              element={
+                <LabelingRoute>
+                  <ConciliarEtiquetado />
+                </LabelingRoute>
+              }
+            />
+          </Routes>
+        </ReceptionProvider>
       </AuthProvider>
     </BrowserRouter>
   );
