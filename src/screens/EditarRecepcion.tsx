@@ -16,6 +16,7 @@ import {
 } from "@/services/firestore";
 import { db } from "@/lib/firebase";
 import { useAuthorization } from "@/hooks/useAuthorization";
+import { useCatalogos } from "@/hooks/useCatalogos";
 import { QRCodeSVG } from "qrcode.react";
 import type { Producto, Proveedor } from "./Configuracion";
 import { ReceptionProductCard } from "./ProgramacionRecepcion";

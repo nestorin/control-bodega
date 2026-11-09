@@ -13,6 +13,7 @@ import { db } from "@/lib/firebase";
 import { createFirestoreServices } from "@/services/firestore";
 import { useAuthorization, isPermissionDenied } from "@/hooks/useAuthorization";
 import { useUIContext } from "@/context";
+import { InventoryGridTab } from "@/components/inventario/InventoryGridTab";
 import type { LotCaducidadDoc } from "@/services/firestore/types";
 import { WAREHOUSE_IDS } from "@/config/warehouses";
 import {

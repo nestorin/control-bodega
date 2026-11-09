@@ -15,6 +15,8 @@ import {
   buildAuthenticatedEvidenceLink,
   buildEvidenceShareMessage,
 } from "@/services/evidenceShare";
+import { useReceptionFlow } from "@/hooks/useReceptionFlow";
+import { useUIContext } from "@/context/UIContext";
 
 export interface EvidenciaData {
   id: string;
@@ -269,7 +271,7 @@ export default function EvidenciaDetalle() {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<EvidenciaData | null>(ev);
+  const [draft, setDraft] = useState<EvidenciaData | null>(ev ? ev : null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
   // Sync draft with selectedEvidencia changes

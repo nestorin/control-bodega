@@ -343,6 +343,10 @@ export const staticHeaderConfig: Partial<Record<Screen, HeaderConfig>> = {
     subtitle: "SISTEMA",
     title: "Configuración",
   },
+  etiquetado: {
+    subtitle: "ETIQUETADO",
+    title: "Módulo de etiquetado",
+  },
   "programacion-recepcion": {
     subtitle: "NUEVA RECEPCIÓN",
     title: "Programación de recepción",
