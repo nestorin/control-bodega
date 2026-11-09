@@ -17,36 +17,7 @@ import {
 } from "@/services/evidenceShare";
 import { useReceptionFlow } from "@/hooks/useReceptionFlow";
 import { useUIContext } from "@/context/UIContext";
-
-export interface EvidenciaData {
-  id: string;
-  fotoTrailer: string | null;
-  fotoProducto: string | null;
-  documento?: string | null;
-  proveedor: string;
-  proveedorLogistico: string;
-  item: string;
-  tarimas: number;
-  caducidad: string;
-  lote: string;
-  ocFolio: string;
-  fecha: string;
-  hora: string;
-  estado: string;
-  color: string;
-  bg: string;
-  img: string;
-  receptionId?: string;
-  evidenceId?: string;
-  purchaseOrderNumber?: string;
-  pallets?: EvidencePalletRow[];
-}
-
-interface Props {
-  evidencia: EvidenciaData;
-  onBack: () => void;
-  onDelete?: () => void;
-}
+import type { EvidenciaData } from "@/types";
 
 function WhatsAppIcon() {
   return (

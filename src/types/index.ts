@@ -158,6 +158,7 @@ export interface EvidenciaData {
   id: string;
   fotoTrailer?: string | null;
   fotoProducto?: string | null;
+  documento?: string | null;
   proveedor: string;
   proveedorLogistico: string;
   item: string;
