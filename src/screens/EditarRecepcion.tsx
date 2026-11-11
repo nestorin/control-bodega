@@ -18,6 +18,7 @@ import {
   type ReceptionCreateInput,
   type ReceptionDoc,
 } from "@/services/firestore";
+import { buildPalletPlan, findCajasPorTarima } from "@/services/palletPlan";
 import { db } from "@/lib/firebase";
 import { useAuthorization } from "@/hooks/useAuthorization";
 import { useCatalogos } from "@/hooks/useCatalogos";
@@ -77,8 +78,13 @@ export default function EditarRecepcion({
   const { user, canQuery } = useAuthorization();
   const navigate = useNavigate();
 
-  const { catalogoProveedores, catalogoProductos, catalogosLoading, catalogosError } =
-    useCatalogos();
+  const {
+    catalogoProveedores,
+    catalogoProductos,
+    catalogoConversiones,
+    catalogosLoading,
+    catalogosError,
+  } = useCatalogos();
   const { editReceptionData } = useReceptionFlow();
 
   // Legacy prop fallbacks: App passes no props, so the context/hook state wins.
@@ -274,17 +280,22 @@ export default function EditarRecepcion({
         palletsCreated: 0,
       }));
 
-      // edit_reception regenerates the QR set from plannedPallets and enforces
-      // sequential pallet numbers plus a lineIndex pointing at the position of
-      // the matching entry in `lines`.
-      const plannedPallets: PlannedReceptionPalletDraft[] = productLines.map((line, index) => ({
-        palletNumber: index + 1,
-        lineIndex: index,
-        productId: line.productId,
-        productName: line.productName,
-        quantity: line.quantity,
-        unit: line.unit,
-      }));
+      // Two QR codes are printed per tarima (see CapturaTarima.tsx), so editing must not
+      // collapse a multi-tarima line. The plan is rebuilt with the same shared rule used at
+      // creation (src/services/palletPlan.ts): the ratio comes from the conversions catalog
+      // and, when the product has no conversion entry, the existing pallet count is preserved
+      // instead of assuming a ratio.
+      const plannedPallets: PlannedReceptionPalletDraft[] = buildPalletPlan(
+        productLines.map((line, index) => ({
+          lineIndex: index,
+          productId: line.productId,
+          productName: line.productName,
+          quantity: line.quantity,
+          unit: line.unit,
+          cajasPorTarima: findCajasPorTarima(line.productName, catalogoConversiones),
+          pallets: line.pallets,
+        })),
+      );
 
       const operationId = `op-edit-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       const editData: ReceptionCreateInput = {
