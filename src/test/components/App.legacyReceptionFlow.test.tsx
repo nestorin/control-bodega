@@ -25,64 +25,84 @@ vi.mock("@/screens/Home", () => ({
   ),
 }));
 
-vi.mock("@/screens/NuevaRecepcionStep1", () => ({
-  default: ({
-    onContinue,
-    initialData,
-    onBack,
-  }: {
-    onContinue: (data: unknown) => void;
-    initialData?: Record<string, unknown>;
-    onBack: () => void;
-  }) => (
-    <div>
-      {initialData?.receptionId && (
-        <p role="status">
-          Restored {String(initialData.receptionId)} / {String(initialData.ocFolio)}
-        </p>
-      )}
-      <button onClick={onBack}>Abandon reception</button>
-      <button
-        onClick={() =>
-          onContinue(
-            initialData?.receptionId
-              ? initialData
-              : {
+vi.mock("@/screens/NuevaRecepcionStep1", async () => {
+  const { useReceptionFlow } = await import("@/hooks/useReceptionFlow");
+  return {
+    // App renders this screen with NO props: the mock mirrors the real
+    // contract (optional props with hook fallbacks) via useReceptionFlow.
+    default: function NuevaRecepcionStep1Mock() {
+      const { currentReception, setCurrentReception, navigate } = useReceptionFlow();
+      return (
+        <div>
+          {currentReception?.receptionId && (
+            <p role="status">
+              Restored {currentReception.receptionId} / {currentReception.ocFolio}
+            </p>
+          )}
+          <button
+            onClick={() => {
+              setCurrentReception(null);
+              navigate("home");
+            }}
+          >
+            Abandon reception
+          </button>
+          <button
+            onClick={() => {
+              setCurrentReception(
+                currentReception ?? {
                   hasOC: true,
                   ocFolio: "OC-LEGACY-1",
-                  tarimas: "1",
+                  tarimas: 1,
                   proveedor: "Supplier",
                   proveedorLogistico: "Carrier",
                   receptionId: "reception-legacy-1",
                   productos: [],
                   conversionesTabla: [],
                 },
-          )
-        }
-      >
-        Continue legacy reception
-      </button>
-    </div>
-  ),
-}));
+              );
+              navigate("nueva-step2");
+            }}
+          >
+            Continue legacy reception
+          </button>
+        </div>
+      );
+    },
+  };
+});
 
-vi.mock("@/screens/NuevaRecepcionStep2", () => ({
-  default: ({ onContinue, onBack }: { onContinue: () => void; onBack: () => void }) => (
-    <div>
-      <button onClick={onBack}>Back to reception details</button>
-      <button onClick={onContinue}>Continue to pallet capture</button>
-    </div>
-  ),
-}));
+vi.mock("@/screens/NuevaRecepcionStep2", async () => {
+  const { useReceptionFlow } = await import("@/hooks/useReceptionFlow");
+  return {
+    default: function NuevaRecepcionStep2Mock() {
+      const { navigate } = useReceptionFlow();
+      return (
+        <div>
+          <button onClick={() => navigate("nueva-step1")}>Back to reception details</button>
+          <button onClick={() => navigate("captura-tarima")}>Continue to pallet capture</button>
+        </div>
+      );
+    },
+  };
+});
 
-vi.mock("@/screens/CapturaTarima", () => ({
-  default: ({ onFinish }: { onFinish: () => void }) => (
-    <div>
-      <p>Legacy pallet capture</p>
-      <button onClick={onFinish}>Finish pallet capture</button>
-    </div>
-  ),
-}));
+vi.mock("@/screens/CapturaTarima", async () => {
+  const { useReceptionFlow } = await import("@/hooks/useReceptionFlow");
+  return {
+    // Optional prop with hook fallback, exactly like the real screen.
+    default: function CapturaTarimaMock({ onFinish }: { onFinish?: () => void }) {
+      const { navigate } = useReceptionFlow();
+      const handleFinish = onFinish ?? (() => navigate("completada"));
+      return (
+        <div>
+          <p>Legacy pallet capture</p>
+          <button onClick={handleFinish}>Finish pallet capture</button>
+        </div>
+      );
+    },
+  };
+});
 
 vi.mock("@/screens/RecepcionCompletada", () => ({
   default: () => <p>Reception completed</p>,

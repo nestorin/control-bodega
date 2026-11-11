@@ -37,9 +37,27 @@ interface ReceptionReference {
   proveedorLogistico: string;
 }
 
-interface Props {}
+interface Props {
+  onBack?: () => void;
+  onViewReference?: (reference: ReceptionReference) => void;
+  currentReception?: {
+    ocFolio: string;
+    tarimas: number;
+    receptionId?: string;
+    proveedor?: string;
+    proveedorLogistico?: string;
+  } | null;
+  qrCode?: string;
+  authorizedWarehouseIds?: string[];
+}
 
-export default function TarimaDetalle() {
+export default function TarimaDetalle({
+  onBack,
+  onViewReference,
+  currentReception: currentReceptionProp,
+  qrCode,
+  authorizedWarehouseIds,
+}: Props) {
   const [showFormats, setShowFormats] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);

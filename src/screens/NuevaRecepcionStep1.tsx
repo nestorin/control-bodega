@@ -60,7 +60,90 @@ const catalogoConversiones = [
 
 const conversionProps = catalogoConversiones;
 
-function NuevaRecepcionStep1Form() {
+interface Props {
+  onBack?: () => void;
+  onContinue?: (formData: {
+    hasOC: boolean;
+    ocFolio: string;
+    tarimas: string;
+    proveedor: string;
+    proveedorLogistico: string;
+    receptionId?: string;
+    productos?: Array<{
+      productId: string | null;
+      codigo: string | null;
+      nombre: string;
+      unidad: string | null;
+      cantidad: number;
+      importe: number;
+      estadoMatch: "confirmado" | "sugerido" | "manual";
+    }>;
+    conversionesTabla?: Array<{
+      producto: string;
+      productId: string | null;
+      codigo: string;
+      unidades: number;
+      unidad: string;
+      piezasPorCaja: number;
+      cajasPorTarima: number;
+      cajas: number;
+      tarimas: number;
+      stickers: number;
+    }>;
+  }) => void;
+  initialData?: {
+    hasOC: boolean;
+    ocFolio: string;
+    tarimas: string;
+    proveedor: string;
+    proveedorLogistico: string;
+    receptionId?: string;
+    conversionesTabla?: Array<{
+      producto: string;
+      productId?: string | null;
+      codigo: string;
+      unidades: number;
+      unidad: string;
+      piezasPorCaja: number;
+      cajasPorTarima: number;
+      cajas: number;
+      tarimas: number;
+      stickers: number;
+    }>;
+    productos?: Array<{
+      productId: string | null;
+      codigo: string | null;
+      nombre: string;
+      unidad: string | null;
+      cantidad: number;
+      importe: number;
+      estadoMatch: "confirmado" | "sugerido" | "manual";
+    }>;
+  };
+  catalogos?: {
+    proveedores: Proveedor[];
+    productos: Producto[];
+  };
+  catalogosStatus?: {
+    loading: boolean;
+    error: Error | null;
+  };
+  conversiones?: Array<{
+    producto: string;
+    piezasPorCaja: number;
+    cajasPorTarima: number;
+  }>;
+}
+type ReceptionFormData = Parameters<NonNullable<Props["onContinue"]>>[0];
+
+function NuevaRecepcionStep1Form({
+  onContinue,
+  onBack,
+  initialData,
+  catalogos,
+  catalogosStatus,
+  conversiones,
+}: Props) {
   // ============================================
   // New Architecture Hooks
   // ============================================
@@ -87,7 +170,27 @@ function NuevaRecepcionStep1Form() {
   // ============================================
   const currentReception = ctxCurrentReception;
   const onBackLegacy = onBack ?? (() => navigate("home"));
-  const onContinueLegacy = onContinue;
+  const onContinueLegacy =
+    onContinue ??
+    ((data: ReceptionFormData) => {
+      setCurrentReception({
+        ...(currentReception ?? {}),
+        hasOC: data.hasOC,
+        ocFolio: data.ocFolio,
+        tarimas: parseInt(data.tarimas, 10) || 20,
+        proveedor: data.proveedor,
+        proveedorLogistico: data.proveedorLogistico,
+        receptionId: data.receptionId,
+        productos: (data.productos ?? []).map((product) => ({
+          ...product,
+          precio: 0,
+          estadoMatch: product.estadoMatch,
+        })),
+        lote: currentReception?.lote,
+        caducidad: currentReception?.caducidad,
+      });
+      navigate("nueva-step2");
+    });
   const catalogosLegacy = catalogos ?? {
     proveedores: catalogoProveedores,
     productos: catalogoProductos,
@@ -884,6 +987,20 @@ function NuevaRecepcionStep1Form() {
   );
 }
 
-export default function NuevaRecepcionStep1() {
-  return <NuevaRecepcionStep1Form />;
+export default function NuevaRecepcionStep1({ ...props }: Props) {
+  if (props.catalogosStatus?.loading) {
+    return (
+      <div className="flex flex-col gap-4 p-6" style={{ fontFamily: "'Inter',sans-serif" }}>
+        <div
+          className="flex items-center gap-3 text-[#607078]"
+          style={{ fontFamily: "'Inter',sans-serif" }}
+        >
+          <div className="size-6 border-2 border-[#3276a8] border-t-transparent rounded-full animate-spin" />
+          <span className="text-base font-medium">Cargando catálogos…</span>
+        </div>
+      </div>
+    );
+  }
+
+  return <NuevaRecepcionStep1Form {...props} />;
 }

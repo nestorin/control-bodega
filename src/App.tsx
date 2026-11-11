@@ -1,7 +1,10 @@
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
-import { ReceptionProvider } from "@/context/ReceptionContext";
+import { ReceptionProvider, useReceptionContext } from "@/context/ReceptionContext";
+import { CatalogosProvider } from "@/context/CatalogosContext";
+import { InventoryProvider } from "@/context/InventoryContext";
+import { UIProvider } from "@/context/UIContext";
 import { useAuthorization } from "@/hooks/useAuthorization";
 import {
   CANONICAL_WAREHOUSE_IDS,
@@ -25,7 +28,7 @@ import EscanearQR from "./screens/EscanearQR";
 import EditarRecepcion from "./screens/EditarRecepcion";
 import Evidencias, { mapReceptionEvidence } from "./screens/Evidencias";
 import EvidenciaDetalle from "./screens/EvidenciaDetalle";
-import type { EvidenciaData } from "./types";
+import type { EvidenciaData, Screen as ContextScreen } from "./types";
 import LotesCaducidades from "./screens/LotesCaducidades";
 import Embarques from "./screens/Embarques";
 import Configuracion, {
@@ -109,59 +112,65 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <ReceptionProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/unauthorized" element={<Unauthorized />} />
-            <Route
-              path="/*"
-              element={
-                <ProtectedRoute>
-                  <AppLayout />
-                </ProtectedRoute>
-              }
-            />
-            {/* Etiquetado Module Routes */}
-            <Route
-              path="/etiquetado"
-              element={
-                <LabelingRoute>
-                  <EtiquetadoDashboard />
-                </LabelingRoute>
-              }
-            />
-            <Route
-              path="/etiquetado/nuevo"
-              element={
-                <LabelingRoute>
-                  <NuevaEtiquetado />
-                </LabelingRoute>
-              }
-            />
-            <Route
-              path="/etiquetado/entregar"
-              element={
-                <LabelingRoute>
-                  <EntregarEtiquetado />
-                </LabelingRoute>
-              }
-            />
-            <Route
-              path="/etiquetado/recibir"
-              element={
-                <LabelingRoute>
-                  <RecibirEtiquetado />
-                </LabelingRoute>
-              }
-            />
-            <Route
-              path="/etiquetado/conciliar"
-              element={
-                <LabelingRoute>
-                  <ConciliarEtiquetado />
-                </LabelingRoute>
-              }
-            />
-          </Routes>
+          <CatalogosProvider canQuery={true}>
+            <InventoryProvider>
+              <UIProvider>
+                <Routes>
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/unauthorized" element={<Unauthorized />} />
+                  <Route
+                    path="/*"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout />
+                      </ProtectedRoute>
+                    }
+                  />
+                  {/* Etiquetado Module Routes */}
+                  <Route
+                    path="/etiquetado"
+                    element={
+                      <LabelingRoute>
+                        <EtiquetadoDashboard />
+                      </LabelingRoute>
+                    }
+                  />
+                  <Route
+                    path="/etiquetado/nuevo"
+                    element={
+                      <LabelingRoute>
+                        <NuevaEtiquetado />
+                      </LabelingRoute>
+                    }
+                  />
+                  <Route
+                    path="/etiquetado/entregar"
+                    element={
+                      <LabelingRoute>
+                        <EntregarEtiquetado />
+                      </LabelingRoute>
+                    }
+                  />
+                  <Route
+                    path="/etiquetado/recibir"
+                    element={
+                      <LabelingRoute>
+                        <RecibirEtiquetado />
+                      </LabelingRoute>
+                    }
+                  />
+                  <Route
+                    path="/etiquetado/conciliar"
+                    element={
+                      <LabelingRoute>
+                        <ConciliarEtiquetado />
+                      </LabelingRoute>
+                    }
+                  />
+                </Routes>
+              </UIProvider>
+            </InventoryProvider>
+          </CatalogosProvider>
         </ReceptionProvider>
       </AuthProvider>
     </BrowserRouter>
@@ -200,12 +209,26 @@ function LabelingUnavailable() {
 function AppLayout() {
   const { user, profile, logout, canQuery } = useAuthorization();
   const receptionSession = useReceptionSession();
+  const { currentScreen: ctxCurrentScreen, navigate: ctxNavigate } = useReceptionContext();
   const [screen, setScreen] = useState<Screen>("home");
   const [activeNav, setActiveNav] = useState<NavItem>("home");
   const [editId, setEditId] = useState<string>("OC-24891");
   const [selectedEvidencia, setSelectedEvidencia] = useState<EvidenciaData | null>(null);
   const [tarimaActual, setTarimaActual] = useState(3);
   const [scannedQrCode, setScannedQrCode] = useState<string | null>(null);
+
+  // Screens navigate through useReceptionFlow, which dispatches NAVIGATE on
+  // ReceptionContext; mirror that into the local screen state. The mount run
+  // is skipped so direct screen overrides (e.g. test modes) are not clobbered.
+  // Cast: App's local Screen and the shared types Screen have drifted
+  // (etiquetado-* variants vs login/register); values crossing this boundary
+  // in practice are shared members.
+  const syncedScreenRef = useRef(ctxCurrentScreen);
+  useEffect(() => {
+    if (syncedScreenRef.current === ctxCurrentScreen) return;
+    syncedScreenRef.current = ctxCurrentScreen;
+    setScreen(ctxCurrentScreen as Screen);
+  }, [ctxCurrentScreen]);
 
   // TEST-ONLY: Legacy mode for TarimaDetalle (bypasses Firestore query)
   // Enable with: ?test=legacy-tarima-detalle
@@ -723,6 +746,10 @@ function AppLayout() {
   }, []);
 
   function navigate(s: Screen, nav?: NavItem) {
+    // Dispatch as well so ReceptionContext stays the single source of truth
+    // for the active screen (screens navigate through useReceptionFlow).
+    // Cast for the same Screen union drift noted in the sync effect above.
+    ctxNavigate(s as ContextScreen, nav);
     setScreen(s);
     if (nav) setActiveNav(nav);
     if (isMobile) setSidebarOpen(false);

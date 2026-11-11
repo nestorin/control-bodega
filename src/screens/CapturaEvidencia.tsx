@@ -23,6 +23,7 @@ import {
 } from "@/services/evidenceShare";
 import { uploadEvidencePair } from "@/services/evidenceUpload";
 import { evidenceDocumentPath, validateEvidenceDocument } from "@/services/evidenceDocument";
+import type { ReceptionData } from "@/types";
 
 const imgArrowRight = "/assets/55de6.svg";
 const ORG_ID = "org_exepa_001";
@@ -197,7 +198,19 @@ function PhotoUploadBox({
   );
 }
 
-export default function CapturaEvidencia() {
+interface Props {
+  onBack?: () => void;
+  onContinue?: () => void;
+  receptionId?: string;
+  currentReception?: ReceptionData | null;
+}
+
+export default function CapturaEvidencia({
+  onBack: onBackProp,
+  onContinue: onContinueProp,
+  receptionId: receptionIdProp,
+  currentReception: currentReceptionProp,
+}: Props) {
   // ============================================
   // New Architecture Hooks
   // ============================================
@@ -209,10 +222,13 @@ export default function CapturaEvidencia() {
 
   // ============================================
   // Legacy Props Fallback (for migration period)
+  // App renders this screen with no props, so context/hook state wins unless
+  // a prop is explicitly provided.
   // ============================================
-  const currentReception = ctxCurrentReception;
-  const onBack = () => navigate("home");
-  const onContinue = () => navigate("captura-tarima");
+  const currentReception = currentReceptionProp ?? ctxCurrentReception;
+  const receptionId = receptionIdProp ?? currentReception?.receptionId;
+  const onBack = onBackProp ?? (() => navigate("home"));
+  const onContinue = onContinueProp ?? (() => navigate("captura-tarima"));
 
   // ============================================
   // Local State
@@ -278,13 +294,11 @@ export default function CapturaEvidencia() {
 
   function buildWhatsAppMessage() {
     return buildEvidenceShareMessage({
-      receptionId: currentReception?.receptionId || "Sin recepción",
+      receptionId: receptionId || "Sin recepción",
       supplier: form.proveedor,
       item: form.item,
       palletCount: form.tarimas,
-      evidenceLink: currentReception?.receptionId
-        ? buildAuthenticatedEvidenceLink(currentReception.receptionId)
-        : null,
+      evidenceLink: receptionId ? buildAuthenticatedEvidenceLink(receptionId) : null,
     });
   }
 
@@ -296,7 +310,6 @@ export default function CapturaEvidencia() {
       const evidenceStorage = storage;
       const trailerFile = photoFiles[0];
       const productFile = photoFiles[1];
-      const receptionId = currentReception?.receptionId;
       if (receptionId && user && evidenceStorage && warehouseId && trailerFile && productFile) {
         const extension = (file: File) => {
           if (file.type === "image/png") return "png";

@@ -68,6 +68,7 @@ export function useReceptionFlow(): UseReceptionFlowReturn {
     setSelectedEvidencia: ctxSetSelectedEvidencia,
     setTarimaActual: ctxSetTarimaActual,
     resetAll: ctxResetAll,
+    navigate: ctxNavigate,
   } = useReceptionContext();
 
   const { closeSidebarOnMobile } = useUIContext();
@@ -76,12 +77,15 @@ export function useReceptionFlow(): UseReceptionFlowReturn {
   // Navigation with sidebar close on mobile
   const navigateWithSidebar = useCallback(
     (screen: Screen, nav?: NavItem) => {
+      // Keep ReceptionContext.currentScreen in sync: AppLayout renders the
+      // active screen from it (screens navigate through this hook).
+      ctxNavigate(screen, nav);
       navigate(screen);
       closeSidebarOnMobile();
       // Note: Active nav update is handled by UIContext or screen components
       // The nav parameter is kept for API compatibility
     },
-    [navigate, closeSidebarOnMobile],
+    [ctxNavigate, navigate, closeSidebarOnMobile],
   );
 
   // Start a new reception (from NuevaRecepcionStep1/Step2)

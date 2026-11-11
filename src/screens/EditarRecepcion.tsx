@@ -5,6 +5,10 @@
  * - useReceptionFlow for navigation and reception state
  * - useCatalogos for supplier catalogs
  * - useAuthorization for auth state
+ *
+ * The legacy props (recId, suppliers, products, onBack, onSave) are optional
+ * and only exist as a migration fallback: App renders this screen with no
+ * props, so every prop resolves to its hook/context equivalent.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -20,9 +24,18 @@ import { useCatalogos } from "@/hooks/useCatalogos";
 import { useReceptionFlow } from "@/hooks/useReceptionFlow";
 import { QRCodeSVG } from "qrcode.react";
 import type { Producto, Proveedor } from "./Configuracion";
+import { ReceptionProductCard } from "./ProgramacionRecepcion";
 import { useNavigate } from "react-router-dom";
 
 const ORG_ID = "org_exepa_001";
+
+interface Props {
+  recId?: string;
+  suppliers?: Proveedor[];
+  products?: Producto[];
+  onBack?: () => void;
+  onSave?: () => void;
+}
 
 interface EditableProductLine {
   lineIndex: number;
@@ -54,7 +67,13 @@ function receptionErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "No se pudo cargar la recepción.";
 }
 
-export default function EditarRecepcion() {
+export default function EditarRecepcion({
+  recId: recIdProp,
+  suppliers,
+  products,
+  onBack,
+  onSave,
+}: Props) {
   const { user, canQuery } = useAuthorization();
   const navigate = useNavigate();
 
@@ -62,7 +81,12 @@ export default function EditarRecepcion() {
     useCatalogos();
   const { editReceptionData } = useReceptionFlow();
 
-  const recId = editReceptionData?.receptionId;
+  // Legacy prop fallbacks: App passes no props, so the context/hook state wins.
+  const recId = recIdProp ?? editReceptionData?.receptionId;
+  const supplierCatalog = suppliers ?? catalogoProveedores;
+  const productCatalog = products ?? catalogoProductos;
+  const handleBack = onBack ?? (() => navigate("recepciones"));
+  const handleSaveSuccess = onSave ?? (() => navigate("recepciones"));
 
   const services = useMemo(() => (db ? createFirestoreServices(db, ORG_ID) : null), []);
   const [reception, setReception] = useState<ReceptionDoc | null>(null);
@@ -73,12 +97,16 @@ export default function EditarRecepcion() {
   const [error, setError] = useState<string | null>(null);
   const [productLines, setProductLines] = useState<EditableProductLine[]>([]);
 
-  // Filter suppliers by type
-  const merchandiseSuppliers = catalogoProveedores.filter(
-    (supplier) => supplier.tipo === "mercancia",
+  // Filter suppliers by type.
+  // Memoized: these arrays are referenced in the load effect's dependency list,
+  // so a fresh array per render would re-trigger the effect forever.
+  const merchandiseSuppliers = useMemo(
+    () => supplierCatalog.filter((supplier) => supplier.tipo === "mercancia"),
+    [supplierCatalog],
   );
-  const logisticsSuppliers = catalogoProveedores.filter(
-    (supplier) => supplier.tipo === "logistica",
+  const logisticsSuppliers = useMemo(
+    () => supplierCatalog.filter((supplier) => supplier.tipo === "logistica"),
+    [supplierCatalog],
   );
 
   useEffect(() => {
@@ -169,8 +197,7 @@ export default function EditarRecepcion() {
         setProductLines(Array.from(linesMap.values()).sort((a, b) => a.lineIndex - b.lineIndex));
       })
       .catch((loadError) => {
-        if (!active) return;
-        setError(receptionErrorMessage(loadError));
+        if (active) setError(receptionErrorMessage(loadError));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -179,12 +206,50 @@ export default function EditarRecepcion() {
     return () => {
       active = false;
     };
-  }, [recId, canQuery, services, catalogosLoading, editReceptionData, merchandiseSuppliers]);
+  }, [canQuery, recId, services, merchandiseSuppliers, editReceptionData]);
 
-  const editable = isEditableDraft(reception!);
+  // reception is null on the first render (and whenever loading failed),
+  // so never assert non-null here.
+  const editable = reception ? isEditableDraft(reception) : false;
+  const totalPallets =
+    reception?.plannedPallets?.length ?? productLines.reduce((sum, l) => sum + l.pallets, 0);
+
+  function handleProductQuantityChange(lineIndex: number, quantity: number) {
+    setProductLines((prev) =>
+      prev.map((line) =>
+        line.lineIndex === lineIndex ? { ...line, quantity: Math.max(1, quantity) } : line,
+      ),
+    );
+  }
+
+  function handleProductUnitChange(lineIndex: number, unit: string) {
+    setProductLines((prev) =>
+      prev.map((line) => (line.lineIndex === lineIndex ? { ...line, unit } : line)),
+    );
+  }
+
+  function handleAddProductLine() {
+    const nextLineIndex =
+      productLines.length > 0 ? Math.max(...productLines.map((l) => l.lineIndex)) + 1 : 0;
+    setProductLines((prev) => [
+      ...prev,
+      {
+        lineIndex: nextLineIndex,
+        productId: "",
+        productName: "",
+        quantity: 1,
+        unit: "cajas",
+        pallets: 1,
+      },
+    ]);
+  }
+
+  function handleRemoveProductLine(lineIndex: number) {
+    setProductLines((prev) => prev.filter((line) => line.lineIndex !== lineIndex));
+  }
 
   async function handleSave() {
-    if (!reception || !services || !user) return;
+    if (!reception || !editable || !services || !user?.uid) return;
     setSaving(true);
     setError(null);
     try {
@@ -200,93 +265,61 @@ export default function EditarRecepcion() {
         throw new Error("Seleccioná cada producto del catálogo antes de guardar.");
       }
 
-      // Build lines from productLines
-      const lines: PlannedReceptionPalletDraft[] = productLines.map((line) => ({
-        lineIndex: line.lineIndex,
+      // One line per edited product line; the backend derives palletsCreated.
+      const lines = productLines.map((line) => ({
+        productId: line.productId,
+        quantity: line.quantity,
+        unit: line.unit,
+        lot: undefined,
+        palletsCreated: 0,
+      }));
+
+      // edit_reception regenerates the QR set from plannedPallets and enforces
+      // sequential pallet numbers plus a lineIndex pointing at the position of
+      // the matching entry in `lines`.
+      const plannedPallets: PlannedReceptionPalletDraft[] = productLines.map((line, index) => ({
+        palletNumber: index + 1,
+        lineIndex: index,
         productId: line.productId,
         productName: line.productName,
         quantity: line.quantity,
         unit: line.unit,
-        status: "PLANNED" as const,
-        activated: false,
-        palletNumber: line.lineIndex + 1,
       }));
 
-      // Create edit data for the reception
+      const operationId = `op-edit-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       const editData: ReceptionCreateInput = {
-        folio: reception.folio,
-        palletCount: reception.palletCount,
+        warehouseId: reception.warehouseId,
+        supplierId,
         purchaseOrderId: reception.purchaseOrderId,
         purchaseOrderNumber: reception.purchaseOrderNumber,
-        supplierId: supplierRecord.id,
-        supplierCode: reception.supplierCode,
-        supplierName: supplierRecord.name,
-        logisticsProvider: logisticsProvider || reception.logisticsProvider,
-        productName: reception.productName,
-        status: "DRAFT" as const,
-        operationId: reception.operationId || `op-${Date.now()}`,
-        actorUserId: user.uid,
-        evidencePhotos: reception.evidencePhotos,
-        warehouseId: reception.warehouseId,
+        folio: reception.folio || reception.purchaseOrderNumber || reception.id,
         scheduledDate: reception.scheduledDate,
+        supplierCode: supplierRecord.code,
+        supplierName: supplierRecord.name,
+        logisticsProvider: logisticsProvider.trim(),
+        productName: productLines.map((l) => l.productName).join(", "),
+        palletCount: plannedPallets.length,
+        plannedPallets,
+        status: "DRAFT",
+        operationId,
+        actorUserId: user.uid,
       };
-
-      // Generate operation ID if needed
-      const operationId = reception.operationId || `op-${Date.now()}`;
 
       const updated = await services.receptions.editReception(
         reception.id,
         editData,
-        lines.map((line) => ({
-          ...line,
-          palletsCreated: 1,
-        })),
+        lines,
         user.uid,
         operationId,
         reception.version,
       );
       setReception(updated);
-      navigate("recepciones");
+      handleSaveSuccess();
     } catch (saveError) {
       setError(receptionErrorMessage(saveError));
     } finally {
       setSaving(false);
     }
-  }
-
-  function handleAddProductLine() {
-    const nextIndex =
-      productLines.length > 0 ? Math.max(...productLines.map((l) => l.lineIndex)) + 1 : 0;
-    setProductLines((prev) => [
-      ...prev,
-      {
-        lineIndex: nextIndex,
-        productId: "",
-        productName: "",
-        quantity: 0,
-        unit: "",
-        pallets: 0,
-      },
-    ]);
-  }
-
-  function handleRemoveProductLine(lineIndex: number) {
-    setProductLines((prev) => prev.filter((line) => line.lineIndex !== lineIndex));
-  }
-
-  function handleProductSelect(lineIndex: number, product: Producto) {
-    setProductLines((prev) =>
-      prev.map((current) =>
-        current.lineIndex === lineIndex
-          ? {
-              ...current,
-              productName: product.nombre,
-              productId: product.id,
-              unit: product.unidad,
-            }
-          : current,
-      ),
-    );
   }
 
   if (loading) {
@@ -302,11 +335,7 @@ export default function EditarRecepcion() {
         <p role="alert" className="text-red-700">
           {error || "No se pudo cargar la recepción."}
         </p>
-        <button
-          type="button"
-          className="mt-4 rounded-lg border px-4 py-2"
-          onClick={() => navigate("recepciones")}
-        >
+        <button type="button" className="mt-4 rounded-lg border px-4 py-2" onClick={handleBack}>
           Volver
         </button>
       </section>
@@ -330,189 +359,255 @@ export default function EditarRecepcion() {
           </span>
         </header>
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm text-[#607078]">
-            <span className="font-bold">Proveedor:</span>
-            <span>{reception.supplierName}</span>
+        {!editable && (
+          <div className="rounded-xl border border-[#f2d49a] bg-[#fff8e8] px-4 py-3 text-sm text-[#76551f]">
+            Esta recepción no se puede editar: solo se permiten cambios en borradores que todavía no
+            iniciaron la captura de tarimas.
           </div>
-          <div className="flex items-center gap-2 text-sm text-[#607078]">
-            <span className="font-bold">Proveedor logístico:</span>
-            <span>{reception.logisticsProvider || "Sin proveedor logístico"}</span>
+        )}
+        {error && (
+          <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </p>
+        )}
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-xl bg-[#f4f7f8] p-4">
+            <p className="text-xs font-bold uppercase text-[#607078]">Orden de compra</p>
+            <p className="mt-1 font-semibold text-[#172126]">
+              {reception.purchaseOrderNumber || "—"}
+            </p>
           </div>
-          <div className="flex items-center gap-2 text-sm text-[#607078]">
-            <span className="font-bold">Tarimas:</span>
-            <span>{reception.palletCount}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-[#607078]">
-            <span className="font-bold">Fecha:</span>
-            <span>{reception.scheduledDate || "—"}</span>
+          <div className="rounded-xl bg-[#f4f7f8] p-4">
+            <p className="text-xs font-bold uppercase text-[#607078]">Total de tarimas</p>
+            <p className="mt-1 font-semibold text-[#172126]">{totalPallets}</p>
+            <p className="mt-1 text-xs text-[#607078]">
+              Calculado del plan de tarimas para mantener cantidades y QR sincronizados.
+            </p>
           </div>
         </div>
 
-        {editable && (
-          <section className="rounded-xl border border-[#dce4e7] bg-[#f8fafb] p-4">
-            <h2 className="mb-3 text-lg font-bold text-[#172126]">Líneas de producto</h2>
-            <div className="space-y-3">
-              {productLines.map((line) => (
-                <div
-                  key={line.lineIndex}
-                  className="rounded-2xl border border-[#dce4e7] bg-[#fbfcfc] p-4 shadow-sm"
-                >
-                  <div className="mb-3 flex items-start justify-between gap-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wide text-[#607078]">
-                      Producto {line.lineIndex + 1}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveProductLine(line.lineIndex)}
-                      className="touch-target flex size-11 shrink-0 items-center justify-center rounded-xl border border-[#f3d4d1] bg-white text-[#c0392b] hover:bg-[#fff4f3]"
-                      aria-label={`Eliminar producto ${line.lineIndex + 1}`}
-                    >
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6l-1 14H6L5 6" />
-                        <path d="M10 11v6" />
-                        <path d="M14 11v6" />
-                        <path d="M9 6V4h6v2" />
-                      </svg>
-                    </button>
-                  </div>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-[11px] font-bold uppercase tracking-wide text-[#607078]">
-                        Producto
-                      </label>
-                      <select
-                        value={line.productId}
-                        onChange={(e) => {
-                          const product = catalogoProductos.find((p) => p.id === e.target.value);
-                          if (product) handleProductSelect(line.lineIndex, product);
-                        }}
-                        className="rounded-lg border border-[#dce4e7] bg-white px-3 py-2 text-sm focus:border-[#3276a8] focus:outline-none"
-                      >
-                        <option value="">Seleccionar producto</option>
-                        {catalogoProductos.map((product) => (
-                          <option key={product.id} value={product.id}>
-                            {product.nombre} ({product.sku})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs font-medium text-[#607078]">Cantidad</label>
-                      <input
-                        type="number"
-                        value={line.quantity}
-                        onChange={(e) =>
-                          setProductLines((prev) =>
-                            prev.map((current) =>
-                              current.lineIndex === line.lineIndex
-                                ? { ...current, quantity: parseInt(e.target.value) || 0 }
-                                : current,
-                            ),
-                          )
-                        }
-                        min="0"
-                        className="rounded-lg border border-[#dce4e7] bg-white px-3 py-2 text-sm focus:border-[#3276a8] focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {editable && (
-                <button
-                  type="button"
-                  onClick={handleAddProductLine}
-                  className="flex items-center gap-2 w-full rounded-lg border-2 border-dashed border-[#dce4e7] bg-white py-2 text-sm font-medium text-[#3276a8] hover:bg-[#f4f7f8]"
-                >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="flex flex-col gap-2 text-sm font-semibold text-[#607078]">
+            Proveedor de mercancía
+            {editable ? (
+              <select
+                className="min-h-11 rounded-lg border border-[#dce4e7] px-3 text-[#172126]"
+                value={supplierId}
+                onChange={(event) => setSupplierId(event.target.value)}
+              >
+                <option value="">Seleccionar proveedor</option>
+                {reception.supplierId &&
+                  !merchandiseSuppliers.some(
+                    (supplier) => supplier.id === reception.supplierId,
+                  ) && (
+                    <option value={reception.supplierId}>
+                      {reception.supplierName || reception.supplierCode || "Proveedor actual"}
+                    </option>
+                  )}
+                {merchandiseSuppliers.map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.nombre}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="min-h-11 rounded-lg bg-[#f4f7f8] px-3 py-3 text-[#172126]">
+                {reception.supplierName || reception.supplierCode || "Sin proveedor"}
+              </span>
+            )}
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-semibold text-[#607078]">
+            Proveedor logístico
+            {editable ? (
+              <select
+                className="min-h-11 rounded-lg border border-[#dce4e7] px-3 text-[#172126]"
+                value={logisticsProvider}
+                onChange={(event) => setLogisticsProvider(event.target.value)}
+              >
+                <option value="">Sin proveedor logístico</option>
+                {logisticsProvider &&
+                  !logisticsSuppliers.some((supplier) => supplier.nombre === logisticsProvider) && (
+                    <option value={logisticsProvider}>{logisticsProvider}</option>
+                  )}
+                {logisticsSuppliers.map((supplier) => (
+                  <option key={supplier.id} value={supplier.nombre}>
+                    {supplier.nombre}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="min-h-11 rounded-lg bg-[#f4f7f8] px-3 py-3 text-[#172126]">
+                {reception.logisticsProvider || "Sin proveedor logístico"}
+              </span>
+            )}
+          </label>
+        </div>
+
+        <div>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-base font-bold text-[#172126]">Productos programados</h2>
+            {editable && (
+              <button
+                type="button"
+                onClick={handleAddProductLine}
+                className="text-sm text-[#3276a8] hover:underline"
+              >
+                + Agregar producto
+              </button>
+            )}
+          </div>
+          {productLines.length ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {productLines.map((line) =>
+                editable ? (
+                  <ReceptionProductCard
+                    key={line.lineIndex}
+                    number={line.lineIndex + 1}
+                    inputId={`edit-product-${line.lineIndex}`}
+                    inputAriaLabel={`Producto línea ${line.lineIndex + 1}`}
+                    value={line.productName}
+                    onChange={(value) =>
+                      setProductLines((prev) =>
+                        prev.map((current) =>
+                          current.lineIndex === line.lineIndex
+                            ? { ...current, productName: value, productId: "" }
+                            : current,
+                        ),
+                      )
+                    }
+                    onSelect={(product) =>
+                      setProductLines((prev) =>
+                        prev.map((current) =>
+                          current.lineIndex === line.lineIndex
+                            ? {
+                                ...current,
+                                productName: product.nombre,
+                                productId: product.id,
+                                unit: product.unidad,
+                              }
+                            : current,
+                        ),
+                      )
+                    }
+                    catalogos={productCatalog}
+                    onRemove={() => handleRemoveProductLine(line.lineIndex)}
                   >
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                  Agregar línea de producto
-                </button>
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="grid min-w-0 gap-1 text-xs font-bold uppercase tracking-wide text-[#607078]">
+                        Cantidad
+                        <input
+                          type="number"
+                          min="1"
+                          value={line.quantity}
+                          onChange={(event) =>
+                            handleProductQuantityChange(
+                              line.lineIndex,
+                              parseInt(event.target.value) || 1,
+                            )
+                          }
+                          className="min-h-11 w-full min-w-0 rounded-lg border border-[#dce4e7] bg-white px-3 text-[13px] text-[#172126]"
+                          inputMode="numeric"
+                        />
+                      </label>
+                      <label className="grid min-w-0 gap-1 text-xs font-bold uppercase tracking-wide text-[#607078]">
+                        Unidad
+                        <select
+                          value={line.unit}
+                          onChange={(event) =>
+                            handleProductUnitChange(line.lineIndex, event.target.value)
+                          }
+                          className="min-h-11 w-full min-w-0 rounded-lg border border-[#dce4e7] bg-white px-3 text-[13px] text-[#172126]"
+                        >
+                          <option value="cajas">Cajas</option>
+                          <option value="piezas">Piezas</option>
+                          <option value="unidades">Unidades</option>
+                          <option value="pallets">Pallets</option>
+                        </select>
+                      </label>
+                    </div>
+                    <p className="text-sm text-[#607078]">
+                      Línea {line.lineIndex + 1} · {line.pallets} tarimas
+                    </p>
+                  </ReceptionProductCard>
+                ) : (
+                  <div
+                    key={line.lineIndex}
+                    className="min-w-0 rounded-2xl border border-[#dce4e7] bg-[#fbfcfc] p-4 shadow-sm sm:p-5"
+                  >
+                    <p className="break-words font-semibold text-[#172126]">{line.productName}</p>
+                    <p className="mt-1 text-sm text-[#607078]">
+                      {line.quantity} {line.unit} · {line.pallets} tarimas
+                    </p>
+                  </div>
+                ),
               )}
             </div>
-          </section>
-        )}
+          ) : (
+            <p className="rounded-xl bg-[#f4f7f8] p-4 text-sm text-[#607078]">
+              Esta recepción no tiene un plan detallado de tarimas.
+              {editable && " Agregá productos usando el botón de arriba."}
+            </p>
+          )}
+        </div>
 
-        <div className="flex flex-col md:flex-row gap-3 justify-end pt-4 border-t border-[#dce4e7]">
+        <div>
+          <h2 className="mb-3 text-base font-bold text-[#172126]">Tarimas y códigos QR</h2>
+          {reception.plannedPallets && reception.plannedPallets.length ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {reception.plannedPallets.map((pallet) => (
+                <article
+                  key={pallet.qrIdentifier}
+                  className="flex min-w-0 items-center gap-3 rounded-xl border border-[#edf1f3] p-3"
+                >
+                  <QRCodeSVG
+                    value={pallet.qrIdentifier}
+                    size={76}
+                    level="H"
+                    marginSize={2}
+                    title={`Código QR ${pallet.qrIdentifier}`}
+                    className="shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <p className="font-bold text-[#172126]">
+                      Tarima {pallet.palletNumber} · {pallet.status}
+                    </p>
+                    <p className="truncate text-sm text-[#607078]">
+                      {pallet.productName} · {pallet.quantity} {pallet.unit}
+                    </p>
+                    <p className="break-all text-xs font-semibold text-[#3276a8]">
+                      {pallet.qrIdentifier}
+                    </p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-xl bg-[#f4f7f8] p-4 text-sm text-[#607078]">
+              Esta recepción no tiene códigos QR disponibles en su plan.
+            </p>
+          )}
+        </div>
+
+        <footer className="flex flex-wrap justify-between gap-3 border-t border-[#edf1f3] pt-4">
           <button
             type="button"
-            onClick={() => navigate("recepciones")}
-            className="flex items-center gap-2 min-h-11 rounded-lg border border-[#dce4e7] bg-white px-5 py-2 text-sm font-semibold text-[#172126] hover:bg-[#f8fafb]"
+            className="min-h-11 rounded-lg border border-[#dce4e7] px-5 font-bold text-[#16343f]"
+            onClick={handleBack}
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
             Volver
           </button>
           {editable && (
             <button
               type="button"
-              onClick={handleSave}
+              className="min-h-11 rounded-lg bg-[#16343f] px-5 font-bold text-white disabled:opacity-60"
               disabled={saving}
-              className="flex items-center gap-2 min-h-11 rounded-lg bg-[#3276a8] px-5 py-2 text-sm font-semibold text-white hover:bg-[#2a6291] disabled:opacity-50"
+              onClick={() => void handleSave()}
             >
-              {saving ? (
-                <>
-                  <svg
-                    className="animate-spin"
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
-                    <path d="M12 2a10 10 0 0 1 10 10" strokeOpacity="1" />
-                  </svg>
-                  Guardando…
-                </>
-              ) : (
-                <>
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                    <polyline points="17 21 17 13 7 13 7 21" />
-                    <polyline points="7 3 7 8 15 8" />
-                  </svg>
-                  Guardar cambios
-                </>
-              )}
+              {saving ? "Guardando…" : "Guardar cambios"}
             </button>
           )}
-        </div>
+        </footer>
       </section>
     </div>
   );

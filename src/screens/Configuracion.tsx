@@ -2156,30 +2156,48 @@ const TABS: {
 ];
 
 interface ConfiguracionProps {
-  productos: Producto[];
-  setProductos: React.Dispatch<React.SetStateAction<Producto[]>>;
-  proveedores: Proveedor[];
-  setProveedores: React.Dispatch<React.SetStateAction<Proveedor[]>>;
-  conversiones: Conversion[];
-  setConversiones: React.Dispatch<React.SetStateAction<Conversion[]>>;
-  almacenes: Almacen[];
-  setAlmacenes: React.Dispatch<React.SetStateAction<Almacen[]>>;
-  onActivarAlmacen: (id: string) => void;
+  productos?: Producto[];
+  setProductos?: React.Dispatch<React.SetStateAction<Producto[]>>;
+  proveedores?: Proveedor[];
+  setProveedores?: React.Dispatch<React.SetStateAction<Proveedor[]>>;
+  conversiones?: Conversion[];
+  setConversiones?: React.Dispatch<React.SetStateAction<Conversion[]>>;
+  almacenes?: Almacen[];
+  setAlmacenes?: React.Dispatch<React.SetStateAction<Almacen[]>>;
+  onActivarAlmacen?: (id: string) => void;
 }
 
 const ORG_ID = "org_exepa_001";
 
 export default function Configuracion({
-  productos,
-  setProductos,
-  proveedores,
-  setProveedores,
-  conversiones,
-  setConversiones,
-  almacenes,
-  setAlmacenes,
+  productos: productosProp,
+  setProductos: setProductosProp,
+  proveedores: proveedoresProp,
+  setProveedores: setProveedoresProp,
+  conversiones: conversionesProp,
+  setConversiones: setConversionesProp,
+  almacenes: almacenesProp,
+  setAlmacenes: setAlmacenesProp,
   onActivarAlmacen,
 }: ConfiguracionProps) {
+  // ============================================
+  // Legacy Props Fallback (for migration period)
+  // ============================================
+  const [localProductos, setLocalProductos] = useState<Producto[]>(PRODUCTOS_INIT);
+  const [localProveedores, setLocalProveedores] = useState<Proveedor[]>(PROVEEDORES_INIT);
+  const [localConversiones, setLocalConversiones] = useState<Conversion[]>(CONVERSIONES_INIT);
+  const [localAlmacenes, setLocalAlmacenes] = useState<Almacen[]>(ALMACENES_INIT);
+
+  const productos = productosProp ?? localProductos;
+  const setProductos = setProductosProp ?? setLocalProductos;
+  const proveedores = proveedoresProp ?? localProveedores;
+  const setProveedores = setProveedoresProp ?? setLocalProveedores;
+  const conversiones = conversionesProp ?? localConversiones;
+  const setConversiones = setConversionesProp ?? setLocalConversiones;
+  const almacenes = almacenesProp ?? localAlmacenes;
+  const setAlmacenes = setAlmacenesProp ?? setLocalAlmacenes;
+  const handleActivarAlmacen = onActivarAlmacen ?? (() => {});
+
   const { canQuery } = useAuthorization();
   const [tab, setTab] = useState<Tab>("almacenes");
   const [firestoreReady, setFirestoreReady] = useState(false);
@@ -2688,7 +2706,7 @@ export default function Configuracion({
           <TabAlmacenes
             almacenes={almacenes}
             setAlmacenes={setAlmacenes}
-            onActivarAlmacen={onActivarAlmacen}
+            onActivarAlmacen={handleActivarAlmacen}
             onCreate={handleCreateAlmacen}
             onUpdate={handleUpdateAlmacen}
             onDelete={handleDeleteAlmacen}

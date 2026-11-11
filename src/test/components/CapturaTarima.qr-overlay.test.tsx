@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const scannerHarness = vi.hoisted(() => ({
@@ -30,6 +30,7 @@ vi.mock("@/hooks/useAuthorization", () => ({
   useAuthorization: () => ({ accessStatus: "UNAUTHENTICATED", profile: null, canQuery: false }),
 }));
 
+import { renderWithAppProviders } from "../utils/renderWithAppProviders";
 import CapturaTarima from "@/screens/CapturaTarima";
 
 const firstQr = "TQR-OC-2026-001-001";
@@ -45,7 +46,7 @@ describe("CapturaTarima QR overlay", () => {
   });
 
   it("clears the detected QR overlay when save advances to the next pallet", async () => {
-    render(
+    renderWithAppProviders(
       <CapturaTarima
         onBack={vi.fn()}
         onFinish={vi.fn()}
@@ -94,7 +95,7 @@ describe("CapturaTarima QR overlay", () => {
 
   it("validates a manually entered planned pallet ID and rejects it after activation", async () => {
     const alert = vi.spyOn(window, "alert").mockImplementation(() => undefined);
-    render(
+    renderWithAppProviders(
       <CapturaTarima
         onBack={vi.fn()}
         onFinish={vi.fn()}
@@ -145,7 +146,7 @@ describe("CapturaTarima QR overlay", () => {
 
   it("rejects a manually entered ID that is not part of the reception plan", async () => {
     const alert = vi.spyOn(window, "alert").mockImplementation(() => undefined);
-    render(
+    renderWithAppProviders(
       <CapturaTarima
         onBack={vi.fn()}
         onFinish={vi.fn()}
@@ -185,7 +186,7 @@ describe("CapturaTarima QR overlay", () => {
 
   it("finishes the last pallet without leaving the save spinner active", async () => {
     const onFinish = vi.fn();
-    render(
+    renderWithAppProviders(
       <CapturaTarima
         onBack={vi.fn()}
         onFinish={onFinish}

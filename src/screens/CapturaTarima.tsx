@@ -30,6 +30,7 @@ import { useCatalogos } from "@/hooks/useCatalogos";
 import { useInventory } from "@/hooks/useInventory";
 import { useUIContext } from "@/context";
 import { useQrScanner } from "@/hooks/useQrScanner";
+import type { Almacen, Producto, ReceptionData } from "@/types";
 
 const assetPathPrefix = "/assets";
 const imgIndicador = `${assetPathPrefix}/08d70.svg`;
@@ -82,7 +83,26 @@ interface TarimaData {
   completed: boolean;
 }
 
-export default function CapturaTarima() {
+interface Props {
+  onBack?: () => void;
+  onFinish?: () => void;
+  almacenActivo?: Almacen | null;
+  onAumentarInventario?: (
+    almacenId: string,
+    productos: Array<{ productoId: string; cajas: number }>,
+  ) => void;
+  catalogos?: { productos: Producto[] };
+  currentReception?: ReceptionData | null;
+}
+
+export default function CapturaTarima({
+  onBack: onBackProp,
+  onFinish: onFinishProp,
+  almacenActivo: almacenActivoProp,
+  onAumentarInventario: onAumentarInventarioProp,
+  catalogos: catalogosProp,
+  currentReception: currentReceptionProp,
+}: Props) {
   // ============================================
   // New Architecture Hooks (order matters - useAuthorization before useFirestore)
   // ============================================
@@ -127,13 +147,15 @@ export default function CapturaTarima() {
 
   // ============================================
   // Legacy Props Fallback (for migration period)
+  // App renders this screen with no props, so context/hook state wins unless
+  // a prop is explicitly provided.
   // ============================================
-  const currentReception = ctxCurrentReception;
-  const almacenActivo = getAlmacenActivo() ?? null;
-  const catalogos = { productos: catalogoProductos };
-  const onAumentarInventario = aumentarInventario;
-  const onBack = () => navigate("home");
-  const onFinish = () => navigate("completada");
+  const currentReception = currentReceptionProp ?? ctxCurrentReception;
+  const almacenActivo = almacenActivoProp ?? getAlmacenActivo() ?? null;
+  const catalogos = catalogosProp ?? { productos: catalogoProductos };
+  const onAumentarInventario = onAumentarInventarioProp ?? aumentarInventario;
+  const onBack = onBackProp ?? (() => navigate("home"));
+  const onFinish = onFinishProp ?? (() => navigate("completada"));
   const conversionesTablaBase = (currentReception?.conversionesTabla ??
     []) as unknown as ConversionesTablaItem[];
 
@@ -269,11 +291,25 @@ export default function CapturaTarima() {
   const [captureError, setCaptureError] = useState<string | null>(null);
   const handlingScanRef = useRef(false);
   const scannerStartingRef = useRef(false);
+  // Last QR validated for the current pallet (camera or manual entry).
+  // Drives the "QR Detectado" banner and the save gate, mirroring the
+  // pre-refactor `scannedCode` state.
+  const [activeQr, setActiveQr] = useState<string | null>(null);
+  const overlayClearTimerRef = useRef<number | null>(null);
 
   // Cleanup scanner on index change
   useEffect(() => {
     return () => stopScanning();
   }, [currentIndex, stopScanning]);
+
+  // Clear the pending banner auto-clear timer on unmount
+  useEffect(() => {
+    return () => {
+      if (overlayClearTimerRef.current !== null) {
+        window.clearTimeout(overlayClearTimerRef.current);
+      }
+    };
+  }, []);
 
   // ============================================
   // Atomic Save Pattern (Race Condition Fix)
@@ -386,6 +422,7 @@ export default function CapturaTarima() {
           );
         }
         setScannedQrCode(code);
+        setActiveQr(code);
         setManualPalletId("");
         setCurrentIndex(tarimaIndex);
         stopScanning();
@@ -446,7 +483,7 @@ export default function CapturaTarima() {
 
   async function handleSaveTarima() {
     if (!currentTarima) return;
-    if (useFirestore && lastResult !== currentTarima.id) {
+    if (useFirestore && activeQr !== currentTarima.id) {
       alert("Escaneá el QR de esta tarima antes de activar su registro.");
       return;
     }
@@ -506,8 +543,18 @@ export default function CapturaTarima() {
       // Move to next or complete
       if (isLastTarima) {
         transition("completed");
-        navigate("completada");
+        onFinish();
       } else {
+        // Keep the "QR Detectado" banner visible for a beat after advancing,
+        // then auto-clear it (pre-refactor 1500ms behavior). Only clear if the
+        // operator has not already validated the next pallet.
+        const validatedQr = currentTarima.id;
+        if (overlayClearTimerRef.current !== null) {
+          window.clearTimeout(overlayClearTimerRef.current);
+        }
+        overlayClearTimerRef.current = window.setTimeout(() => {
+          setActiveQr((prev) => (prev === validatedQr ? null : prev));
+        }, 1500);
         setCurrentIndex((prev) => prev + 1);
         setScannedQrCode(null);
       }
@@ -618,6 +665,11 @@ export default function CapturaTarima() {
 
         {/* QR Scanner */}
         <Panel className="mb-4">
+          <p className="mb-3 text-sm text-gray-600">
+            {currentTarima
+              ? `ID: ${currentTarima.id} · ${currentTarima.producto}`
+              : "Preparando..."}
+          </p>
           <div className="relative aspect-video bg-gray-100 rounded-xl overflow-hidden">
             <video ref={qrReaderRef} className="w-full h-full object-cover" playsInline muted />
             {scanError && (
@@ -647,25 +699,25 @@ export default function CapturaTarima() {
               </div>
             )}
           </div>
-          {lastResult && !currentTarima.completed && (
-            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
-              <span className="text-green-800 font-medium">✓ QR Detectado: {lastResult}</span>
-              <button
-                onClick={handleSaveTarima}
-                disabled={isSaving}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
-              >
-                {isSaving ? "Guardando..." : "Guardar y siguiente"}
-              </button>
+          {activeQr && !currentTarima.completed && (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 p-3">
+              <span className="font-medium text-green-800">✓ QR Detectado</span>
+              <span className="font-mono text-sm text-green-700">{activeQr}</span>
             </div>
           )}
         </Panel>
 
         {/* Manual Input */}
         <Panel className="mb-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">Entrada manual de tarima</h4>
+          <label
+            htmlFor="manual-pallet-id"
+            className="mb-3 block text-sm font-medium text-gray-700"
+          >
+            Ingresar ID de tarima manualmente
+          </label>
           <div className="flex gap-2">
             <input
+              id="manual-pallet-id"
               type="text"
               value={manualPalletId}
               onChange={(e) => setManualPalletId(e.target.value.toUpperCase())}
@@ -678,7 +730,7 @@ export default function CapturaTarima() {
               disabled={isValidatingManualId || !manualPalletId.trim()}
               className="px-6 py-3 bg-[#16343f] text-white rounded-lg hover:bg-[#1e4456] disabled:opacity-50 transition-colors font-medium"
             >
-              {isValidatingManualId ? "Validando..." : "Validar"}
+              {isValidatingManualId ? "Validando..." : "Validar ID"}
             </button>
           </div>
         </Panel>
@@ -781,6 +833,17 @@ export default function CapturaTarima() {
 
         {/* Navigation */}
         <div className="flex gap-3 pt-4 border-t border-gray-200">
+          <button
+            onClick={handleSaveTarima}
+            disabled={isSaving || !currentTarima || currentTarima.completed}
+            className="flex-1 py-3 px-4 bg-[#16343f] text-white rounded-lg hover:bg-[#1e4456] disabled:opacity-60 transition-colors font-medium"
+          >
+            {isSaving
+              ? "Guardando..."
+              : currentTarima?.completed
+                ? "Re-guardar"
+                : "Guardar y siguiente →"}
+          </button>
           <button
             onClick={onBack}
             className="flex-1 py-3 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"

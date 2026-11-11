@@ -70,12 +70,18 @@ export function useQrScanner(): UseQrScannerReturn {
       try {
         setScanError(null);
 
-        // Check for camera permission
-        const permission = await navigator.permissions.query({ name: "camera" as PermissionName });
-        if (permission.state === "denied") {
-          throw new Error(
-            "Permiso de cámara denegado. Habilítalo en la configuración del navegador.",
-          );
+        // Check for camera permission when the Permissions API is available.
+        // Older browsers (and jsdom) don't implement navigator.permissions;
+        // camera denial still surfaces as NotAllowedError from
+        // decodeFromVideoDevice below, so skipping the pre-check is safe.
+        const permissionApi = navigator.permissions;
+        if (permissionApi && typeof permissionApi.query === "function") {
+          const permission = await permissionApi.query({ name: "camera" as PermissionName });
+          if (permission.state === "denied") {
+            throw new Error(
+              "Permiso de cámara denegado. Habilítalo en la configuración del navegador.",
+            );
+          }
         }
 
         const BrowserQRCodeReader = await loadZxing();

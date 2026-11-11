@@ -35,9 +35,42 @@ type ReceptionOcrProduct = {
   estadoMatch: "confirmado" | "sugerido" | "manual";
 };
 
-interface Props {}
+interface Props {
+  onBack?: () => void;
+  onContinue?: () => void;
+  initialData?: {
+    hasOC: boolean;
+    ocFolio: string;
+    tarimas: string;
+    proveedor: string;
+    proveedorLogistico: string;
+    receptionId?: string;
+    productos?: ReceptionOcrProduct[];
+  };
+  conversiones?: Array<{
+    producto: string;
+    productId?: string | null;
+    piezasPorCaja: number;
+    cajasPorTarima: number;
+  }>;
+  catalogos?: {
+    proveedores: Proveedor[];
+    productos: Producto[];
+  };
+  catalogosStatus?: {
+    loading: boolean;
+    error?: Error | null;
+  };
+}
 
-export default function NuevaRecepcionStep2() {
+export default function NuevaRecepcionStep2({
+  onBack,
+  onContinue,
+  initialData,
+  catalogos,
+  catalogosStatus,
+  conversiones,
+}: Props) {
   // ============================================
   // New Architecture Hooks
   // ============================================
@@ -54,9 +87,21 @@ export default function NuevaRecepcionStep2() {
 
   const { closeSidebarOnMobile, isMobile } = useUIContext();
 
-  // Get reception data from context
+  // ============================================
+  // Legacy Props Fallback (for migration period)
+  // ============================================
   const currentReception = ctxCurrentReception;
-  const onBackLegacy = () => navigate("nueva-step1");
+  const onBackLegacy = onBack ?? (() => navigate("nueva-step1"));
+  const onContinueLegacy = onContinue ?? (() => navigate("captura-tarima"));
+  const catalogosLegacy = catalogos ?? {
+    proveedores: catalogoProveedores,
+    productos: catalogoProductos,
+  };
+  const catalogosStatusLegacy = catalogosStatus ?? {
+    loading: catalogosLoading,
+    error: catalogosError,
+  };
+  const conversionesLegacy = conversiones ?? catalogoConversiones;
 
   // Guard: don't render until catalogs are loaded (prevents empty logistics provider list)
   if (catalogosStatusLegacy.loading) {

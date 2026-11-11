@@ -22,7 +22,6 @@ vi.mock("@/config/featureFlags", () => ({ isFeatureEnabled: () => true }));
 
 import { renderWithAppProviders } from "../../test/utils/renderWithAppProviders";
 import EditarRecepcion from "../../screens/EditarRecepcion";
-import { editReception } from "../../services/firestore";
 
 const receptionDraft = {
   id: "reception-1",
@@ -144,8 +143,8 @@ describe("EditarRecepcion", () => {
     expect(screen.getByTitle("Código QR TQR-reception-1-001")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
 
-    await waitFor(() => expect(editReception).toHaveBeenCalledOnce());
-    const args = editReception.mock.calls[0];
+    await waitFor(() => expect(mockServices.editReception).toHaveBeenCalledOnce());
+    const args = mockServices.editReception.mock.calls[0];
     expect(args[0]).toBe("reception-1");
     expect(args[1]).toMatchObject({
       supplierId: "supplier-1",
@@ -195,7 +194,7 @@ describe("EditarRecepcion", () => {
     expect(screen.getByText("15 cajas · 2 tarimas")).toBeInTheDocument();
     expect(screen.getByText(/solo se permiten cambios en borradores/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Guardar cambios" })).not.toBeInTheDocument();
-    expect(editReception).not.toHaveBeenCalled();
+    expect(mockServices.editReception).not.toHaveBeenCalled();
   });
 
   it("selects a preloaded catalog product and persists its canonical ID and unit", async () => {
@@ -218,13 +217,13 @@ describe("EditarRecepcion", () => {
     expect(input).toHaveValue("Producto nuevo");
     fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
 
-    await waitFor(() => expect(editReception).toHaveBeenCalledOnce());
-    expect(editReception.mock.calls[0][1].plannedPallets[0]).toMatchObject({
+    await waitFor(() => expect(mockServices.editReception).toHaveBeenCalledOnce());
+    expect(mockServices.editReception.mock.calls[0][1].plannedPallets[0]).toMatchObject({
       productId: "product-2",
       productName: "Producto nuevo",
       unit: "piezas",
     });
-    expect(editReception.mock.calls[0][2][0]).toMatchObject({
+    expect(mockServices.editReception.mock.calls[0][2][0]).toMatchObject({
       productId: "product-2",
       unit: "piezas",
     });
@@ -251,6 +250,6 @@ describe("EditarRecepcion", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Seleccioná cada producto del catálogo antes de guardar.",
     );
-    expect(editReception).not.toHaveBeenCalled();
+    expect(mockServices.editReception).not.toHaveBeenCalled();
   });
 });

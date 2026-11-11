@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -21,6 +21,7 @@ vi.mock("firebase/storage", () => ({
   deleteObject: mocks.deleteObject,
 }));
 
+import { renderWithAppProviders } from "../utils/renderWithAppProviders";
 import CapturaEvidencia from "@/screens/CapturaEvidencia";
 
 describe("CapturaEvidencia document upload", () => {
@@ -33,7 +34,7 @@ describe("CapturaEvidencia document upload", () => {
   });
 
   it("persists the separate PDF path with the existing photos", async () => {
-    render(
+    renderWithAppProviders(
       <CapturaEvidencia
         onBack={vi.fn()}
         onContinue={vi.fn()}
@@ -67,7 +68,7 @@ describe("CapturaEvidencia document upload", () => {
   });
 
   it("rejects unsupported documents before upload", async () => {
-    render(
+    renderWithAppProviders(
       <CapturaEvidencia
         onBack={vi.fn()}
         onContinue={vi.fn()}

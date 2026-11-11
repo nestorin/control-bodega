@@ -10,7 +10,7 @@ import { mapReceptionListItem } from "@/domains/reception/receptionLifecycle";
 import { QRCodeSVG } from "qrcode.react";
 import { downloadTarimaQrBatch } from "@/services/tarimaQrDownload";
 import "./Recepciones.css";
-import { useReceptionFlow } from "@/hooks/useReceptionFlow";
+import { useNavigate } from "react-router-dom";
 
 const imgIndicador = "/assets/08d70.svg";
 const imgIndicadorRed = "/assets/9d6fd.svg";
@@ -469,7 +469,23 @@ function DeleteModal({
   );
 }
 
-export default function Recepciones() {
+export default function Recepciones({
+  onSelectTarima,
+  onEdit,
+  onResume,
+}: {
+  onSelectTarima?: (recId: string) => void;
+  onEdit?: (id: string) => void;
+  onResume?: (id: string) => void;
+}) {
+  const navigate = useNavigate();
+  // ============================================
+  // Legacy Props Fallback (for migration period)
+  // ============================================
+  const onSelectTarimaLegacy = onSelectTarima ?? (() => navigate("editar-recepcion"));
+  const onEditLegacy = onEdit ?? (() => navigate("editar-recepcion"));
+  const onResumeLegacy = onResume ?? (() => navigate("nueva-step1"));
+
   const { canQuery, canAccessWarehouse, hasAnyRole } = useAuthorization();
   const useFirestore = isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery;
   const canQueryNorthWarehouse = useFirestore && canAccessWarehouse(WAREHOUSE_IDS.NORTH);
@@ -815,15 +831,11 @@ export default function Recepciones() {
               tabIndex={0}
               aria-label={`Abrir recepción ${rec.displayId || rec.id}`}
               className="flex items-center justify-between px-4 md:px-5 py-3 md:py-4 w-full hover:shadow-[0px_12px_20px_rgba(22,52,63,0.12)] transition-shadow touch-target cursor-pointer"
-              onClick={() => {
-                const { navigate } = useReceptionFlow();
-                navigate("editar-recepcion", "recepciones");
-              }}
+              onClick={() => onSelectTarimaLegacy(rec.id)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  const { navigate } = useReceptionFlow();
-                  navigate("editar-recepcion", "recepciones");
+                  onSelectTarimaLegacy(rec.id);
                 }
               }}
             >
@@ -905,8 +917,7 @@ export default function Recepciones() {
                     className="text-xs font-bold text-[#3276a8] underline"
                     onClick={(event) => {
                       event.stopPropagation();
-                      const { navigate } = useReceptionFlow();
-                      navigate("nueva-step1");
+                      onResumeLegacy(rec.id);
                     }}
                   >
                     Reanudar
@@ -914,10 +925,7 @@ export default function Recepciones() {
                 )}
                 <RowMenu
                   canEdit={rec.estado === "Borrador"}
-                  onEdit={() => {
-                    const { navigate } = useReceptionFlow();
-                    navigate("editar-recepcion", "recepciones");
-                  }}
+                  onEdit={() => onEditLegacy(rec.id)}
                   onPrint={() => void handleReceptionQrAction(rec.id, "print")}
                   onDownload={() => void handleReceptionQrAction(rec.id, "download")}
                   canManage={canManage}

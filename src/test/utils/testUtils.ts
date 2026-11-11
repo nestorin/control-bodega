@@ -8,6 +8,7 @@ import { createElement, type ReactElement } from "react";
 import type { Firestore } from "firebase/firestore";
 import { WAREHOUSE_IDS } from "@/config/warehouses";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { ReceptionProvider } from "@/context/ReceptionContext";
 import type { Producto, Proveedor } from "@/screens/Configuracion";
 import type { OcrProduct } from "@/types/domain";
 
@@ -219,10 +220,14 @@ export function renderWithProviders(
         MemoryRouter,
         { initialEntries: ["/"] },
         createElement(
-          Routes,
+          ReceptionProvider,
           null,
-          ...routes.map((route, i) => createElement(Route, { key: i, ...route.props })),
-          createElement(Route, { path: "/*", element: children }),
+          createElement(
+            Routes,
+            null,
+            ...routes.map((route, i) => createElement(Route, { key: i, ...route.props })),
+            createElement(Route, { path: "/*", element: children }),
+          ),
         ),
       ),
     );
