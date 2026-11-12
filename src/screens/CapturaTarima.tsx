@@ -447,6 +447,25 @@ export default function CapturaTarima({
     ],
   );
 
+  /**
+   * Jump to another pallet of the reception.
+   *
+   * The detected QR belongs to a single pallet, so it is dropped when the
+   * operator moves to a different one: a QR scan must never unlock the
+   * activation of a pallet it was not issued for.
+   */
+  function goToPallet(index: number) {
+    const target = tarimasList[index];
+    if (!target) return;
+    if (activeQr !== target.id) {
+      // The scanned QR belongs to a single pallet: dropping it keeps the
+      // activation gate bound to the pallet the operator is working on.
+      setActiveQr(null);
+      setScannedQrCode(null);
+    }
+    setCurrentIndex(index);
+  }
+
   async function handleManualPalletValidation() {
     const palletId = manualPalletId.trim();
     if (!palletId || isValidatingManualId) return;
@@ -739,8 +758,11 @@ export default function CapturaTarima({
         <Panel className="mb-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm text-gray-500 mb-1">Lote *</label>
+              <label htmlFor="captura-tarima-lote" className="block text-sm text-gray-500 mb-1">
+                Lote *
+              </label>
               <input
+                id="captura-tarima-lote"
                 type="text"
                 value={currentTarima.lote}
                 onChange={(e) =>
@@ -754,8 +776,14 @@ export default function CapturaTarima({
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-500 mb-1">Caducidad *</label>
+              <label
+                htmlFor="captura-tarima-caducidad"
+                className="block text-sm text-gray-500 mb-1"
+              >
+                Caducidad *
+              </label>
               <input
+                id="captura-tarima-caducidad"
                 type="date"
                 value={currentTarima.caducidad}
                 onChange={(e) =>
@@ -769,8 +797,14 @@ export default function CapturaTarima({
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-sm text-gray-500 mb-1">Observaciones</label>
+              <label
+                htmlFor="captura-tarima-observaciones"
+                className="block text-sm text-gray-500 mb-1"
+              >
+                Observaciones
+              </label>
               <textarea
+                id="captura-tarima-observaciones"
                 value={currentTarima.observaciones}
                 onChange={(e) =>
                   setTarimasList((prev) =>
@@ -830,6 +864,27 @@ export default function CapturaTarima({
             </button>
           </div>
         )}
+
+        {/* Quick navigation between pallets */}
+        <div className="flex flex-wrap items-center justify-center gap-2 pt-4 border-t border-gray-200">
+          {tarimasList.map((pallet, index) => (
+            <button
+              key={pallet.id}
+              type="button"
+              onClick={() => goToPallet(index)}
+              title={`Tarima ${index + 1}${pallet.completed ? " ✓" : ""}`}
+              className={`min-w-9 h-9 px-2 rounded-lg border text-sm font-medium transition-colors ${
+                index === currentIndex
+                  ? "bg-[#16343f] text-white border-[#16343f]"
+                  : pallet.completed
+                    ? "bg-green-50 text-green-700 border-green-200"
+                    : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              {index + 1}
+            </button>
+          ))}
+        </div>
 
         {/* Navigation */}
         <div className="flex gap-3 pt-4 border-t border-gray-200">
