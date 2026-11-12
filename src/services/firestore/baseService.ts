@@ -48,10 +48,16 @@ export abstract class BaseService<T extends { id: string }> {
     return snap.exists() ? this.fromFirestore(snap) : null;
   }
 
+  /**
+   * Firestore excludes documents missing the orderBy field from the result.
+   * The default `createdAt` order silently drops legacy documents without it.
+   * Pass `orderBy: null` for collections that may omit the field, or order by a
+   * field guaranteed to exist on every document.
+   */
   async getAll(
     options: {
       where?: Array<[string, WhereFilterOp, any]>;
-      orderBy?: [string, "asc" | "desc"];
+      orderBy?: [string, "asc" | "desc"] | null;
       limit?: number;
       startAfter?: DocumentSnapshot;
     } = {},
@@ -69,7 +75,7 @@ export abstract class BaseService<T extends { id: string }> {
     }
     if (options.orderBy) {
       constraints.push(orderBy(options.orderBy[0], options.orderBy[1]));
-    } else {
+    } else if (options.orderBy === undefined) {
       constraints.push(orderBy("createdAt", "desc"));
     }
     if (options.limit) {

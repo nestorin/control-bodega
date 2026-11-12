@@ -1078,18 +1078,22 @@ export class LotCaducidadService extends BaseService<LotCaducidadDoc> {
   }
 
   async getByWarehouse(warehouseId: string): Promise<LotCaducidadDoc[]> {
+    // Legacy lots may lack createdAt; ordering by it makes Firestore drop them.
     const result = await this.getAll({
       where: [["warehouseId", "==", warehouseId]],
+      orderBy: null,
     });
     return result.data;
   }
 
   async getByProduct(warehouseId: string, productId: string): Promise<LotCaducidadDoc[]> {
+    // Legacy lots may lack createdAt; ordering by it makes Firestore drop them.
     const result = await this.getAll({
       where: [
         ["warehouseId", "==", warehouseId],
         ["productId", "==", productId],
       ],
+      orderBy: null,
     });
     return result.data;
   }
@@ -1100,6 +1104,7 @@ export class LotCaducidadService extends BaseService<LotCaducidadDoc> {
     operationId: string,
   ): Promise<LotCaducidadDoc> {
     // Check if lot already exists for this product/warehouse/lot/month
+    // Legacy lots may lack createdAt; ordering by it makes Firestore drop them.
     const existing = await this.getAll({
       where: [
         ["warehouseId", "==", data.warehouseId],
@@ -1108,6 +1113,7 @@ export class LotCaducidadService extends BaseService<LotCaducidadDoc> {
         ["monthKey", "==", data.monthKey],
       ],
       limit: 1,
+      orderBy: null,
     });
 
     if (existing.data.length > 0) {
@@ -1134,6 +1140,7 @@ export class LotCaducidadService extends BaseService<LotCaducidadDoc> {
     const now = serverTimestamp();
 
     for (const lot of lots) {
+      // Legacy lots may lack createdAt; ordering by it makes Firestore drop them.
       const existing = await this.getAll({
         where: [
           ["warehouseId", "==", lot.warehouseId],
@@ -1142,6 +1149,7 @@ export class LotCaducidadService extends BaseService<LotCaducidadDoc> {
           ["monthKey", "==", lot.monthKey],
         ],
         limit: 1,
+        orderBy: null,
       });
 
       if (existing.data.length > 0) {
