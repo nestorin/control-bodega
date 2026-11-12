@@ -528,7 +528,7 @@ def edit_reception(req: https_fn.CallableRequest):
             for pallet in existing_plan
         ):
             raise _error("Reception pallet capture has already started")
-        old_lines_snapshot = transaction.get(lines_ref)
+        old_lines_snapshot = transaction.get(firestore.Query(lines_ref))
         old_lines = list(old_lines_snapshot) if old_lines_snapshot is not None else []
         if len(old_lines) + len(normalized_lines) + 3 > 500:
             raise https_fn.HttpsError(
@@ -947,7 +947,7 @@ def mutate_reception(req: https_fn.CallableRequest):
         if action == "DELETE_DRAFT":
             if _reception_dependencies(lambda query: transaction.get(query), root, reception_ref, reception):
                 raise _error("Reception has dependent records; cancel it instead")
-            lines = list(transaction.get(reception_ref.collection("lines")))
+            lines = list(transaction.get(firestore.Query(reception_ref.collection("lines"))))
             if len(lines) + 3 > MAX_TRANSACTION_WRITES:
                 raise _error("Reception has too many lines to delete atomically")
 

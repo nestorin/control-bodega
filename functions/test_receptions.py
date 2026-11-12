@@ -640,5 +640,272 @@ class ReceptionCommandContractTests(unittest.TestCase):
         self.assertIs(movement["occurredAt"], firestore.SERVER_TIMESTAMP)
 
 
+class ReceptionLinesQueryRegressionTests(unittest.TestCase):
+    def test_delete_draft_reads_lines_as_query_and_deletes_draft_lines(self):
+        reception_id = "reception-1"
+        operation_id = "delete-reception-1"
+        root_path = f"organizations/{receptions.ORG_ID}"
+        reception_path = f"{root_path}/receptions/{reception_id}"
+        lines_path = f"{reception_path}/lines"
+
+        class Snapshot:
+            def __init__(self, data=None, reference=None):
+                self.exists = data is not None
+                self._data = data
+                self.reference = reference
+
+            def to_dict(self):
+                return self._data
+
+        class Reference:
+            def __init__(self, path):
+                self.path = path
+                self.id = path.rsplit("/", 1)[-1]
+
+            def collection(self, collection_id):
+                return Collection(f"{self.path}/{collection_id}")
+
+            def document(self, document_id=None):
+                return Reference(f"{self.path}/{document_id or 'generated'}")
+
+            def get(self):
+                return reception_snapshot
+
+        class DependencyQuery:
+            def __init__(self, path):
+                self.path = path
+
+            def limit(self, _count):
+                return self
+
+        class Collection:
+            def __init__(self, path):
+                self.path = path
+
+            def document(self, document_id=None):
+                return Reference(f"{self.path}/{document_id or 'generated'}")
+
+            def where(self, _field_path, _op_string, _value):
+                return DependencyQuery(self.path)
+
+            def limit(self, _count):
+                return DependencyQuery(self.path)
+
+        line_reference = Reference(f"{lines_path}/line-1")
+        reception_snapshot = Snapshot({
+            "organizationId": receptions.ORG_ID,
+            "warehouseId": "wh_tehuacan_1",
+            "status": "DRAFT",
+            "version": 1,
+        })
+        line_snapshot = Snapshot({"id": "line-1"}, line_reference)
+
+        class Transaction:
+            def __init__(self):
+                self.reads = []
+                self.deletes = []
+                self.sets = []
+
+            def get(self, reference):
+                self.reads.append(reference)
+                if isinstance(reference, DependencyQuery):
+                    return []
+                if isinstance(reference, firestore.Query):
+                    parent_path = getattr(reference._parent, "path", None)
+                    if parent_path == lines_path:
+                        return [line_snapshot]
+                    return []
+                if getattr(reference, "path", None) == reception_path:
+                    return reception_snapshot
+                if getattr(reference, "path", None) == lines_path:
+                    return []
+                return Snapshot()
+
+            def delete(self, reference):
+                self.deletes.append(reference)
+
+            def set(self, reference, data):
+                self.sets.append((reference, data))
+
+            def update(self, reference, data):
+                self.sets.append((reference, data))
+
+        class Database:
+            def __init__(self, transaction):
+                self._transaction = transaction
+
+            def collection(self, collection_id):
+                return Collection(collection_id)
+
+            def transaction(self):
+                return self._transaction
+
+        transaction = Transaction()
+        request = SimpleNamespace(
+            auth=SimpleNamespace(uid="admin-1", token={}),
+            data={
+                "receptionId": reception_id,
+                "operationId": operation_id,
+                "action": "DELETE_DRAFT",
+            },
+        )
+
+        with (
+            patch.object(receptions.firestore, "client", return_value=Database(transaction)),
+            patch.object(receptions.firestore, "transactional", side_effect=lambda callback: callback),
+            patch.object(receptions, "_admin_reception_actor", return_value={"userId": "admin-1"}),
+            patch.object(receptions, "_storage_evidence_exists", return_value=False),
+        ):
+            result = inspect.unwrap(receptions.mutate_reception)(request)
+
+        line_queries = [
+            read for read in transaction.reads
+            if isinstance(read, firestore.Query)
+            and getattr(read._parent, "path", None) == lines_path
+        ]
+        self.assertEqual(len(line_queries), 1, "Expected draft lines to be read with a Query")
+        read_arg = line_queries[0]
+        self.assertIsInstance(read_arg, firestore.Query)
+        self.assertNotIsInstance(read_arg, firestore.CollectionReference)
+
+        deleted_paths = [reference.path for reference in transaction.deletes]
+        self.assertIn(line_reference.path, deleted_paths)
+        self.assertIn(reception_path, deleted_paths)
+        self.assertEqual(result["action"], "DELETE_DRAFT")
+        self.assertFalse(result["idempotent"])
+
+    def test_edit_reception_reads_existing_lines_as_query(self):
+        reception_id = "reception-1"
+        operation_id = "edit-reception-1"
+        root_path = f"organizations/{receptions.ORG_ID}"
+        reception_path = f"{root_path}/receptions/{reception_id}"
+        lines_path = f"{reception_path}/lines"
+
+        class Snapshot:
+            def __init__(self, data=None, reference=None):
+                self.exists = data is not None
+                self._data = data
+                self.reference = reference
+
+            def to_dict(self):
+                return self._data
+
+        class Reference:
+            def __init__(self, path):
+                self.path = path
+                self.id = path.rsplit("/", 1)[-1]
+
+            def collection(self, collection_id):
+                return Collection(f"{self.path}/{collection_id}")
+
+            def document(self, document_id=None):
+                return Reference(f"{self.path}/{document_id or 'generated'}")
+
+        class Collection:
+            def __init__(self, path):
+                self.path = path
+
+            def document(self, document_id=None):
+                return Reference(f"{self.path}/{document_id or 'generated'}")
+
+        old_line_reference = Reference(f"{lines_path}/line-old-1")
+        reception_snapshot = Snapshot({
+            "organizationId": receptions.ORG_ID,
+            "warehouseId": "wh_tehuacan_1",
+            "status": "DRAFT",
+            "version": 1,
+            "plannedPallets": [],
+        })
+        old_line_snapshot = Snapshot({"id": "line-old-1"}, old_line_reference)
+
+        class Transaction:
+            def __init__(self):
+                self.reads = []
+                self.deletes = []
+                self.updates = []
+                self.sets = []
+
+            def get(self, reference):
+                self.reads.append(reference)
+                if isinstance(reference, firestore.Query):
+                    parent_path = getattr(reference._parent, "path", None)
+                    if parent_path == lines_path:
+                        return [old_line_snapshot]
+                    return []
+                if getattr(reference, "path", None) == reception_path:
+                    return reception_snapshot
+                if getattr(reference, "path", None) == lines_path:
+                    return []
+                return Snapshot()
+
+            def delete(self, reference):
+                self.deletes.append(reference)
+
+            def update(self, reference, data):
+                self.updates.append((reference, data))
+
+            def set(self, reference, data):
+                self.sets.append((reference, data))
+
+        class Database:
+            def __init__(self, transaction):
+                self._transaction = transaction
+
+            def collection(self, collection_id):
+                return Collection(collection_id)
+
+            def transaction(self):
+                return self._transaction
+
+        transaction = Transaction()
+        request = SimpleNamespace(
+            auth=SimpleNamespace(uid="operator-1", token={}),
+            data={
+                "operationId": operation_id,
+                "receptionId": reception_id,
+                "warehouseId": "wh_tehuacan_1",
+                "expectedVersion": 1,
+                "folio": "REC-1",
+                "supplierId": "supplier-1",
+                "supplierPurchaseOrderId": "PO-1",
+                "supplierPurchaseOrderNumber": "1",
+                "supplierCode": "SUP",
+                "supplierName": "Supplier",
+                "logisticsProvider": "Provider",
+                "lines": [{"productId": "product-1", "quantity": 2, "unit": "cajas"}],
+                "plannedPallets": [{
+                    "palletNumber": 1,
+                    "lineIndex": 0,
+                    "productId": "product-1",
+                    "productName": "Product",
+                    "quantity": 2,
+                    "unit": "cajas",
+                }],
+            },
+        )
+
+        with (
+            patch.object(receptions.firestore, "client", return_value=Database(transaction)),
+            patch.object(receptions.firestore, "transactional", side_effect=lambda callback: callback),
+            patch.object(receptions, "_check_actor", return_value={"userId": "operator-1"}),
+        ):
+            result = inspect.unwrap(receptions.edit_reception)(request)
+
+        line_queries = [
+            read for read in transaction.reads
+            if isinstance(read, firestore.Query)
+            and getattr(read._parent, "path", None) == lines_path
+        ]
+        self.assertEqual(len(line_queries), 1, "Expected existing lines to be read with a Query")
+        read_arg = line_queries[0]
+        self.assertIsInstance(read_arg, firestore.Query)
+        self.assertNotIsInstance(read_arg, firestore.CollectionReference)
+
+        deleted_paths = [reference.path for reference in transaction.deletes]
+        self.assertIn(old_line_reference.path, deleted_paths)
+        self.assertEqual(result["receptionId"], reception_id)
+        self.assertFalse(result["idempotent"])
+
+
 if __name__ == "__main__":
     unittest.main()

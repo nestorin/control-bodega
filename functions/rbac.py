@@ -19,6 +19,7 @@ except ValueError:
 ORG_ID = "org_exepa_001"
 WAREHOUSE_IDS = {"wh_tehuacan_1", "wh_tehuacan_2"}
 MAX_TRANSACTION_WRITES = 500
+MAX_TRANSACTION_READS = 500
 WAREHOUSE_ALIASES = {
     "almacen-001": "wh_tehuacan_1", "almacen-002": "wh_tehuacan_2",
     "alm_norte": "wh_tehuacan_1", "alm_sur": "wh_tehuacan_2",
@@ -98,6 +99,16 @@ def _validate_inventory_import_write_count(movement_count: int) -> None:
     if movement_count + 1 > MAX_TRANSACTION_WRITES:
         raise https_fn.HttpsError(
             "resource-exhausted", "Inventory import exceeds the atomic write limit"
+        )
+
+
+def _validate_inventory_import_read_count(movement_count: int) -> None:
+    # A saturated bounded query cannot prove that the collection contains no
+    # additional movement, so reject it before starting the inventory writes.
+    if movement_count >= MAX_TRANSACTION_READS:
+        raise https_fn.HttpsError(
+            "resource-exhausted",
+            f"Inventory import reaches or exceeds the atomic read limit of {MAX_TRANSACTION_READS} documents",
         )
 
 
@@ -356,7 +367,12 @@ def import_inventory(req: https_fn.CallableRequest):
                 raise _error("Operation id already used")
             return {"idempotent": True, "movementCount": result.get("movementCount", 0)}
         current = {}
-        for snapshot in transaction.get(db.collection(f"organizations/{ORG_ID}/inventory_movements")):
+        movements_query = firestore.Query(
+            db.collection(f"organizations/{ORG_ID}/inventory_movements")
+        ).limit(MAX_TRANSACTION_READS)
+        movements = list(transaction.get(movements_query))
+        _validate_inventory_import_read_count(len(movements))
+        for snapshot in movements:
             movement = snapshot.to_dict() or {}
             key = (movement.get("warehouseId"), movement.get("productId"))
             delta = movement.get("quantity", 0) if movement.get("direction") == "IN" else -movement.get("quantity", 0)

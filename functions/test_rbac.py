@@ -65,12 +65,24 @@ class _Transaction:
     def __init__(self, documents, movements=()):
         self._documents = documents
         self._movements = list(movements)
+        self.reads = []
         self.sets = []
         self.updates = []
 
     def get(self, reference):
+        self.reads.append(reference)
         if isinstance(reference, _Collection):
-            return list(self._movements)
+            return [
+                movement if isinstance(movement, _Snapshot) else _Snapshot(movement)
+                for movement in self._movements
+            ]
+        if isinstance(reference, firestore.Query):
+            limit = getattr(reference, "_limit", None)
+            movements = self._movements if limit is None else self._movements[:limit]
+            return [
+                movement if isinstance(movement, _Snapshot) else _Snapshot(movement)
+                for movement in movements
+            ]
         return _Snapshot(self._documents.get(reference.path))
 
     def set(self, reference, data):
@@ -93,6 +105,160 @@ class _Database:
 
     def transaction(self):
         return self._transaction
+
+
+class InventoryImportQueryRegressionTests(unittest.TestCase):
+    def _run_import(self, mode, rows, movements):
+        uid = "admin-1"
+        warehouse_id = "wh_tehuacan_1"
+        documents = {
+            f"organizations/{rbac.ORG_ID}/users/{uid}": {
+                "userId": uid,
+                "organizationId": rbac.ORG_ID,
+                "status": "ACTIVE",
+                "role": "ADMIN",
+                "warehouseId": warehouse_id,
+            },
+        }
+        transaction = _Transaction(documents, movements)
+        request = SimpleNamespace(
+            auth=SimpleNamespace(uid=uid, token={}),
+            data={
+                "operationId": f"import-{mode.lower()}-1",
+                "mode": mode,
+                "rows": rows,
+            },
+        )
+
+        with (
+            patch.object(rbac.firestore, "client", return_value=_Database(documents, transaction)),
+            patch.object(rbac.firestore, "transactional", side_effect=lambda callback: callback),
+        ):
+            result = inspect.unwrap(rbac.import_inventory)(request)
+
+        query_reads = [read for read in transaction.reads if isinstance(read, firestore.Query)]
+        self.assertEqual(len(query_reads), 1)
+        read_arg = query_reads[0]
+        self.assertIsInstance(read_arg, firestore.Query)
+        self.assertNotIsInstance(read_arg, firestore.CollectionReference)
+        return result, transaction
+
+    def _movement_writes(self, transaction):
+        return [
+            write for write in transaction.sets
+            if write[0].path.startswith(f"organizations/{rbac.ORG_ID}/inventory_movements/")
+        ]
+
+    def test_import_inventory_reads_movements_with_a_firestore_query(self):
+        result, transaction = self._run_import(
+            "ADD",
+            [{"productId": "product-1", "warehouseId": "wh_tehuacan_1", "quantity": 3}],
+            [],
+        )
+
+        self.assertFalse(result["idempotent"])
+        self.assertEqual(result["movementCount"], 1)
+
+    def test_import_inventory_add_writes_expected_inventory_movement(self):
+        result, transaction = self._run_import(
+            "ADD",
+            [{"productId": "product-1", "warehouseId": "wh_tehuacan_1", "quantity": 3}],
+            [{
+                "warehouseId": "wh_tehuacan_1",
+                "productId": "product-1",
+                "direction": "IN",
+                "quantity": 5,
+            }],
+        )
+
+        self.assertFalse(result["idempotent"])
+        self.assertEqual(result["movementCount"], 1)
+        movement_writes = self._movement_writes(transaction)
+        self.assertEqual(len(movement_writes), 1)
+        _, movement = movement_writes[0]
+        self.assertEqual(movement["direction"], "IN")
+        self.assertEqual(movement["quantity"], 3)
+        self.assertEqual(movement["movementType"], "ADJUSTMENT")
+
+    def test_import_inventory_replace_writes_expected_inventory_movements(self):
+        result, transaction = self._run_import(
+            "REPLACE",
+            [{"productId": "product-1", "warehouseId": "wh_tehuacan_1", "quantity": 3}],
+            [
+                {
+                    "warehouseId": "wh_tehuacan_1",
+                    "productId": "product-1",
+                    "direction": "IN",
+                    "quantity": 5,
+                },
+                {
+                    "warehouseId": "wh_tehuacan_1",
+                    "productId": "product-2",
+                    "direction": "IN",
+                    "quantity": 4,
+                },
+            ],
+        )
+
+        self.assertFalse(result["idempotent"])
+        self.assertEqual(result["movementCount"], 2)
+        movement_writes = sorted(
+            self._movement_writes(transaction),
+            key=lambda write: write[1]["productId"],
+        )
+        self.assertEqual(len(movement_writes), 2)
+        _, product_one_movement = movement_writes[0]
+        self.assertEqual(product_one_movement["productId"], "product-1")
+        self.assertEqual(product_one_movement["direction"], "OUT")
+        self.assertEqual(product_one_movement["quantity"], 2)
+        self.assertEqual(product_one_movement["movementType"], "ADJUSTMENT")
+        _, product_two_movement = movement_writes[1]
+        self.assertEqual(product_two_movement["productId"], "product-2")
+        self.assertEqual(product_two_movement["direction"], "OUT")
+        self.assertEqual(product_two_movement["quantity"], 4)
+        self.assertEqual(product_two_movement["movementType"], "ADJUSTMENT")
+
+    def test_import_inventory_rejects_movement_collection_at_read_limit(self):
+        uid = "admin-1"
+        warehouse_id = "wh_tehuacan_1"
+        documents = {
+            f"organizations/{rbac.ORG_ID}/users/{uid}": {
+                "userId": uid,
+                "organizationId": rbac.ORG_ID,
+                "status": "ACTIVE",
+                "role": "ADMIN",
+                "warehouseId": warehouse_id,
+            },
+        }
+        movements = [
+            {
+                "warehouseId": warehouse_id,
+                "productId": f"product-{index}",
+                "direction": "IN",
+                "quantity": 1,
+            }
+            for index in range(rbac.MAX_TRANSACTION_READS + 1)
+        ]
+        transaction = _Transaction(documents, movements)
+        request = SimpleNamespace(
+            auth=SimpleNamespace(uid=uid, token={}),
+            data={
+                "operationId": "import-read-limit-1",
+                "mode": "ADD",
+                "rows": [{"productId": "product-1", "warehouseId": warehouse_id, "quantity": 3}],
+            },
+        )
+
+        with (
+            patch.object(rbac.firestore, "client", return_value=_Database(documents, transaction)),
+            patch.object(rbac.firestore, "transactional", side_effect=lambda callback: callback),
+            self.assertRaises(https_fn.HttpsError) as raised,
+        ):
+            inspect.unwrap(rbac.import_inventory)(request)
+
+        self.assertEqual(raised.exception.code, "resource-exhausted")
+        self.assertIn(str(rbac.MAX_TRANSACTION_READS), raised.exception.message)
+        self.assertEqual(transaction.sets, [])
 
 
 class InventoryMovementTimestampTests(unittest.TestCase):
