@@ -11,6 +11,39 @@ import { QRCodeSVG } from "qrcode.react";
 import { useReceptionFlow } from "@/hooks/useReceptionFlow";
 import { useCatalogos } from "@/hooks/useCatalogos";
 import { useUIContext } from "@/context";
+import type { ReceptionConversionRow } from "@/types";
+
+/** Number of labels rendered by the demo branch (no reception at all). */
+const DEMO_TARIMAS = 20;
+
+/** One label slot, derived from the reception conversion table. */
+interface TarimaSlot {
+  producto: string;
+  cajas: number;
+  piezasPorCaja: number | null;
+}
+
+/** Normalize a product name for catalog matching (trim + uppercase). */
+function normalizeProductName(name: string): string {
+  return (name || "").trim().toUpperCase();
+}
+
+/**
+ * Resolve the units per box of a product from the reception conversion table.
+ *
+ * The catalog is keyed by product name, so the lookup is a normalized name
+ * comparison — the same rule used by `services/palletPlan.ts`. Returns null
+ * when the product has no conversion row.
+ */
+function findPiezasPorCaja(
+  conversionesTabla: ReceptionConversionRow[],
+  productName: string,
+): number | null {
+  const target = normalizeProductName(productName);
+  if (!target) return null;
+  const match = conversionesTabla.find((conv) => normalizeProductName(conv.producto) === target);
+  return match?.piezasPorCaja ?? null;
+}
 
 interface Tarima {
   id: string;
@@ -98,15 +131,35 @@ function Etiqueta({
         borderBottom: !isLastRow ? "1px dashed #c8d4d8" : "none",
       }}
     >
-      {/* QR — grande y centrado arriba */}
+      {/* QR block — large and centered on top */}
       <div style={{ display: "flex", justifyContent: "center" }}>
-        <QRCodeSVG
-          value={tarima.id}
-          size={200}
-          level="H"
-          marginSize={2}
-          style={{ display: "block" }}
-        />
+        {tarima.id ? (
+          <QRCodeSVG
+            value={tarima.id}
+            size={200}
+            level="H"
+            marginSize={2}
+            style={{ display: "block" }}
+          />
+        ) : (
+          <div
+            style={{
+              width: "200px",
+              height: "200px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "1px dashed #c8d4d8",
+              borderRadius: "8px",
+              fontFamily: "Inter, sans-serif",
+              fontSize: "13px",
+              fontWeight: 700,
+              color: "#607078",
+            }}
+          >
+            QR no asignado
+          </div>
+        )}
       </div>
 
       {/* Footer: tarima + ID + cara/copia */}
@@ -256,46 +309,111 @@ export default function ImpresionEtiquetas() {
   const ocFolio = currentReception?.ocFolio ?? "OC-24891";
   const ocNumber = ocFolio.replace("OC-", "");
   const conversionesTabla = currentReception?.conversionesTabla ?? [];
+  const plannedPallets = currentReception?.plannedPallets ?? [];
+  const codigosQR = currentReception?.codigosQR ?? [];
 
-  // Si hay conversionesTabla, generar tarimas basadas en productos reales
-  // Si no, usar datos de ejemplo
-  const tarimas: Tarima[] =
-    conversionesTabla && conversionesTabla.length > 0
-      ? conversionesTabla.flatMap((conv, idx) =>
-          conv.conversions.flatMap((conversion) =>
-            conversion.stickers.map((sticker, si) => ({
-              id: sticker.qrPayload,
-              numero: idx * 10 + si + 1,
-              total: conversionesTabla.reduce(
-                (a, b) => a + b.conversions.reduce((c, d) => c + d.stickers.length, 0),
-                0,
-              ),
-              ordenCompra: ocFolio,
-              fechaRecepcion: "19 Sep 2026 · 09:42",
-              producto: conv.productName,
-              caducidad: "15 Mar 2027",
-              cajas: Math.ceil(conversion.quantity / 24),
-              unidadesPorCaja: 24,
-              lote: "LT-0926-A",
-              proveedor: "Distribuidora del Norte",
-              proveedorLogistico: "Logística Veloz",
-            })),
-          ),
-        )
-      : Array.from({ length: currentReception?.tarimas ?? 20 }, (_, i) => ({
-          id: `TQR-${ocNumber}-${String(i + 1).padStart(3, "0")}`,
-          numero: i + 1,
-          total: currentReception?.tarimas ?? 20,
-          ordenCompra: ocFolio,
-          fechaRecepcion: "19 Sep 2026 · 09:42",
-          producto: "Agua mineral 600 ml",
-          caducidad: "15 Mar 2027",
-          cajas: 48,
-          unidadesPorCaja: i % 3 === 0 ? null : 24,
-          lote: "LT-0926-A",
-          proveedor: "Distribuidora del Norte",
-          proveedorLogistico: "Logística Veloz",
-        }));
+  // One slot per tarima, derived from the reception conversion table.
+  const slots: TarimaSlot[] = conversionesTabla.flatMap((conv) =>
+    Array.from({ length: conv.tarimas ?? 0 }, () => ({
+      producto: conv.producto,
+      cajas: conv.cajas,
+      piezasPorCaja: conv.piezasPorCaja ?? null,
+    })),
+  );
+
+  // The QR identifier of a printed label MUST come from the backend: it is
+  // `plannedPallets[].qrIdentifier` (or the matching `codigosQR[]` entry).
+  // The backend derives it from the operation id, so it can NEVER be
+  // synthesized from the purchase order folio — a folio-derived identifier
+  // scans to nothing.
+  const tarimas: Tarima[] = (() => {
+    // Primary source: the planned pallets returned by the backend. One planned
+    // pallet is one tarima and carries its own real, scannable identifier.
+    if (plannedPallets.length > 0) {
+      return plannedPallets.map((pallet) => ({
+        id: pallet.qrIdentifier ?? "",
+        numero: pallet.palletNumber,
+        total: plannedPallets.length,
+        ordenCompra: currentReception?.ocFolio ?? "",
+        fechaRecepcion: currentReception?.fechaRecepcion ?? "",
+        producto: pallet.productName,
+        caducidad: pallet.expiryDate ?? currentReception?.caducidad ?? "",
+        cajas: pallet.quantity,
+        unidadesPorCaja: findPiezasPorCaja(conversionesTabla, pallet.productName),
+        lote: pallet.lot ?? currentReception?.lote ?? "",
+        proveedor: currentReception?.proveedor ?? "",
+        proveedorLogistico: currentReception?.proveedorLogistico ?? "",
+      }));
+    }
+
+    // Secondary source: the QR code list, paired with the conversion table
+    // (which knows how many pallets each product has).
+    if (codigosQR.length > 0) {
+      const codigoSlots: TarimaSlot[] =
+        slots.length > 0
+          ? slots
+          : codigosQR.map(() => ({ producto: "", cajas: 0, piezasPorCaja: null }));
+      return codigoSlots.map((slot, index) => ({
+        id: codigosQR[index] ?? "",
+        numero: index + 1,
+        total: codigoSlots.length,
+        ordenCompra: currentReception?.ocFolio ?? "",
+        fechaRecepcion: currentReception?.fechaRecepcion ?? "",
+        producto: slot.producto,
+        caducidad: currentReception?.caducidad ?? "",
+        cajas: slot.cajas,
+        unidadesPorCaja: slot.piezasPorCaja,
+        lote: currentReception?.lote ?? "",
+        proveedor: currentReception?.proveedor ?? "",
+        proveedorLogistico: currentReception?.proveedorLogistico ?? "",
+      }));
+    }
+
+    // A reception with no backend QR identifier: keep the label structure so
+    // the operator still sees the pallet plan, but leave the identifier empty
+    // instead of printing a QR code that no scanner can resolve.
+    if (currentReception) {
+      const receptionSlots: TarimaSlot[] =
+        slots.length > 0
+          ? slots
+          : Array.from({ length: currentReception.tarimas ?? 0 }, () => ({
+              producto: "",
+              cajas: 0,
+              piezasPorCaja: null,
+            }));
+      return receptionSlots.map((slot, index) => ({
+        id: "",
+        numero: index + 1,
+        total: receptionSlots.length,
+        ordenCompra: currentReception.ocFolio ?? "",
+        fechaRecepcion: currentReception.fechaRecepcion ?? "",
+        producto: slot.producto,
+        caducidad: currentReception.caducidad ?? "",
+        cajas: slot.cajas,
+        unidadesPorCaja: slot.piezasPorCaja,
+        lote: currentReception.lote ?? "",
+        proveedor: currentReception.proveedor ?? "",
+        proveedorLogistico: currentReception.proveedorLogistico ?? "",
+      }));
+    }
+
+    // Demo data: there is no reception at all, so the screen still renders
+    // sample labels with the hardcoded demo values.
+    return Array.from({ length: DEMO_TARIMAS }, (_, i) => ({
+      id: `TQR-${ocNumber}-${String(i + 1).padStart(3, "0")}`,
+      numero: i + 1,
+      total: DEMO_TARIMAS,
+      ordenCompra: ocFolio,
+      fechaRecepcion: "19 Sep 2026 · 09:42",
+      producto: "Agua mineral 600 ml",
+      caducidad: "15 Mar 2027",
+      cajas: 48,
+      unidadesPorCaja: i % 3 === 0 ? null : 24,
+      lote: "LT-0926-A",
+      proveedor: "Distribuidora del Norte",
+      proveedorLogistico: "Logística Veloz",
+    }));
+  })();
 
   // NUEVO: Generar stickers - 4 por tarima (2 caras × 2 copias)
   const stickers = tarimas.flatMap((tarima) =>
@@ -351,8 +469,8 @@ export default function ImpresionEtiquetas() {
             }}
           >
             {conversionesTabla && conversionesTabla.length > 0
-              ? `${stickers.length} stickers (4×tarima) · {pages.length} páginas`
-              : `${tarimas.length} etiquetas · {pages.length} páginas · 4 por hoja`}
+              ? `${stickers.length} stickers (4×tarima) · ${pages.length} páginas`
+              : `${tarimas.length} etiquetas · ${pages.length} páginas · 4 por hoja`}
           </span>
         </div>
         <div style={{ display: "flex", gap: "10px" }}>
@@ -422,7 +540,9 @@ export default function ImpresionEtiquetas() {
             }}
           >
             {page.map((tarima, i) => (
-              <Etiqueta key={tarima.id} tarima={tarima} index={i} />
+              // The slot index keeps the key unique even when a tarima has no
+              // QR identifier yet (empty ids would collide).
+              <Etiqueta key={`${tarima.id}-${i}`} tarima={tarima} index={i} />
             ))}
           </div>
         ))}
