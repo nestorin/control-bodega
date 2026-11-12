@@ -319,6 +319,7 @@ interface Props {}
 
 export default function Evidencias() {
   const { canQuery } = useAuthorization();
+  const { setSelectedEvidencia, navigate } = useReceptionFlow();
   const useFirestore = isFeatureEnabled("USE_FIRESTORE_EVIDENCIAS") && !!db && canQuery;
 
   const [listaLocal, setListaLocal] = useState<EvidenciaData[]>(evidenciasDataLocal);
@@ -547,7 +548,6 @@ export default function Evidencias() {
           <div
             key={ev.id}
             onClick={() => {
-              const { setSelectedEvidencia, navigate } = useReceptionFlow();
               setSelectedEvidencia(ev);
               navigate("evidencia-detalle", "evidencias");
             }}
