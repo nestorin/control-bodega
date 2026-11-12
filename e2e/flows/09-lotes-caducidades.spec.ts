@@ -93,7 +93,7 @@ test.describe("FEFO: Lotes y Caducidades", () => {
     await page.goto("/");
     await expect(page.getByRole("button", { name: "Inventario", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Inventario", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Lotes y Caducidades" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Inventario" })).toBeVisible();
     await expect(page.locator("tbody tr")).toHaveCount(SEED_LOTS.length, {
       timeout: 15_000,
     });

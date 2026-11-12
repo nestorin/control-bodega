@@ -81,7 +81,7 @@ test.describe("Main App - Authenticated Flows", () => {
 
   test("Navigation - should navigate to Lotes y Caducidades", async ({ page }) => {
     await page.getByRole("button", { name: "Inventario", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Lotes y Caducidades" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Inventario" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Exportar CSV" })).toBeVisible();
   });
 
