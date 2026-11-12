@@ -162,6 +162,12 @@ jobs:
           python -m venv functions/venv
           functions/venv/bin/python -m pip install --disable-pip-version-check -r functions/requirements.txt
 
+      # The backend carries its own contract tests (authorization boundaries,
+      # validation, write payloads). They run against the same virtualenv the
+      # emulator uses, so they cost no extra install time and gate every push.
+      - name: Run Functions unit tests
+        run: functions/venv/bin/python -m unittest discover -s functions -p "test_*.py" -t functions
+
       - name: Set up Java for Firebase emulators
         uses: actions/setup-java@v6
         with:
