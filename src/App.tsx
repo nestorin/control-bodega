@@ -19,7 +19,6 @@ import ProgramacionRecepcion from "./screens/ProgramacionRecepcion";
 import NuevaRecepcionStep1 from "./screens/NuevaRecepcionStep1";
 import NuevaRecepcionStep2 from "./screens/NuevaRecepcionStep2";
 import CapturaTarima from "./screens/CapturaTarima";
-import type { PlannedReceptionPallet } from "@/services/firestore/types";
 import RecepcionCompletada from "./screens/RecepcionCompletada";
 import Recepciones from "./screens/Recepciones";
 import TarimaDetalle from "./screens/TarimaDetalle";
@@ -28,7 +27,7 @@ import EscanearQR from "./screens/EscanearQR";
 import EditarRecepcion from "./screens/EditarRecepcion";
 import Evidencias, { mapReceptionEvidence } from "./screens/Evidencias";
 import EvidenciaDetalle from "./screens/EvidenciaDetalle";
-import type { EvidenciaData, Screen as ContextScreen } from "./types";
+import type { Screen as ContextScreen } from "./types";
 import LotesCaducidades from "./screens/LotesCaducidades";
 import Embarques from "./screens/Embarques";
 import Configuracion, {
@@ -209,26 +208,41 @@ function LabelingUnavailable() {
 function AppLayout() {
   const { user, profile, logout, canQuery } = useAuthorization();
   const receptionSession = useReceptionSession();
-  const { currentScreen: ctxCurrentScreen, navigate: ctxNavigate } = useReceptionContext();
+  // ReceptionContext is the single source of truth for the reception in
+  // progress, the selected evidence and the scanned QR code. The screens read
+  // all of them from the context, so App must write them there as well;
+  // keeping a private copy here is what split the two apart.
+  const {
+    currentScreen: ctxCurrentScreen,
+    navigate: ctxNavigate,
+    currentReception,
+    setCurrentReception,
+    selectedEvidencia,
+    setSelectedEvidencia,
+    scannedQrCode,
+    setScannedQrCode,
+  } = useReceptionContext();
   const [screen, setScreen] = useState<Screen>("home");
   const [activeNav, setActiveNav] = useState<NavItem>("home");
   const [editId, setEditId] = useState<string>("OC-24891");
-  const [selectedEvidencia, setSelectedEvidencia] = useState<EvidenciaData | null>(null);
   const [tarimaActual, setTarimaActual] = useState(3);
-  const [scannedQrCode, setScannedQrCode] = useState<string | null>(null);
 
   // Screens navigate through useReceptionFlow, which dispatches NAVIGATE on
-  // ReceptionContext; mirror that into the local screen state. The mount run
-  // is skipped so direct screen overrides (e.g. test modes) are not clobbered.
+  // ReceptionContext; mirror that into the local screen state. A context
+  // navigation must always win over a divergent local screen: comparing only
+  // the previous context value swallowed a navigation to the screen the
+  // context already sits on, leaving the UI stuck (e.g. "Cancelar" in the QR
+  // scanner). The ref keeps the sync idempotent so the two sources cannot
+  // ping-pong.
   // Cast: App's local Screen and the shared types Screen have drifted
   // (etiquetado-* variants vs login/register); values crossing this boundary
   // in practice are shared members.
   const syncedScreenRef = useRef(ctxCurrentScreen);
   useEffect(() => {
-    if (syncedScreenRef.current === ctxCurrentScreen) return;
+    if (syncedScreenRef.current === ctxCurrentScreen && screen === ctxCurrentScreen) return;
     syncedScreenRef.current = ctxCurrentScreen;
     setScreen(ctxCurrentScreen as Screen);
-  }, [ctxCurrentScreen]);
+  }, [ctxCurrentScreen, screen]);
 
   // TEST-ONLY: Legacy mode for TarimaDetalle (bypasses Firestore query)
   // Enable with: ?test=legacy-tarima-detalle
@@ -238,6 +252,7 @@ function AppLayout() {
     if (testMode === "legacy-tarima-detalle") {
       setScreen("tarima-detalle");
       setActiveNav("qr");
+      ctxNavigate("tarima-detalle", "qr");
       // Don't set scannedQrCode - TarimaDetalle will use legacy mode
 
       // Set up conversionesTabla for CapturaTarima (legacy mode)
@@ -301,9 +316,11 @@ function AppLayout() {
     } else if (testMode === "escanear-qr") {
       setScreen("escanear-qr");
       setActiveNav("qr");
+      ctxNavigate("escanear-qr", "qr");
     } else if (testMode === "legacy-captura-evidencia") {
       setScreen("captura-evidencia");
       setActiveNav("home");
+      ctxNavigate("captura-evidencia", "home");
 
       // Set up currentReception for CapturaEvidencia (needs receptionId for Firestore)
       const currentReceptionData = {
@@ -346,6 +363,7 @@ function AppLayout() {
     } else if (testMode === "legacy-evidencia-detalle") {
       setScreen("evidencia-detalle");
       setActiveNav("evidencias");
+      ctxNavigate("evidencia-detalle", "evidencias");
 
       // Set up test data for legacy evidencia detalle
       const evidenciaData = {
@@ -370,6 +388,7 @@ function AppLayout() {
     } else if (testMode === "legacy-captura-tarima") {
       setScreen("captura-tarima");
       setActiveNav("qr");
+      ctxNavigate("captura-tarima", "qr");
 
       // Set up currentReception for CapturaTarima (legacy mode)
       const conversiones = [
@@ -543,49 +562,8 @@ function AppLayout() {
     };
   }, [canQuery]);
 
-  // Estado para la recepción actual en proceso
-  const [currentReception, setCurrentReception] = useState<{
-    hasOC?: boolean;
-    ocFolio: string;
-    tarimas: number;
-    proveedor: string;
-    proveedorLogistico: string;
-    warehouseId?: string;
-    receptionId?: string;
-    fechaRecepcion?: string;
-    lote?: string;
-    caducidad?: string;
-    codigosQR?: string[];
-    plannedPallets?: PlannedReceptionPallet[];
-    purchaseOrderId?: string;
-    purchaseOrderNumber?: string;
-    supplierCode?: string;
-    supplierName?: string;
-    logisticsProvider?: string;
-    scheduledDate?: string;
-    productos: Array<{
-      productId: string | null;
-      codigo: string | null;
-      nombre: string;
-      unidad: string | null;
-      cantidad: number;
-      precio: number;
-      importe: number;
-      estadoMatch: "confirmado" | "sugerido" | "manual";
-    }>;
-    conversionesTabla?: Array<{
-      producto: string;
-      productId?: string | null;
-      codigo: string;
-      unidades: number;
-      unidad: string;
-      piezasPorCaja: number;
-      cajasPorTarima: number;
-      cajas: number;
-      tarimas: number;
-      stickers: number;
-    }>;
-  } | null>(null);
+  // The reception in progress lives in ReceptionContext (see the provider
+  // wiring above); the screens and the headers below read it from there.
   const tarimaTotal = Math.max(1, currentReception?.tarimas ?? TARIMA_TOTAL);
   const scannedTarimaSuffix = scannedQrCode?.match(/-(\d+)$/)?.[1];
   const scannedTarimaNumber = Number(scannedTarimaSuffix);
@@ -602,10 +580,12 @@ function AppLayout() {
     const nextPosition = Math.min(tarimaTotal, Math.max(1, position));
     setTarimaActual(nextPosition);
     if (scannedTarimaSuffix) {
+      // ReceptionContext exposes a plain setter, not a React state updater.
       setScannedQrCode(
-        (code) =>
-          code?.replace(/\d+$/, String(nextPosition).padStart(scannedTarimaSuffix.length, "0")) ??
-          null,
+        scannedQrCode?.replace(
+          /\d+$/,
+          String(nextPosition).padStart(scannedTarimaSuffix.length, "0"),
+        ) ?? null,
       );
     }
   }
@@ -1420,7 +1400,27 @@ function AppLayout() {
           {screen === "recepciones" && <Recepciones />}
           {screen === "escanear-qr" && <EscanearQR />}
           {screen === "editar-recepcion" && <EditarRecepcion />}
-          {screen === "tarima-detalle" && <TarimaDetalle />}
+          {screen === "tarima-detalle" && (
+            <TarimaDetalle
+              qrCode={scannedQrCode ?? undefined}
+              authorizedWarehouseIds={
+                profile && isGlobalMembershipRole(profile.role)
+                  ? [...CANONICAL_WAREHOUSE_IDS]
+                  : profile
+                    ? (normalizeMembershipWarehouses(profile) ?? [])
+                    : []
+              }
+              currentReception={currentReception}
+              onBack={() => {
+                setScannedQrCode(null);
+                navigate("escanear-qr", "qr");
+              }}
+              onViewReference={(reference) => {
+                setEditId(reference.recId);
+                navigate("editar-recepcion", "recepciones");
+              }}
+            />
+          )}
           {screen === "evidencias" && <Evidencias />}
           {screen === "evidencia-detalle" && selectedEvidencia && <EvidenciaDetalle />}
           {screen === "lotes-caducidades" && <LotesCaducidades />}

@@ -9,6 +9,12 @@
 // Navigation & Screen Types
 // ============================================
 
+// The canonical planned-pallet shape lives with the Firestore contract; the
+// reception UI stores those documents verbatim.
+import type { PlannedReceptionPallet } from "@/services/firestore/types";
+
+export type { PlannedReceptionPallet };
+
 /** All possible screen identifiers in the application */
 export type Screen =
   | "home"
@@ -106,7 +112,26 @@ export interface ReceptionData {
   logisticsProvider?: string;
   scheduledDate?: string;
   productos: ReceptionProducto[];
-  conversionesTabla?: ConversionTableRow[];
+  conversionesTabla?: ReceptionConversionRow[];
+}
+
+/**
+ * Conversion row used by the reception UI: one row per received product with
+ * the pallet/sticker breakdown the operator works with. This is the shape
+ * produced by the reception wizard and consumed by CapturaTarima and
+ * ImpresionEtiquetas; ConversionTableRow is the planning-domain shape.
+ */
+export interface ReceptionConversionRow {
+  producto: string;
+  productId?: string | null;
+  codigo: string;
+  unidades: number;
+  unidad: string;
+  piezasPorCaja: number;
+  cajasPorTarima: number;
+  cajas: number;
+  tarimas: number;
+  stickers: number;
 }
 
 /** Product in reception (UI state) */
@@ -119,18 +144,6 @@ export interface ReceptionProducto {
   precio: number;
   importe: number;
   estadoMatch: "confirmado" | "sugerido" | "manual";
-}
-
-/** Planned reception pallet from Firestore */
-export interface PlannedReceptionPallet {
-  lineIndex: number;
-  productId?: string;
-  productName: string;
-  unit: string;
-  quantity: number;
-  cajasPorTarima: number;
-  targetTarimas: number;
-  qrPayload: string;
 }
 
 /** Evidence item for listing */
