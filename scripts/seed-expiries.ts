@@ -44,6 +44,8 @@ function encode(lot: Lot): Record<string, Value> {
     lot: { stringValue: lot.lot },
     monthKey: { stringValue: lot.monthKey },
     expiryDate: { timestampValue: `${lot.expiryDate}T00:00:00Z` },
+    createdAt: { timestampValue: `${catalog.sourceDate}T00:00:00Z` },
+    updatedAt: { timestampValue: `${catalog.sourceDate}T00:00:00Z` },
     cajas: { integerValue: String(lot.cajas) },
     sourceFile: { stringValue: catalog.sourceFile },
     sourceRow: { stringValue: lot.sourceRow },
