@@ -27,7 +27,8 @@
     "seed:expiries": "tsx scripts/seed-expiries.ts",
     "audit:legacy": "tsx scripts/audit-legacy-firestore.ts",
     "backfill:expiry-lots": "tsx scripts/backfill-expiry-lots.ts",
-    "backfill:lot-timestamps": "tsx scripts/backfill-lot-timestamps.ts"
+    "backfill:lot-timestamps": "tsx scripts/backfill-lot-timestamps.ts",
+    "backfill:movement-timestamps": "tsx scripts/backfill-movement-timestamps.ts"
   },
   "dependencies": {
     "@sentry/react": "^11.4.0",

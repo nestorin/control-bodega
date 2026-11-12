@@ -693,11 +693,15 @@ export class InventoryMovementService extends BaseService<InventoryMovementDoc> 
     warehouseId: string,
     productId: string,
   ): Promise<InventoryMovementDoc[]> {
+    // Movement documents are written with `occurredAt` and carry no `createdAt`,
+    // so ordering by `createdAt` makes Firestore drop them from the result and,
+    // in production, fails with FAILED_PRECONDITION for the missing composite index.
     const result = await this.getAll({
       where: [
         ["warehouseId", "==", warehouseId],
         ["productId", "==", productId],
       ],
+      orderBy: null,
     });
     return result.data;
   }
