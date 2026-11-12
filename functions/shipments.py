@@ -1,9 +1,12 @@
 """Authoritative shipment confirmation transaction for Firestore."""
 from firebase_functions import https_fn
 from firebase_functions.options import CorsOptions
-from firebase_admin import firestore, initialize_app
+from firebase_admin import firestore, get_app, initialize_app
 
-initialize_app()
+try:
+    get_app()
+except ValueError:
+    initialize_app()
 
 ORG_ID = "org_exepa_001"
 WAREHOUSE_IDS = {"wh_tehuacan_1", "wh_tehuacan_2"}
@@ -208,6 +211,9 @@ def confirm_shipment(req: https_fn.CallableRequest):
                 "unit": line.get("unit", "pallet"),
                 "operationId": operation_id,
                 "actorUserId": uid,
+                "createdAt": firestore.SERVER_TIMESTAMP,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+                "occurredAt": firestore.SERVER_TIMESTAMP,
             })
         transaction.set(confirmation_ref, {
             "shipmentId": shipment_id,

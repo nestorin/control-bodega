@@ -533,6 +533,112 @@ class ReceptionCommandContractTests(unittest.TestCase):
         self.assertEqual(transaction.updates, [])
         self.assertEqual(len(transaction.sets), 1)  # only the new operation receipt
 
+    def test_register_pallet_movement_write_includes_created_and_updated_timestamps(self):
+        class Reference:
+            def __init__(self, path):
+                self.path = path
+                self.id = path.rsplit("/", 1)[-1]
+
+            def collection(self, collection_id):
+                return Collection(f"{self.path}/{collection_id}")
+
+            def document(self, document_id=None):
+                return Reference(f"{self.path}/{document_id or 'generated'}")
+
+        class Collection:
+            def __init__(self, path):
+                self.path = path
+
+            def document(self, document_id=None):
+                return Reference(f"{self.path}/{document_id or 'generated'}")
+
+        class Snapshot:
+            def __init__(self, data=None):
+                self.exists = data is not None
+                self._data = data
+
+            def to_dict(self):
+                return self._data
+
+        class Transaction:
+            def __init__(self, documents):
+                self.documents = documents
+                self.sets = []
+                self.updates = []
+
+            def get(self, reference):
+                return Snapshot(self.documents.get(reference.path))
+
+            def set(self, reference, data):
+                self.sets.append((reference, data))
+
+            def update(self, reference, data):
+                self.updates.append((reference, data))
+
+        class Database:
+            def __init__(self, transaction):
+                self._transaction = transaction
+
+            def collection(self, collection_id):
+                return Collection(collection_id)
+
+            def transaction(self):
+                return self._transaction
+
+        reception_id = "reception-1"
+        qr_identifier = "TQR-reception-1-001"
+        root = f"organizations/{receptions.ORG_ID}"
+        transaction = Transaction({
+            f"{root}/receptions/{reception_id}": {
+                "organizationId": receptions.ORG_ID,
+                "warehouseId": "wh_tehuacan_1",
+                "status": "IN_PROGRESS",
+                "version": 4,
+                "plannedPallets": [{
+                    "palletId": "pallet-reception-1-001",
+                    "receptionId": reception_id,
+                    "palletNumber": 1,
+                    "productId": "product-1",
+                    "productName": "Agua mineral",
+                    "quantity": 24,
+                    "unit": "cajas",
+                    "qrIdentifier": qr_identifier,
+                    "status": "IN_CAPTURE",
+                    "activated": False,
+                    "lot": "L-001",
+                    "expiryDate": "2027-03-15",
+                }],
+            },
+        })
+        request = SimpleNamespace(data={
+            "operationId": "register-pallet-timestamps-1",
+            "receptionId": reception_id,
+            "warehouseId": "wh_tehuacan_1",
+            "productId": "product-1",
+            "qrIdentifier": qr_identifier,
+            "quantity": 24,
+            "unit": "cajas",
+            "lot": "L-001",
+            "expiryDate": "2027-03-15",
+        })
+
+        with (
+            patch.object(receptions.firestore, "client", return_value=Database(transaction)),
+            patch.object(receptions.firestore, "transactional", side_effect=lambda callback: callback),
+            patch.object(receptions, "_check_actor", return_value={"userId": "operator-1"}),
+        ):
+            inspect.unwrap(receptions.register_reception_pallet)(request)
+
+        movement_writes = [write for write in transaction.sets if "/inventory_movements/" in write[0].path]
+        self.assertEqual(len(movement_writes), 1)
+        _, movement = movement_writes[0]
+        self.assertIn("createdAt", movement)
+        self.assertIn("updatedAt", movement)
+        self.assertIn("occurredAt", movement)
+        self.assertIs(movement["createdAt"], firestore.SERVER_TIMESTAMP)
+        self.assertIs(movement["updatedAt"], firestore.SERVER_TIMESTAMP)
+        self.assertIs(movement["occurredAt"], firestore.SERVER_TIMESTAMP)
+
 
 if __name__ == "__main__":
     unittest.main()

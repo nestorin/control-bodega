@@ -709,7 +709,8 @@ def register_reception_pallet(req: https_fn.CallableRequest):
             "palletId": pallet_id, "productId": product_id, "movementType": "RECEIPT",
             "direction": "IN", "quantity": quantity, "unit": _string(data.get("unit", "cajas"), "unit", 32),
             "lot": lot, "expiryDate": expiry_value, "operationId": operation_id,
-            "actorUserId": actor["userId"], "occurredAt": now})
+            "actorUserId": actor["userId"], "occurredAt": now,
+            "createdAt": now, "updatedAt": now})
         if existing_lot is None:
             transaction.set(lot_ref, {
                 "id": lot_projection_id,

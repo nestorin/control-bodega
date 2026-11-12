@@ -166,6 +166,8 @@ def adjust_inventory(req: https_fn.CallableRequest):
             "operationId": operation_id,
             "actorUserId": uid,
             "occurredAt": now,
+            "createdAt": now,
+            "updatedAt": now,
         })
         transaction.set(audit_ref, {
             "organizationId": ORG_ID,
@@ -381,6 +383,7 @@ def import_inventory(req: https_fn.CallableRequest):
                 "movementType": "ADJUSTMENT", "direction": "IN" if delta > 0 else "OUT",
                 "quantity": abs(delta), "unit": "cajas", "operationId": f"{operation_id}:{movement_count}",
                 "actorUserId": uid, "occurredAt": firestore.SERVER_TIMESTAMP,
+                "createdAt": firestore.SERVER_TIMESTAMP, "updatedAt": firestore.SERVER_TIMESTAMP,
             })
             movement_count += 1
         transaction.set(operation_ref, {"kind": "inventory_import", "mode": mode, "movementCount": movement_count, "actorUserId": uid, "operationId": operation_id, "createdAt": firestore.SERVER_TIMESTAMP})
