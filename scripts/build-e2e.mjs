@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const projectId = "demo-exepa-e2e";
 const emulatorPorts = JSON.parse(
@@ -7,6 +8,41 @@ const emulatorPorts = JSON.parse(
 );
 const ocrEmulatorUrl = `http://127.0.0.1:${emulatorPorts.functions}/${projectId}/us-central1`;
 const useMockAuth = process.env.VITE_USE_MOCK_AUTH !== "false";
+
+// The Firestore domain flags live in a single shared file that the production
+// Hosting build also consumes. Reading it here keeps the E2E bundle on exactly
+// the configuration production ships, so the E2E suite can no longer validate a
+// build that differs from the deployed one.
+const firestoreDomainFlagsFile = new URL("../config/firestore-domain-flags.env", import.meta.url);
+
+function readFirestoreDomainFlags(url) {
+  const filePath = fileURLToPath(url);
+  const contents = readFileSync(url, "utf8");
+  const flags = {};
+  let lineNumber = 0;
+
+  for (const rawLine of contents.split(/\r?\n/)) {
+    lineNumber += 1;
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+
+    const match = /^(VITE_FIRESTORE_[A-Z_]+)=(true|false)$/.exec(line);
+    if (!match) {
+      throw new Error(
+        `Malformed Firestore domain flag on line ${lineNumber} of ${filePath}: "${rawLine}"`,
+      );
+    }
+    flags[match[1]] = match[2];
+  }
+
+  if (Object.keys(flags).length === 0) {
+    throw new Error(`No Firestore domain flags are defined in ${filePath}`);
+  }
+
+  return flags;
+}
+
+const firestoreDomainFlags = readFirestoreDomainFlags(firestoreDomainFlagsFile);
 
 for (const [name, value] of Object.entries({
   VITE_FIREBASE_PROJECT_ID: process.env.VITE_FIREBASE_PROJECT_ID,
@@ -51,13 +87,7 @@ const child = spawnSync("pnpm", ["run", "build"], {
     VITE_RECAPTCHA_SITE_KEY: "e2e-recaptcha-site-key",
     VITE_OCR_URL: ocrEmulatorUrl,
     VITE_SENTRY_DSN: "",
-    VITE_FIRESTORE_CATALOGOS: "true",
-    VITE_FIRESTORE_RECEPCIONES: "true",
-    VITE_FIRESTORE_EVIDENCIAS: "true",
-    VITE_FIRESTORE_INVENTARIO: "true",
-    VITE_FIRESTORE_LOTES: "true",
-    VITE_FIRESTORE_EMBARQUES: "true",
-    VITE_FIRESTORE_OFFLINE_QUEUE: "true",
+    ...firestoreDomainFlags,
     VITE_USE_NEW_RECEPTION_FLOW: "true",
   },
 });
