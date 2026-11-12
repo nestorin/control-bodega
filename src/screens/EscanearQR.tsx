@@ -23,9 +23,11 @@ export default function EscanearQR() {
 
   // Legacy callbacks replaced by navigation
   const onFound = (id: string) => {
-    // Store scanned QR in context, then navigate to captura-tarima
+    // Store the scanned QR in the context and open the pallet detail. The
+    // detail screen resolves the pallet from Firestore, so an unknown code
+    // ends in the explicit "Tarima no encontrada" state instead of a dead end.
     ctxSetScannedQrCode(id);
-    navigate("captura-tarima");
+    navigate("tarima-detalle", "qr");
   };
 
   const onClose = () => {
