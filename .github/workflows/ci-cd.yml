@@ -163,8 +163,11 @@ jobs:
           functions/venv/bin/python -m pip install --disable-pip-version-check -r functions/requirements.txt
 
       # The backend carries its own contract tests (authorization boundaries,
-      # validation, write payloads). They run against the same virtualenv the
-      # emulator uses, so they cost no extra install time and gate every push.
+      # validation, write payloads). They run in this job and reuse the
+      # virtualenv it already builds, so they cost no extra install time and
+      # gate every push. The E2E job starts only the auth, firestore and
+      # storage emulators, so this suite is the backend's only automated
+      # coverage.
       - name: Run Functions unit tests
         run: functions/venv/bin/python -m unittest discover -s functions -p "test_*.py" -t functions
 

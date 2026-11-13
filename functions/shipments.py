@@ -3,6 +3,8 @@ from firebase_functions import https_fn
 from firebase_functions.options import CorsOptions
 from firebase_admin import firestore, get_app, initialize_app
 
+from rbac import _warehouse_allowed
+
 try:
     get_app()
 except ValueError:
@@ -95,7 +97,10 @@ def confirm_shipment(req: https_fn.CallableRequest):
         warehouse_id = shipment.get("warehouseId")
         if warehouse_id not in WAREHOUSE_IDS:
             raise _error("Shipment warehouse is not canonical")
-        if member.get("role") != "ADMIN" and member.get("warehouseId") != warehouse_id:
+        # The Firestore rules grant ADMIN and SUPER_ADMIN global warehouse access,
+        # the inventory callables already implement that, and production memberships
+        # rely on it, so reuse the same scope rule here.
+        if not _warehouse_allowed(member, warehouse_id):
             raise https_fn.HttpsError("permission-denied", "Warehouse access denied")
 
         confirmation = transaction.get(confirmation_ref)

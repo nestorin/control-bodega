@@ -185,6 +185,85 @@ class MembershipRoleGateTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "failed-precondition")
         self.assertEqual(raised.exception.message, "Active organization membership required")
 
+    def _run_update_membership(self, role, warehouse_ids=None):
+        actor_uid = "admin-1"
+        target_uid = "target-1"
+        documents = {
+            f"organizations/{rbac.ORG_ID}/users/{actor_uid}": {
+                "userId": actor_uid,
+                "organizationId": rbac.ORG_ID,
+                "status": "ACTIVE",
+                "role": "ADMIN",
+                "warehouseId": "wh_tehuacan_1",
+            },
+            f"organizations/{rbac.ORG_ID}/users/{target_uid}": {
+                "userId": target_uid,
+                "organizationId": rbac.ORG_ID,
+                "status": "ACTIVE",
+                "role": "SUPERVISOR",
+                "warehouseId": "wh_tehuacan_1",
+            },
+        }
+        transaction = _Transaction(documents)
+        data = {
+            "operationId": "membership-operation-1",
+            "targetUid": target_uid,
+            "role": role,
+            "status": "ACTIVE",
+        }
+        if warehouse_ids is not None:
+            data["warehouseIds"] = list(warehouse_ids)
+        request = SimpleNamespace(
+            auth=SimpleNamespace(uid=actor_uid, token={}),
+            data=data,
+        )
+
+        with (
+            patch.object(rbac.firestore, "client", return_value=_Database(documents, transaction)),
+            patch.object(rbac.firestore, "transactional", side_effect=lambda callback: callback),
+        ):
+            result = inspect.unwrap(rbac.update_membership)(request)
+
+        return result, transaction
+
+    def test_update_membership_accepts_a_super_admin_without_warehouse_scope(self):
+        result, transaction = self._run_update_membership("SUPER_ADMIN")
+
+        self.assertFalse(result["idempotent"])
+        membership_write = transaction.updates[0][1]
+        self.assertEqual(membership_write["role"], "SUPER_ADMIN")
+        self.assertEqual(membership_write["warehouseIds"], [])
+
+    def test_update_membership_accepts_a_super_admin_with_warehouse_scope(self):
+        result, transaction = self._run_update_membership(
+            "SUPER_ADMIN", warehouse_ids=["wh_tehuacan_1", "wh_tehuacan_2"]
+        )
+
+        self.assertFalse(result["idempotent"])
+        membership_write = transaction.updates[0][1]
+        self.assertEqual(membership_write["role"], "SUPER_ADMIN")
+        self.assertEqual(
+            membership_write["warehouseIds"], ["wh_tehuacan_1", "wh_tehuacan_2"]
+        )
+
+    def test_update_membership_still_rejects_a_warehouse_scope_for_admin(self):
+        with self.assertRaises(https_fn.HttpsError) as raised:
+            self._run_update_membership("ADMIN", warehouse_ids=["wh_tehuacan_1"])
+
+        self.assertEqual(raised.exception.code, "invalid-argument")
+        self.assertEqual(
+            raised.exception.message, "ADMIN must have global warehouse scope"
+        )
+
+    def test_update_membership_still_requires_a_warehouse_scope_for_scoped_roles(self):
+        with self.assertRaises(https_fn.HttpsError) as raised:
+            self._run_update_membership("SUPERVISOR")
+
+        self.assertEqual(raised.exception.code, "invalid-argument")
+        self.assertEqual(
+            raised.exception.message, "Active membership requires warehouse scope"
+        )
+
 
 class InventoryImportQueryRegressionTests(unittest.TestCase):
     def _run_import(self, mode, rows, movements):

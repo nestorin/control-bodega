@@ -53,7 +53,12 @@ def _auth_uid(req: https_fn.CallableRequest) -> str:
 
 
 def _is_super_admin(req: https_fn.CallableRequest) -> bool:
-    """SUPER_ADMIN is a custom Auth claim, never a Firestore membership role."""
+    """Report the optional Auth claim fast path for SUPER_ADMIN.
+
+    The Firestore membership role is the primary source of truth for
+    SUPER_ADMIN; the ``superAdmin`` custom claim is only an optional
+    shortcut for callers that already carry it.
+    """
     token = getattr(req.auth, "token", None) if req.auth is not None else None
     return isinstance(token, dict) and token.get("superAdmin") is True
 
@@ -241,7 +246,10 @@ def update_membership(req: https_fn.CallableRequest):
         raise https_fn.HttpsError("invalid-argument", "warehouseId and warehouseIds disagree")
     if role == "ADMIN" and requested_warehouse_ids:
         raise https_fn.HttpsError("invalid-argument", "ADMIN must have global warehouse scope")
-    if role != "ADMIN" and status == "ACTIVE" and not requested_warehouse_ids:
+    # Firestore rules grant ADMIN and SUPER_ADMIN global warehouse access, the
+    # inventory callables already implement that, and production memberships rely
+    # on it, so SUPER_ADMIN may omit the scope or carry it without narrowing access.
+    if role not in {"ADMIN", "SUPER_ADMIN"} and status == "ACTIVE" and not requested_warehouse_ids:
         raise https_fn.HttpsError("invalid-argument", "Active membership requires warehouse scope")
     compatibility_warehouse_id = (
         requested_warehouse_ids[0] if len(requested_warehouse_ids) == 1 else None
