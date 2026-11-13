@@ -10,7 +10,10 @@ except ValueError:
 
 ORG_ID = "org_exepa_001"
 WAREHOUSE_IDS = {"wh_tehuacan_1", "wh_tehuacan_2"}
-ALLOWED_ROLES = {"OPERATOR", "SUPERVISOR", "AUDITOR", "ADMIN"}
+# SUPER_ADMIN is a real Firestore membership role: firestore.rules grants it the
+# same authority as ADMIN, receptions.py already accepts it, and production
+# memberships carry it.
+ALLOWED_ROLES = {"OPERATOR", "SUPERVISOR", "AUDITOR", "ADMIN", "SUPER_ADMIN"}
 
 # CORS configuration for production domain
 ALLOWED_ORIGIN = "https://exepa-almacen-safe.web.app"

@@ -26,9 +26,12 @@ WAREHOUSE_ALIASES = {
     "ALM-001": "wh_tehuacan_1", "ALM-002": "wh_tehuacan_2",
     "warehouse-1": "wh_tehuacan_1", "warehouse-2": "wh_tehuacan_2",
 }
+# SUPER_ADMIN is a real Firestore membership role: firestore.rules grants it the
+# same authority as ADMIN, receptions.py already accepts it, and production
+# memberships carry it.
 ROLES = {
     "OPERATOR", "SUPERVISOR", "AUDITOR", "ADMIN",
-    "AUXILIAR_ALMACENISTA", "ALMACENISTA", "GERENTE_ALMACEN",
+    "AUXILIAR_ALMACENISTA", "ALMACENISTA", "GERENTE_ALMACEN", "SUPER_ADMIN",
 }
 # PENDING is gone: open sign-up provisions ACTIVE profiles directly, so there
 # is no approval queue for an admin to move anyone out of.

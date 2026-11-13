@@ -7,7 +7,7 @@ from firebase_admin import firestore
 from firebase_functions import https_fn
 
 import rbac
-from rbac import _membership, _validate_inventory_import_write_count
+from rbac import _actor, _membership, _validate_inventory_import_write_count
 
 
 class InventoryImportTransactionBudgetTests(unittest.TestCase):
@@ -105,6 +105,85 @@ class _Database:
 
     def transaction(self):
         return self._transaction
+
+
+class MembershipRoleGateTests(unittest.TestCase):
+    """Regression coverage for SUPER_ADMIN as a real Firestore membership role."""
+
+    def _database_with_membership(self, uid, member):
+        documents = {
+            f"organizations/{rbac.ORG_ID}/users/{uid}": member,
+        }
+        return _Database(documents, _Transaction(documents))
+
+    def _active_member(self, uid, role):
+        return {
+            "userId": uid,
+            "organizationId": rbac.ORG_ID,
+            "status": "ACTIVE",
+            "role": role,
+            "warehouseId": "wh_tehuacan_1",
+        }
+
+    def test_super_admin_membership_is_accepted_by_the_membership_gate(self):
+        uid = "super-admin-1"
+        database = self._database_with_membership(
+            uid, self._active_member(uid, "SUPER_ADMIN")
+        )
+
+        member = _membership(database, uid)
+
+        self.assertEqual(member["role"], "SUPER_ADMIN")
+        self.assertEqual(member["status"], "ACTIVE")
+        self.assertEqual(member["organizationId"], rbac.ORG_ID)
+
+    def test_actor_returns_super_admin_membership_without_the_auth_claim(self):
+        uid = "super-admin-2"
+        database = self._database_with_membership(
+            uid, self._active_member(uid, "SUPER_ADMIN")
+        )
+        request = SimpleNamespace(auth=SimpleNamespace(uid=uid, token={}))
+
+        actor = _actor(request, database)
+
+        self.assertEqual(actor["role"], "SUPER_ADMIN")
+        self.assertEqual(actor["userId"], uid)
+        self.assertEqual(actor["organizationId"], rbac.ORG_ID)
+        self.assertEqual(actor["status"], "ACTIVE")
+
+    def test_previously_accepted_membership_roles_are_still_accepted(self):
+        for role in ("ALMACENISTA", "ADMIN"):
+            with self.subTest(role=role):
+                uid = f"member-{role.lower()}"
+                database = self._database_with_membership(
+                    uid, self._active_member(uid, role)
+                )
+
+                self.assertEqual(_membership(database, uid)["role"], role)
+
+    def test_inactive_super_admin_membership_is_still_rejected(self):
+        uid = "super-admin-3"
+        member = self._active_member(uid, "SUPER_ADMIN")
+        member["status"] = "INACTIVE"
+        database = self._database_with_membership(uid, member)
+
+        with self.assertRaises(https_fn.HttpsError) as raised:
+            _membership(database, uid)
+
+        self.assertEqual(raised.exception.code, "failed-precondition")
+        self.assertEqual(raised.exception.message, "Active organization membership required")
+
+    def test_unknown_membership_role_is_still_rejected(self):
+        uid = "member-unknown-role"
+        database = self._database_with_membership(
+            uid, self._active_member(uid, "ROOT")
+        )
+
+        with self.assertRaises(https_fn.HttpsError) as raised:
+            _membership(database, uid)
+
+        self.assertEqual(raised.exception.code, "failed-precondition")
+        self.assertEqual(raised.exception.message, "Active organization membership required")
 
 
 class InventoryImportQueryRegressionTests(unittest.TestCase):

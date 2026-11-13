@@ -227,6 +227,144 @@ class ShipmentMovementTimestampTests(unittest.TestCase):
         self.assertIs(movement["occurredAt"], firestore.SERVER_TIMESTAMP)
 
 
+class ShipmentSuperAdminMembershipTests(unittest.TestCase):
+    """Regression coverage for SUPER_ADMIN as a real Firestore membership role."""
+
+    def test_confirm_shipment_accepts_a_super_admin_membership(self):
+        class Snapshot:
+            def __init__(self, data=None, reference=None):
+                self.exists = data is not None
+                self._data = data
+                self.reference = reference
+
+            def to_dict(self):
+                return self._data
+
+        class Reference:
+            def __init__(self, path):
+                self.path = path
+                self.id = path.rsplit("/", 1)[-1]
+
+            def collection(self, collection_id):
+                return Collection(f"{self.path}/{collection_id}")
+
+            def document(self, document_id=None):
+                return Reference(f"{self.path}/{document_id or 'generated'}")
+
+        class Collection:
+            def __init__(self, path):
+                self.path = path
+
+            def document(self, document_id=None):
+                return Reference(f"{self.path}/{document_id or 'generated'}")
+
+            def where(self, *_args):
+                return Query(self.path)
+
+        class CollectionGroup:
+            def __init__(self, group_id):
+                self.path = group_id
+
+            def where(self, *_args):
+                return Query(self.path)
+
+        class Query:
+            def __init__(self, path):
+                self.path = path
+
+            def where(self, *_args):
+                return self
+
+            def limit(self, _count):
+                return self
+
+        class Transaction:
+            def __init__(self, documents, queries):
+                self.documents = documents
+                self.queries = queries
+                self.sets = []
+                self.updates = []
+
+            def get(self, reference):
+                if isinstance(reference, Query):
+                    return list(self.queries.get(reference.path, []))
+                return self.documents.get(reference.path, Snapshot())
+
+            def set(self, reference, data, **_kwargs):
+                self.sets.append((reference, data))
+
+            def update(self, reference, data):
+                self.updates.append((reference, data))
+
+        class Database:
+            def __init__(self, transaction):
+                self._transaction = transaction
+
+            def document(self, path):
+                return Reference(path)
+
+            def collection(self, collection_id):
+                return Collection(collection_id)
+
+            def collection_group(self, group_id):
+                return CollectionGroup(group_id)
+
+            def transaction(self):
+                return self._transaction
+
+        org_id = shipments.ORG_ID
+        shipment_id = "shipment-1"
+        warehouse_id = "wh_tehuacan_1"
+        product_id = "product-1"
+        pallet_id = "pallet-1"
+        documents = {
+            f"organizations/{org_id}/users/super-admin-1": Snapshot({
+                "userId": "super-admin-1",
+                "organizationId": org_id,
+                "status": "ACTIVE",
+                "role": "SUPER_ADMIN",
+                "warehouseId": warehouse_id,
+            }),
+            f"organizations/{org_id}/shipments/{shipment_id}": Snapshot({
+                "organizationId": org_id,
+                "warehouseId": warehouse_id,
+                "status": "IN_PROGRESS",
+                "lines": [{
+                    "productId": product_id,
+                    "quantity": 1,
+                    "unit": "pallet",
+                    "palletsScanned": [pallet_id],
+                }],
+            }),
+        }
+        queries = {
+            f"organizations/{org_id}/inventory_movements": [
+                Snapshot({"direction": "IN", "quantity": 5}),
+            ],
+            "pallets": [
+                Snapshot(
+                    {"id": pallet_id, "productId": product_id},
+                    Reference(f"organizations/{org_id}/pallets/{pallet_id}"),
+                ),
+            ],
+        }
+        transaction = Transaction(documents, queries)
+        request = SimpleNamespace(
+            auth=SimpleNamespace(uid="super-admin-1"),
+            data={"shipmentId": shipment_id, "operationId": "shipment-operation-1"},
+        )
+
+        with (
+            patch.object(shipments.firestore, "client", return_value=Database(transaction)),
+            patch.object(shipments.firestore, "transactional", side_effect=lambda callback: callback),
+        ):
+            result = inspect.unwrap(shipments.confirm_shipment)(request)
+
+        self.assertEqual(result["shipmentId"], shipment_id)
+        self.assertEqual(result["status"], "COMPLETED")
+        self.assertFalse(result["idempotent"])
+
+
 class ShipmentModuleInitializationTests(unittest.TestCase):
     def test_reimporting_the_module_does_not_fail_when_the_default_app_exists(self):
         import firebase_admin
