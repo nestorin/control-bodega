@@ -3,6 +3,7 @@ from firebase_functions import https_fn
 from firebase_functions.options import CorsOptions
 from firebase_admin import firestore, get_app, initialize_app
 
+from firestore_transactions import read_document, read_documents
 from rbac import _warehouse_allowed
 
 try:
@@ -76,8 +77,8 @@ def confirm_shipment(req: https_fn.CallableRequest):
 
     @firestore.transactional
     def _transaction(transaction):
-        membership = transaction.get(membership_ref)
-        if not membership.exists:
+        membership = read_document(transaction, membership_ref)
+        if membership is None or not membership.exists:
             raise _error("Organization membership required")
         member = membership.to_dict() or {}
         if (
@@ -88,8 +89,8 @@ def confirm_shipment(req: https_fn.CallableRequest):
         ):
             raise _error("Active organization membership required")
 
-        shipment_snapshot = transaction.get(shipment_ref)
-        if not shipment_snapshot.exists:
+        shipment_snapshot = read_document(transaction, shipment_ref)
+        if shipment_snapshot is None or not shipment_snapshot.exists:
             raise https_fn.HttpsError("not-found", "Shipment not found")
         shipment = shipment_snapshot.to_dict() or {}
         if shipment.get("organizationId") != ORG_ID:
@@ -103,8 +104,8 @@ def confirm_shipment(req: https_fn.CallableRequest):
         if not _warehouse_allowed(member, warehouse_id):
             raise https_fn.HttpsError("permission-denied", "Warehouse access denied")
 
-        confirmation = transaction.get(confirmation_ref)
-        if confirmation.exists:
+        confirmation = read_document(transaction, confirmation_ref)
+        if confirmation is not None and confirmation.exists:
             previous = confirmation.to_dict() or {}
             if previous.get("operationId") == operation_id:
                 return {"shipmentId": shipment_id, "status": "COMPLETED", "idempotent": True}
@@ -155,7 +156,7 @@ def confirm_shipment(req: https_fn.CallableRequest):
         # Deterministic lock documents serialize confirmations for the same
         # warehouse/product pairs and are read before any transaction writes.
         for lock_ref in lock_refs:
-            transaction.get(lock_ref)
+            read_document(transaction, lock_ref)
 
         # Firestore Python transactions support query reads; stock and pallets
         # are therefore re-read before any writes in the same transaction.
@@ -166,7 +167,7 @@ def confirm_shipment(req: https_fn.CallableRequest):
                 .where("productId", "==", product_id)
             )
             available = 0
-            for movement in transaction.get(movement_query):
+            for movement in read_documents(transaction, movement_query):
                 item = movement.to_dict() or {}
                 if item.get("direction") == "IN" or item.get("movementType") in {"RECEIPT", "TRANSFER"}:
                     available += int(item.get("quantity", 0))
@@ -182,7 +183,7 @@ def confirm_shipment(req: https_fn.CallableRequest):
                 .where("warehouseId", "==", warehouse_id)
                 .where("id", "in", pallet_ids[:30])
             )
-            pallet_snapshots = list(transaction.get(pallet_query))
+            pallet_snapshots = read_documents(transaction, pallet_query)
             pallets_by_id = {
                 (snapshot.to_dict() or {}).get("id"): snapshot.to_dict() or {}
                 for snapshot in pallet_snapshots

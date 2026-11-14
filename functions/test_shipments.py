@@ -71,13 +71,23 @@ class _Transaction:
     def __init__(self, documents, queries):
         self.documents = documents
         self.queries = queries
+        self.reads = []
         self.sets = []
         self.updates = []
 
     def get(self, reference):
         if isinstance(reference, _Query):
-            return list(self.queries.get(reference.path, []))
-        return self.documents.get(reference.path, _Snapshot())
+            snapshots = list(self.queries.get(reference.path, []))
+            return self._read(reference, snapshots)
+        snapshot = self.documents.get(reference.path)
+        snapshots = [] if snapshot is None else [snapshot]
+        return self._read(reference, snapshots)
+
+    def _read(self, reference, snapshots):
+        # Record only when the SDK-style generator is consumed, not when get()
+        # is called, so an accidentally unconsumed read cannot look successful.
+        self.reads.append(reference)
+        yield from snapshots
 
     def set(self, reference, data, **_kwargs):
         self.sets.append((reference, data))
@@ -166,6 +176,79 @@ class ShipmentCompletionValidationTests(unittest.TestCase):
         self.assertEqual(
             transaction.updates,
             [("pallet-reference", {"shipmentId": "shipment-1"})],
+        )
+
+
+class ShipmentTransactionReadRegressionTests(unittest.TestCase):
+    def _confirm_shipment(self):
+        org_id = shipments.ORG_ID
+        shipment_id = "shipment-generator-1"
+        warehouse_id = "wh_tehuacan_1"
+        product_id = "product-1"
+        pallet_id = "pallet-1"
+        documents = {
+            f"organizations/{org_id}/users/operator-1": _Snapshot({
+                "userId": "operator-1",
+                "organizationId": org_id,
+                "status": "ACTIVE",
+                "role": "OPERATOR",
+                "warehouseId": warehouse_id,
+            }),
+            f"organizations/{org_id}/shipments/{shipment_id}": _Snapshot({
+                "organizationId": org_id,
+                "warehouseId": warehouse_id,
+                "status": "IN_PROGRESS",
+                "lines": [{
+                    "productId": product_id,
+                    "quantity": 1,
+                    "unit": "pallet",
+                    "palletsScanned": [pallet_id],
+                }],
+            }),
+        }
+        queries = {
+            f"organizations/{org_id}/inventory_movements": [
+                _Snapshot({"direction": "IN", "quantity": 5}),
+            ],
+            "pallets": [
+                _Snapshot(
+                    {"id": pallet_id, "productId": product_id},
+                    _Reference(f"organizations/{org_id}/pallets/{pallet_id}"),
+                ),
+            ],
+        }
+        transaction = _Transaction(documents, queries)
+        request = SimpleNamespace(
+            auth=SimpleNamespace(uid="operator-1"),
+            data={"shipmentId": shipment_id, "operationId": "shipment-generator-operation-1"},
+        )
+
+        with (
+            patch.object(shipments.firestore, "client", return_value=_Database(transaction)),
+            patch.object(shipments.firestore, "transactional", side_effect=lambda callback: callback),
+        ):
+            result = inspect.unwrap(shipments.confirm_shipment)(request)
+
+        return result, transaction, org_id, shipment_id, warehouse_id, product_id
+
+    def test_confirm_shipment_materializes_generator_document_reads(self):
+        result, transaction, org_id, shipment_id, _, _ = self._confirm_shipment()
+
+        self.assertFalse(result["idempotent"])
+        read_paths = [read.path for read in transaction.reads]
+        self.assertIn(f"organizations/{org_id}/users/operator-1", read_paths)
+        self.assertIn(f"organizations/{org_id}/shipments/{shipment_id}", read_paths)
+        self.assertIn(
+            f"organizations/{org_id}/shipment_confirmations/{shipment_id}",
+            read_paths,
+        )
+
+    def test_confirm_shipment_materializes_generator_lock_read(self):
+        _, transaction, org_id, _, warehouse_id, product_id = self._confirm_shipment()
+
+        self.assertIn(
+            f"organizations/{org_id}/inventory_locks/{warehouse_id}_{product_id}",
+            [read.path for read in transaction.reads],
         )
 
 

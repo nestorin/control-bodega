@@ -74,12 +74,13 @@ class ReceptionCommandContractTests(unittest.TestCase):
                 self.writes = []
 
             def get(self, reference):
-                return Snapshot({
+                snapshot = Snapshot({
                     "warehouseId": "wh_tehuacan_1",
                     "status": "IN_PROGRESS",
                     "version": 2,
                     "plannedPallets": [{"status": "IN_CAPTURE", "activated": False}],
                 } if reference.path.endswith("/receptions/reception-1") else None)
+                return (item for item in [snapshot])
 
             def update(self, *args):
                 self.writes.append(args)
@@ -309,7 +310,9 @@ class ReceptionCommandContractTests(unittest.TestCase):
                 self.sets = []
 
             def get(self, reference):
-                return Snapshot(self.documents.get(reference.path))
+                data = self.documents.get(reference.path)
+                snapshots = [] if data is None else [Snapshot(data)]
+                return (item for item in snapshots)
 
             def set(self, reference, data):
                 self.sets.append((reference, data))
@@ -462,7 +465,9 @@ class ReceptionCommandContractTests(unittest.TestCase):
                 self.updates = []
 
             def get(self, reference):
-                return Snapshot(self.documents.get(reference.path))
+                data = self.documents.get(reference.path)
+                snapshots = [] if data is None else [Snapshot(data)]
+                return (item for item in snapshots)
 
             def set(self, reference, data):
                 self.sets.append((reference, data))
@@ -567,7 +572,9 @@ class ReceptionCommandContractTests(unittest.TestCase):
                 self.updates = []
 
             def get(self, reference):
-                return Snapshot(self.documents.get(reference.path))
+                data = self.documents.get(reference.path)
+                snapshots = [] if data is None else [Snapshot(data)]
+                return (item for item in snapshots)
 
             def set(self, reference, data):
                 self.sets.append((reference, data))
@@ -709,17 +716,16 @@ class ReceptionLinesQueryRegressionTests(unittest.TestCase):
             def get(self, reference):
                 self.reads.append(reference)
                 if isinstance(reference, DependencyQuery):
-                    return []
+                    return (item for item in [])
                 if isinstance(reference, firestore.Query):
                     parent_path = getattr(reference._parent, "path", None)
-                    if parent_path == lines_path:
-                        return [line_snapshot]
-                    return []
+                    snapshots = [line_snapshot] if parent_path == lines_path else []
+                    return (item for item in snapshots)
                 if getattr(reference, "path", None) == reception_path:
-                    return reception_snapshot
+                    return (item for item in [reception_snapshot])
                 if getattr(reference, "path", None) == lines_path:
-                    return []
-                return Snapshot()
+                    return (item for item in [])
+                return (item for item in [])
 
             def delete(self, reference):
                 self.deletes.append(reference)
@@ -829,14 +835,13 @@ class ReceptionLinesQueryRegressionTests(unittest.TestCase):
                 self.reads.append(reference)
                 if isinstance(reference, firestore.Query):
                     parent_path = getattr(reference._parent, "path", None)
-                    if parent_path == lines_path:
-                        return [old_line_snapshot]
-                    return []
+                    snapshots = [old_line_snapshot] if parent_path == lines_path else []
+                    return (item for item in snapshots)
                 if getattr(reference, "path", None) == reception_path:
-                    return reception_snapshot
+                    return (item for item in [reception_snapshot])
                 if getattr(reference, "path", None) == lines_path:
-                    return []
-                return Snapshot()
+                    return (item for item in [])
+                return (item for item in [])
 
             def delete(self, reference):
                 self.deletes.append(reference)

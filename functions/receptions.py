@@ -16,6 +16,7 @@ from firebase_functions import https_fn
 from firebase_functions.options import CorsOptions
 from firebase_admin import firestore, storage
 
+from firestore_transactions import read_document, read_documents
 from rbac import (
     ORG_ID, _actor, _canonical_warehouse_id, _error, _validate_operation_id,
     _warehouse_allowed,
@@ -160,12 +161,8 @@ def _operation_result(snapshot, kind, digest):
     return previous.get("result", {})
 
 
-def _transaction_snapshot(transaction, reference):
-    """Read one document across supported Firestore transaction APIs."""
-    result = transaction.get(reference)
-    if hasattr(result, "exists"):
-        return result
-    return next(iter(result), None)
+# Keep the existing local name while sharing the single transaction-read implementation.
+_transaction_snapshot = read_document
 
 
 def _planned_pallet(reception, qr):
@@ -528,8 +525,7 @@ def edit_reception(req: https_fn.CallableRequest):
             for pallet in existing_plan
         ):
             raise _error("Reception pallet capture has already started")
-        old_lines_snapshot = transaction.get(firestore.Query(lines_ref))
-        old_lines = list(old_lines_snapshot) if old_lines_snapshot is not None else []
+        old_lines = read_documents(transaction, firestore.Query(lines_ref))
         if len(old_lines) + len(normalized_lines) + 3 > 500:
             raise https_fn.HttpsError(
                 "resource-exhausted", "Reception has too many lines to replace atomically"
@@ -945,9 +941,14 @@ def mutate_reception(req: https_fn.CallableRequest):
 
         lines = []
         if action == "DELETE_DRAFT":
-            if _reception_dependencies(lambda query: transaction.get(query), root, reception_ref, reception):
+            if _reception_dependencies(
+                lambda query: read_documents(transaction, query),
+                root,
+                reception_ref,
+                reception,
+            ):
                 raise _error("Reception has dependent records; cancel it instead")
-            lines = list(transaction.get(firestore.Query(reception_ref.collection("lines"))))
+            lines = read_documents(transaction, firestore.Query(reception_ref.collection("lines")))
             if len(lines) + 3 > MAX_TRANSACTION_WRITES:
                 raise _error("Reception has too many lines to delete atomically")
 

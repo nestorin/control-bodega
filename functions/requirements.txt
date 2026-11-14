@@ -1,5 +1,6 @@
 firebase-functions==0.6.0
 firebase-admin==6.9.0
+google-cloud-firestore==2.32.0
 paddleocr==2.7.3
 paddlepaddle==2.6.2
 pillow==10.3.0

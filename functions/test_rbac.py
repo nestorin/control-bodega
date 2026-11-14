@@ -53,12 +53,24 @@ class _Reference:
         return _Snapshot(self._documents.get(self.path))
 
 
+class _Query:
+    def __init__(self, path, filters=()):
+        self.path = path
+        self.filters = list(filters)
+
+    def where(self, field_path, op_string, value):
+        return _Query(self.path, [*self.filters, (field_path, op_string, value)])
+
+
 class _Collection:
     def __init__(self, path):
         self.path = path
 
     def document(self, document_id=None):
         return _Reference(f"{self.path}/{document_id or 'generated'}", {})
+
+    def where(self, field_path, op_string, value):
+        return _Query(self.path, [(field_path, op_string, value)])
 
 
 class _Transaction:
@@ -70,20 +82,41 @@ class _Transaction:
         self.updates = []
 
     def get(self, reference):
-        self.reads.append(reference)
+        if isinstance(reference, _Query):
+            snapshots = []
+            for path, data in self._documents.items():
+                if not path.startswith(f"{reference.path}/"):
+                    continue
+                if all(
+                    data.get(field_path) == value
+                    for field_path, op_string, value in reference.filters
+                    if op_string == "=="
+                ):
+                    snapshots.append(_Snapshot(data))
+            return self._read(reference, snapshots)
         if isinstance(reference, _Collection):
-            return [
+            snapshots = [
                 movement if isinstance(movement, _Snapshot) else _Snapshot(movement)
                 for movement in self._movements
             ]
+            return self._read(reference, snapshots)
         if isinstance(reference, firestore.Query):
             limit = getattr(reference, "_limit", None)
             movements = self._movements if limit is None else self._movements[:limit]
-            return [
+            snapshots = [
                 movement if isinstance(movement, _Snapshot) else _Snapshot(movement)
                 for movement in movements
             ]
-        return _Snapshot(self._documents.get(reference.path))
+            return self._read(reference, snapshots)
+        data = self._documents.get(reference.path)
+        snapshots = [] if data is None else [_Snapshot(data)]
+        return self._read(reference, snapshots)
+
+    def _read(self, reference, snapshots):
+        # Record only when the SDK-style generator is consumed, not when get()
+        # is called, so an accidentally unconsumed read cannot look successful.
+        self.reads.append(reference)
+        yield from snapshots
 
     def set(self, reference, data):
         self.sets.append((reference, data))
@@ -264,6 +297,51 @@ class MembershipRoleGateTests(unittest.TestCase):
             raised.exception.message, "Active membership requires warehouse scope"
         )
 
+    def test_update_membership_materializes_generator_document_and_query_reads(self):
+        actor_uid = "admin-1"
+        target_uid = "target-1"
+        documents = {
+            f"organizations/{rbac.ORG_ID}/users/{actor_uid}": {
+                "userId": actor_uid,
+                "organizationId": rbac.ORG_ID,
+                "status": "ACTIVE",
+                "role": "ADMIN",
+                "warehouseId": "wh_tehuacan_1",
+            },
+            f"organizations/{rbac.ORG_ID}/users/{target_uid}": {
+                "userId": target_uid,
+                "organizationId": rbac.ORG_ID,
+                "status": "ACTIVE",
+                "role": "ADMIN",
+                "warehouseId": "wh_tehuacan_1",
+            },
+        }
+        transaction = _Transaction(documents)
+        request = SimpleNamespace(
+            auth=SimpleNamespace(uid=actor_uid, token={}),
+            data={
+                "operationId": "membership-generator-operation-1",
+                "targetUid": target_uid,
+                "role": "SUPERVISOR",
+                "status": "ACTIVE",
+                "warehouseIds": ["wh_tehuacan_1"],
+            },
+        )
+
+        with (
+            patch.object(rbac.firestore, "client", return_value=_Database(documents, transaction)),
+            patch.object(rbac.firestore, "transactional", side_effect=lambda callback: callback),
+        ):
+            result = inspect.unwrap(rbac.update_membership)(request)
+
+        self.assertFalse(result["idempotent"])
+        admin_queries = [read for read in transaction.reads if isinstance(read, _Query)]
+        self.assertEqual(len(admin_queries), 1)
+        self.assertEqual(admin_queries[0].filters, [
+            ("role", "==", "ADMIN"),
+            ("status", "==", "ACTIVE"),
+        ])
+
 
 class InventoryImportQueryRegressionTests(unittest.TestCase):
     def _run_import(self, mode, rows, movements):
@@ -306,6 +384,20 @@ class InventoryImportQueryRegressionTests(unittest.TestCase):
             write for write in transaction.sets
             if write[0].path.startswith(f"organizations/{rbac.ORG_ID}/inventory_movements/")
         ]
+
+    def test_import_inventory_materializes_generator_operation_read(self):
+        result, transaction = self._run_import(
+            "ADD",
+            [{"productId": "product-1", "warehouseId": "wh_tehuacan_1", "quantity": 3}],
+            [],
+        )
+
+        self.assertFalse(result["idempotent"])
+        self.assertEqual(result["movementCount"], 1)
+        self.assertIn(
+            f"organizations/{rbac.ORG_ID}/inventory_operations/import-add-1",
+            [read.path for read in transaction.reads if hasattr(read, "path")],
+        )
 
     def test_import_inventory_reads_movements_with_a_firestore_query(self):
         result, transaction = self._run_import(
@@ -420,6 +512,43 @@ class InventoryImportQueryRegressionTests(unittest.TestCase):
 
 
 class InventoryMovementTimestampTests(unittest.TestCase):
+    def test_adjust_inventory_materializes_generator_operation_read(self):
+        uid = "operator-1"
+        warehouse_id = "wh_tehuacan_1"
+        documents = {
+            f"organizations/{rbac.ORG_ID}/users/{uid}": {
+                "userId": uid,
+                "organizationId": rbac.ORG_ID,
+                "status": "ACTIVE",
+                "role": "OPERATOR",
+                "warehouseId": warehouse_id,
+            },
+        }
+        transaction = _Transaction(documents)
+        request = SimpleNamespace(
+            auth=SimpleNamespace(uid=uid, token={}),
+            data={
+                "operationId": "adjust-generator-operation-1",
+                "warehouseId": warehouse_id,
+                "productId": "product-1",
+                "movementType": "RECEIPT",
+                "quantity": 3,
+            },
+        )
+
+        with (
+            patch.object(rbac.firestore, "client", return_value=_Database(documents, transaction)),
+            patch.object(rbac.firestore, "transactional", side_effect=lambda callback: callback),
+        ):
+            result = inspect.unwrap(rbac.adjust_inventory)(request)
+
+        self.assertFalse(result["idempotent"])
+        self.assertEqual(result["movementId"], "generated")
+        self.assertIn(
+            f"organizations/{rbac.ORG_ID}/inventory_operations/adjust-generator-operation-1",
+            [read.path for read in transaction.reads if hasattr(read, "path")],
+        )
+
     def test_adjust_inventory_movement_write_includes_created_and_updated_timestamps(self):
         uid = "operator-1"
         warehouse_id = "wh_tehuacan_1"

@@ -8,6 +8,7 @@ before entering a transaction.
 from firebase_functions import https_fn
 from firebase_functions.options import CorsOptions
 from firebase_admin import firestore, get_app, initialize_app
+from firestore_transactions import read_document, read_documents
 import re
 
 try:
@@ -164,8 +165,8 @@ def adjust_inventory(req: https_fn.CallableRequest):
 
     @firestore.transactional
     def _transaction(transaction):
-        previous = transaction.get(operation_ref)
-        if previous.exists:
+        previous = read_document(transaction, operation_ref)
+        if previous is not None and previous.exists:
             result = previous.to_dict() or {}
             if result.get("kind") != "inventory_adjustment":
                 raise _error("Operation id already used")
@@ -264,11 +265,11 @@ def update_membership(req: https_fn.CallableRequest):
 
     @firestore.transactional
     def _transaction(transaction):
-        previous_operation = transaction.get(operation_ref)
-        if previous_operation.exists:
+        previous_operation = read_document(transaction, operation_ref)
+        if previous_operation is not None and previous_operation.exists:
             return {"idempotent": True}
-        target_snapshot = transaction.get(target_ref)
-        if not target_snapshot.exists:
+        target_snapshot = read_document(transaction, target_ref)
+        if target_snapshot is None or not target_snapshot.exists:
             raise https_fn.HttpsError("not-found", "Membership not found")
         target = target_snapshot.to_dict() or {}
         if target.get("organizationId") != ORG_ID or target.get("userId") != target_uid:
@@ -277,10 +278,11 @@ def update_membership(req: https_fn.CallableRequest):
         is_last_admin = target.get("role") == "ADMIN" and target.get("status") == "ACTIVE"
         demoting = role != "ADMIN" or status != "ACTIVE"
         if is_last_admin and demoting:
-            admins = transaction.get(
+            admins = read_documents(
+                transaction,
                 db.collection(f"organizations/{ORG_ID}/users")
                 .where("role", "==", "ADMIN")
-                .where("status", "==", "ACTIVE")
+                .where("status", "==", "ACTIVE"),
             )
             if len(admins) <= 1:
                 raise _error("The last active admin cannot be demoted or deactivated")
@@ -371,8 +373,8 @@ def import_inventory(req: https_fn.CallableRequest):
 
     @firestore.transactional
     def _transaction(transaction):
-        previous = transaction.get(operation_ref)
-        if previous.exists:
+        previous = read_document(transaction, operation_ref)
+        if previous is not None and previous.exists:
             result = previous.to_dict() or {}
             if result.get("kind") != "inventory_import":
                 raise _error("Operation id already used")
@@ -381,7 +383,7 @@ def import_inventory(req: https_fn.CallableRequest):
         movements_query = firestore.Query(
             db.collection(f"organizations/{ORG_ID}/inventory_movements")
         ).limit(MAX_TRANSACTION_READS)
-        movements = list(transaction.get(movements_query))
+        movements = read_documents(transaction, movements_query)
         _validate_inventory_import_read_count(len(movements))
         for snapshot in movements:
             movement = snapshot.to_dict() or {}
