@@ -1,9 +1,9 @@
 """Authoritative shipment confirmation transaction for Firestore."""
 from firebase_functions import https_fn
-from firebase_functions.options import CorsOptions
 from firebase_admin import firestore, get_app, initialize_app
 
 from firestore_transactions import read_document, read_documents
+from http_cors import CORS_OPTS
 from rbac import _warehouse_allowed
 
 try:
@@ -17,11 +17,6 @@ WAREHOUSE_IDS = {"wh_tehuacan_1", "wh_tehuacan_2"}
 # same authority as ADMIN, receptions.py already accepts it, and production
 # memberships carry it.
 ALLOWED_ROLES = {"OPERATOR", "SUPERVISOR", "AUDITOR", "ADMIN", "SUPER_ADMIN"}
-
-# CORS configuration for production domain
-ALLOWED_ORIGIN = "https://exepa-almacen-safe.web.app"
-CORS_OPTS = CorsOptions(cors_origins=[ALLOWED_ORIGIN])
-
 
 def _error(message: str) -> https_fn.HttpsError:
     return https_fn.HttpsError("failed-precondition", message)

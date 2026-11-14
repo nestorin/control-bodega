@@ -9,37 +9,17 @@ here.
 
 from hashlib import sha256
 import json
-import os
 from datetime import date, datetime, time, timezone
 
 from firebase_functions import https_fn
-from firebase_functions.options import CorsOptions
 from firebase_admin import firestore, storage
 
+from http_cors import CORS_OPTS
 from firestore_transactions import read_document, read_documents
 from rbac import (
     ORG_ID, _actor, _canonical_warehouse_id, _error, _validate_operation_id,
     _warehouse_allowed,
 )
-
-# CORS configuration for production domain
-ALLOWED_ORIGIN = "https://exepa-almacen-safe.web.app"
-_EMULATOR_ORIGINS = {
-    "http://127.0.0.1:4173",
-    "http://localhost:4173",
-    "http://127.0.0.1:5173",
-    "http://localhost:5173",
-}
-_FUNCTIONS_EMULATOR = os.environ.get("FUNCTIONS_EMULATOR", "").lower() in {
-    "1",
-    "true",
-}
-CORS_OPTS = CorsOptions(
-    cors_origins=[ALLOWED_ORIGIN, *_EMULATOR_ORIGINS]
-    if _FUNCTIONS_EMULATOR
-    else [ALLOWED_ORIGIN],
-)
-
 
 MAX_LINES = 500
 MAX_TRANSACTION_WRITES = 500

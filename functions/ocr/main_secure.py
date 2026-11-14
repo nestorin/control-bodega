@@ -4,15 +4,12 @@ import base64
 import time
 from functools import wraps
 from firebase_functions import https_fn
-from firebase_functions.options import set_global_options, CorsOptions
+from firebase_functions.options import set_global_options
+from http_cors import CORS_OPTS
 from .paddle_ocr import extract_document, parse_cfdi, parse_orden_compra
 
 # Config global: 2GB RAM, 120s timeout, región us-central1
 set_global_options(region="us-central1", memory=2048, timeout_sec=120)
-
-# CORS configuration for production domain
-ALLOWED_ORIGIN = "https://exepa-almacen-safe.web.app"
-CORS_OPTS = CorsOptions(cors_origins=[ALLOWED_ORIGIN])
 
 # ===== RATE LIMIT: 10 req/min por usuario (en memoria, para demo) =====
 _rate_limit_store: dict[str, list[float]] = {}

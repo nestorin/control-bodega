@@ -6,9 +6,9 @@ before entering a transaction.
 """
 
 from firebase_functions import https_fn
-from firebase_functions.options import CorsOptions
 from firebase_admin import firestore, get_app, initialize_app
 from firestore_transactions import read_document, read_documents
+from http_cors import CORS_OPTS
 import re
 
 try:
@@ -37,11 +37,6 @@ ROLES = {
 # PENDING is gone: open sign-up provisions ACTIVE profiles directly, so there
 # is no approval queue for an admin to move anyone out of.
 MEMBERSHIP_STATUSES = {"ACTIVE", "INACTIVE"}
-
-# CORS configuration for production domain
-ALLOWED_ORIGIN = "https://exepa-almacen-safe.web.app"
-CORS_OPTS = CorsOptions(cors_origins=[ALLOWED_ORIGIN])
-
 
 def _error(message: str) -> https_fn.HttpsError:
     return https_fn.HttpsError("failed-precondition", message)
