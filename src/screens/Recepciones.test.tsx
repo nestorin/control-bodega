@@ -2,6 +2,9 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ReceptionProvider, UIProvider, useReceptionContext } from "@/context";
+import { mergePalletStatuses } from "@/domains/reception/receptionResume";
+import type { PalletDoc } from "@/services/firestore/types";
+import type { PlannedReceptionPallet } from "@/services/firestore/types";
 
 const firestoreScenario = vi.hoisted(() => ({
   enabled: false,
@@ -117,6 +120,9 @@ function ReceptionStateProbe() {
     editReceptionData?.receptionId ??
     (editReceptionData && "id" in editReceptionData ? String(editReceptionData.id) : "");
 
+  const firstPalletStatus = currentReception?.plannedPallets?.[0]?.status ?? "";
+  const secondPalletStatus = currentReception?.plannedPallets?.[1]?.status ?? "";
+
   return (
     <>
       <span data-testid="current-screen">{currentScreen}</span>
@@ -125,6 +131,8 @@ function ReceptionStateProbe() {
       <span data-testid="current-planned-pallets-count">
         {currentReception?.plannedPallets?.length ?? 0}
       </span>
+      <span data-testid="first-pallet-status">{firstPalletStatus}</span>
+      <span data-testid="second-pallet-status">{secondPalletStatus}</span>
       <span data-testid="edit-reception-id">{editReceptionId}</span>
     </>
   );
@@ -140,6 +148,180 @@ function renderRecepciones(props: ComponentProps<typeof Recepciones> = {}) {
     </UIProvider>,
   );
 }
+
+describe("mergePalletStatuses", () => {
+  it("merges real pallet statuses into planned pallets by qrIdentifier", () => {
+    const planned: PlannedReceptionPallet[] = [
+      {
+        qrIdentifier: "TQR-1-001",
+        palletNumber: 1,
+        productId: "prod-1",
+        productName: "Agua",
+        quantity: 10,
+        unit: "cajas",
+        lineIndex: 0,
+        status: "PLANNED",
+      },
+      {
+        qrIdentifier: "TQR-1-002",
+        palletNumber: 2,
+        productId: "prod-1",
+        productName: "Agua",
+        quantity: 10,
+        unit: "cajas",
+        lineIndex: 0,
+        status: "PLANNED",
+      },
+    ];
+
+    const realPallets: PalletDoc[] = [
+      {
+        id: "pallet-1",
+        qrIdentifier: "TQR-1-001",
+        receptionId: "rec-1",
+        warehouseId: "wh-1",
+        productId: "prod-1",
+        quantity: 10,
+        unit: "cajas",
+        status: "RECEIVED",
+        palletNumber: 1,
+        organizationId: "org-1",
+        createdAt: {} as any,
+        updatedAt: {} as any,
+      },
+      {
+        id: "pallet-2",
+        qrIdentifier: "TQR-1-002",
+        receptionId: "rec-1",
+        warehouseId: "wh-1",
+        productId: "prod-1",
+        quantity: 10,
+        unit: "cajas",
+        status: "CREATED",
+        palletNumber: 2,
+        organizationId: "org-1",
+        createdAt: {} as any,
+        updatedAt: {} as any,
+      },
+    ];
+
+    const merged = mergePalletStatuses(planned, realPallets);
+
+    expect(merged[0].status).toBe("RECEIVED");
+    expect(merged[1].status).toBe("PLANNED");
+    // Original planned array should not be mutated
+    expect(planned[0].status).toBe("PLANNED");
+    expect(planned[1].status).toBe("PLANNED");
+  });
+
+  it("keeps planned status when no matching real pallet exists", () => {
+    const planned: PlannedReceptionPallet[] = [
+      {
+        qrIdentifier: "TQR-1-001",
+        palletNumber: 1,
+        productId: "prod-1",
+        productName: "Agua",
+        quantity: 10,
+        unit: "cajas",
+        lineIndex: 0,
+        status: "PLANNED",
+      },
+    ];
+
+    const realPallets: PalletDoc[] = [
+      {
+        id: "pallet-2",
+        qrIdentifier: "TQR-1-002",
+        receptionId: "rec-1",
+        warehouseId: "wh-1",
+        productId: "prod-1",
+        quantity: 10,
+        unit: "cajas",
+        status: "RECEIVED",
+        palletNumber: 2,
+        organizationId: "org-1",
+        createdAt: {} as any,
+        updatedAt: {} as any,
+      },
+    ];
+
+    const merged = mergePalletStatuses(planned, realPallets);
+
+    expect(merged[0].status).toBe("PLANNED");
+  });
+
+  it("maps STORED status to RECEIVED", () => {
+    const planned: PlannedReceptionPallet[] = [
+      {
+        qrIdentifier: "TQR-1-001",
+        palletNumber: 1,
+        productId: "prod-1",
+        productName: "Agua",
+        quantity: 10,
+        unit: "cajas",
+        lineIndex: 0,
+        status: "PLANNED",
+      },
+    ];
+
+    const realPallets: PalletDoc[] = [
+      {
+        id: "pallet-1",
+        qrIdentifier: "TQR-1-001",
+        receptionId: "rec-1",
+        warehouseId: "wh-1",
+        productId: "prod-1",
+        quantity: 10,
+        unit: "cajas",
+        status: "STORED",
+        palletNumber: 1,
+        organizationId: "org-1",
+        createdAt: {} as any,
+        updatedAt: {} as any,
+      },
+    ];
+
+    const merged = mergePalletStatuses(planned, realPallets);
+
+    expect(merged[0].status).toBe("RECEIVED");
+  });
+
+  it("maps BLOCKED status to PLANNED", () => {
+    const planned: PlannedReceptionPallet[] = [
+      {
+        qrIdentifier: "TQR-1-001",
+        palletNumber: 1,
+        productId: "prod-1",
+        productName: "Agua",
+        quantity: 10,
+        unit: "cajas",
+        lineIndex: 0,
+        status: "PLANNED",
+      },
+    ];
+
+    const realPallets: PalletDoc[] = [
+      {
+        id: "pallet-1",
+        qrIdentifier: "TQR-1-001",
+        receptionId: "rec-1",
+        warehouseId: "wh-1",
+        productId: "prod-1",
+        quantity: 10,
+        unit: "cajas",
+        status: "BLOCKED",
+        palletNumber: 1,
+        organizationId: "org-1",
+        createdAt: {} as any,
+        updatedAt: {} as any,
+      },
+    ];
+
+    const merged = mergePalletStatuses(planned, realPallets);
+
+    expect(merged[0].status).toBe("PLANNED");
+  });
+});
 
 describe("Recepciones presentation", () => {
   beforeEach(() => {
@@ -373,10 +555,50 @@ describe("Recepciones presentation", () => {
           status: "PLANNED",
           lineIndex: 0,
         },
+        {
+          qrIdentifier: "TQR-1-002",
+          palletNumber: 2,
+          productName: "Agua",
+          quantity: 10,
+          unit: "cajas",
+          status: "PLANNED",
+          lineIndex: 0,
+        },
       ],
     };
     firestoreScenario.receptions = [reception];
     firestoreScenario.reception = reception;
+    // Real pallets from subcollection: first one RECEIVED, second still PLANNED (CREATED)
+    firestoreScenario.pallets = [
+      {
+        id: "pallet-1",
+        qrIdentifier: "TQR-1-001",
+        receptionId: "reception-in-progress",
+        warehouseId: "warehouse-north",
+        productId: "prod-agua",
+        quantity: 10,
+        unit: "cajas",
+        status: "RECEIVED",
+        palletNumber: 1,
+        organizationId: "org_exepa_001",
+        createdAt: {} as any,
+        updatedAt: {} as any,
+      },
+      {
+        id: "pallet-2",
+        qrIdentifier: "TQR-1-002",
+        receptionId: "reception-in-progress",
+        warehouseId: "warehouse-north",
+        productId: "prod-agua",
+        quantity: 10,
+        unit: "cajas",
+        status: "CREATED",
+        palletNumber: 2,
+        organizationId: "org_exepa_001",
+        createdAt: {} as any,
+        updatedAt: {} as any,
+      },
+    ];
 
     renderRecepciones();
     fireEvent.click(await screen.findByRole("button", { name: "Reanudar recepción REC-RESUME-1" }));
@@ -385,7 +607,10 @@ describe("Recepciones presentation", () => {
       expect(screen.getByTestId("current-screen")).toHaveTextContent("captura-tarima");
       expect(screen.getByTestId("session-state")).toHaveTextContent("pallets");
       expect(screen.getByTestId("current-reception-id")).toHaveTextContent("reception-in-progress");
-      expect(screen.getByTestId("current-planned-pallets-count")).toHaveTextContent("1");
+      expect(screen.getByTestId("current-planned-pallets-count")).toHaveTextContent("2");
+      // Verify merged statuses: first pallet RECEIVED, second PLANNED
+      expect(screen.getByTestId("first-pallet-status")).toHaveTextContent("RECEIVED");
+      expect(screen.getByTestId("second-pallet-status")).toHaveTextContent("PLANNED");
     });
     expect(routerNavigate).toHaveBeenCalledWith("/captura-tarima", { replace: true });
   });

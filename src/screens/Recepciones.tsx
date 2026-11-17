@@ -9,6 +9,7 @@ import { Panel, StatusBadge, TouchTarget } from "@/components/ui";
 import { useReceptionContext, useUIContext } from "@/context";
 import { mapReceptionListItem } from "@/domains/reception/receptionLifecycle";
 import {
+  loadReceptionDataForResume,
   mapReceptionDocToReceptionData,
   resolveResumeTarget,
   type ResumeTargetScreen,
@@ -643,7 +644,10 @@ export default function Recepciones({
       if (target === "editar-recepcion") {
         editReception(doc.id, doc as unknown as ReceptionData);
       } else {
-        setCurrentReception(mapReceptionDocToReceptionData(doc));
+        const mergedData = await loadReceptionDataForResume(fsServices, recId, [
+          WAREHOUSE_IDS.NORTH,
+        ]);
+        setCurrentReception(mergedData);
         transition("pallets");
       }
 

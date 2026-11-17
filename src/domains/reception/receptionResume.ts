@@ -1,4 +1,6 @@
 import type { ReceptionDoc } from "@/services/firestore/types";
+import type { PalletDoc } from "@/services/firestore/types";
+import type { PlannedReceptionPallet } from "@/services/firestore/types";
 import type { ReceptionData, Screen } from "@/types";
 
 export type ResumeTargetScreen = Extract<Screen, "editar-recepcion" | "captura-tarima">;
@@ -50,5 +52,66 @@ export function mapReceptionDocToReceptionData(doc: ReceptionDoc): ReceptionData
       importe: 0,
       estadoMatch: "confirmado",
     })),
+  };
+}
+
+/**
+ * Maps a PalletDoc status (from the pallets/ subcollection) to a
+ * PlannedReceptionPallet status (used by the capture flow).
+ *
+ * The reception document's plannedPallets array is NOT updated when individual
+ * pallets are captured; real pallet status lives in the pallets/ subcollection.
+ * On resume we must merge real statuses so that CapturaTarima can compute the
+ * correct continuation point (first incomplete pallet).
+ */
+function mapPalletDocStatusToPlanned(
+  status: PalletDoc["status"],
+): PlannedReceptionPallet["status"] {
+  switch (status) {
+    case "RECEIVED":
+    case "STORED":
+      return "RECEIVED";
+    case "CREATED":
+      return "PLANNED";
+    case "BLOCKED":
+      return "PLANNED";
+    default:
+      return "PLANNED";
+  }
+}
+
+/**
+ * Merges real pallet statuses from the pallets/ subcollection into plannedPallets.
+ * Returns a new array where each planned pallet has the real status if a matching
+ * pallet exists (matched by qrIdentifier), otherwise keeps the original planned status.
+ */
+export function mergePalletStatuses(
+  plannedPallets: PlannedReceptionPallet[],
+  realPallets: PalletDoc[],
+): PlannedReceptionPallet[] {
+  const realByQr = new Map(realPallets.map((p) => [p.qrIdentifier, p]));
+  return plannedPallets.map((planned) => {
+    const real = realByQr.get(planned.qrIdentifier);
+    if (!real) return planned;
+    return { ...planned, status: mapPalletDocStatusToPlanned(real.status) };
+  });
+}
+
+/**
+ * Loads the real pallets for a reception and merges their statuses into the
+ * ReceptionData that will be passed to CapturaTarima.
+ */
+export async function loadReceptionDataForResume(
+  fsServices: ReturnType<typeof import("@/services/firestore").createFirestoreServices>,
+  receptionId: string,
+  warehouseIds: string[],
+): Promise<ReceptionData> {
+  const doc = await fsServices.receptions.getById(receptionId);
+  if (!doc) throw new Error("Reception not found");
+  const realPallets = await fsServices.pallets.getByReception(receptionId, warehouseIds);
+  const baseData = mapReceptionDocToReceptionData(doc);
+  return {
+    ...baseData,
+    plannedPallets: mergePalletStatuses(baseData.plannedPallets ?? [], realPallets),
   };
 }
