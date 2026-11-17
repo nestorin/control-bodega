@@ -664,7 +664,11 @@ export default function Recepciones({
       } else {
         // Only advance to IN_PROGRESS if still DRAFT (rules require DRAFT -> IN_PROGRESS transition)
         if (doc.status === "DRAFT") {
-          await fsServices.receptions.advanceToInProgress(doc.id, "user", `op-resume-${Date.now()}`);
+          await fsServices.receptions.advanceToInProgress(
+            doc.id,
+            "user",
+            `op-resume-${Date.now()}`,
+          );
         }
         const mergedData = await loadReceptionDataForResume(fsServices, recId, [
           receptionWarehouseId,
