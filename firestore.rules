@@ -237,7 +237,8 @@ service cloud.firestore {
               'id', 'organizationId', 'warehouseId', 'purchaseOrderId',
               'supplierId', 'status', 'operationId', 'receivedAt',
               'actorUserId', 'evidencePhotos', 'invoicePreviewPath',
-              'invoicePreviewUrl', 'draftExpiresAt', 'createdAt', 'updatedAt',
+              'invoicePreviewUrl', 'draftExpiresAt', 'plannedPallets',
+              'createdAt', 'updatedAt',
               'cancelledFromStatus', 'cancelledAt', 'cancelledBy', 'hiddenAt', 'hiddenBy'
             ]) &&
             data.id == receptionId &&
@@ -256,6 +257,8 @@ service cloud.firestore {
               (data.supplierId is string && data.supplierId.size() <= 128)) &&
             (!('receivedAt' in data) || data.receivedAt is timestamp) &&
             (!('draftExpiresAt' in data) || data.draftExpiresAt is timestamp) &&
+            (!('plannedPallets' in data) ||
+              (data.plannedPallets is list && data.plannedPallets.size() <= 500)) &&
             (!('evidencePhotos' in data) ||
               (data.evidencePhotos is map &&
                data.evidencePhotos.keys().hasOnly(['trailer', 'product', 'documentation']) &&
