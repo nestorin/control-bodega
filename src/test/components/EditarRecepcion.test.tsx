@@ -1,12 +1,15 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const mockServices = vi.hoisted(() => ({
   getReception: vi.fn(),
   editReception: vi.fn(),
   getSupplier: vi.fn(),
 }));
+
+const navigateMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/firebase", () => ({ db: {} }));
 vi.mock("@/hooks/useAuthorization", () => ({
@@ -20,8 +23,25 @@ vi.mock("@/services/firestore", () => ({
 }));
 vi.mock("@/config/featureFlags", () => ({ isFeatureEnabled: () => true }));
 
+// Override react-router-dom mock for this test to capture navigate calls
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return {
+    ...actual,
+    useNavigate: () => navigateMock,
+    useLocation: () => ({ pathname: "/" }),
+    useParams: () => ({}),
+  };
+});
+
 import { renderWithAppProviders } from "../../test/utils/renderWithAppProviders";
 import EditarRecepcion from "../../screens/EditarRecepcion";
+
+// Helper to read current router location
+function LocationReader() {
+  const location = useLocation();
+  return <span data-testid="location-path">{location.pathname}</span>;
+}
 
 const receptionDraft = {
   id: "reception-1",
@@ -118,15 +138,39 @@ describe("EditarRecepcion", () => {
   it("loads canonical data and persists allowed draft changes through edit_reception", async () => {
     const onSave = vi.fn();
     renderWithAppProviders(
-      <EditarRecepcion
-        recId="reception-1"
-        suppliers={suppliers}
-        products={products}
-        onBack={vi.fn()}
-        onSave={onSave}
-      />,
+      <>
+        <EditarRecepcion
+          recId="reception-1"
+          suppliers={suppliers}
+          products={products}
+          onBack={vi.fn()}
+          onSave={onSave}
+        />
+        <LocationReader />
+      </>,
       {
         editReceptionData: receptionDraft,
+        currentReception: {
+          ...receptionDraft,
+          hasOC: true,
+          ocFolio: receptionDraft.folio,
+          tarimas: receptionDraft.palletCount,
+          proveedor: receptionDraft.supplierName,
+          proveedorLogistico: receptionDraft.logisticsProvider,
+          receptionId: receptionDraft.id,
+          fechaRecepcion: receptionDraft.scheduledDate,
+          productos: receptionDraft.plannedPallets.map((p, i) => ({
+            productId: p.productId,
+            codigo: null,
+            nombre: p.productName,
+            unidad: p.unit,
+            cantidad: p.quantity,
+            precio: 0,
+            importe: 0,
+            estadoMatch: "confirmado" as const,
+          })),
+          conversionesTabla: [],
+        },
       },
     );
 
@@ -155,7 +199,18 @@ describe("EditarRecepcion", () => {
       { productId: "product-1", quantity: 15, unit: "cajas", palletsCreated: 0 },
     ]);
     expect(args[5]).toBe(4);
-    expect(onSave).toHaveBeenCalledOnce();
+
+    // After saving a DRAFT, continueToEvidence should navigate to captura-evidencia
+    // instead of calling onSave (which goes back to recepciones list)
+    await waitFor(() => {
+      console.log("navigateMock calls:", navigateMock.mock.calls);
+      expect(navigateMock).toHaveBeenCalled();
+    });
+    // Check the last call was to captura-evidencia
+    const lastCall = navigateMock.mock.calls[navigateMock.mock.calls.length - 1];
+    expect(lastCall[0]).toBe("captura-evidencia");
+    // onSave should NOT be called for DRAFTs (new flow continues to evidence)
+    expect(onSave).not.toHaveBeenCalled();
   });
 
   it("renders accurate in-progress reception data as read-only", async () => {

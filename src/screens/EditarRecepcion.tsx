@@ -85,7 +85,7 @@ export default function EditarRecepcion({
     catalogosLoading,
     catalogosError,
   } = useCatalogos();
-  const { editReceptionData } = useReceptionFlow();
+  const { editReceptionData, continueToEvidence } = useReceptionFlow();
 
   // Legacy prop fallbacks: App passes no props, so the context/hook state wins.
   const recId = recIdProp ?? editReceptionData?.receptionId;
@@ -325,7 +325,13 @@ export default function EditarRecepcion({
         reception.version,
       );
       setReception(updated);
-      handleSaveSuccess();
+
+      // After saving a DRAFT, continue to evidence capture instead of going back to list
+      if (editable && updated.status === "DRAFT") {
+        continueToEvidence();
+      } else {
+        handleSaveSuccess();
+      }
     } catch (saveError) {
       setError(receptionErrorMessage(saveError));
     } finally {
