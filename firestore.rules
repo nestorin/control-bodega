@@ -321,7 +321,7 @@ service cloud.firestore {
              resource.data.status == 'IN_PROGRESS' &&
              request.resource.data.status == 'IN_PROGRESS' &&
              (hasOnlyChanged(['plannedPallets']) || hasOnlyChanged(['plannedPallets', 'updatedAt']))
-          );
+          ));
 
         // Cancellation, hiding and deletion require audited backend commands.
         allow delete: if false;
