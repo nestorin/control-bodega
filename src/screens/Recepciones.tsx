@@ -918,11 +918,14 @@ export default function Recepciones({
                 setLoadingFs(true);
                 setErrorFs(null);
                 Promise.all(
-                    accessibleWarehouseIds.map((warehouseId) =>
-                      fsServices?.receptions?.getByWarehouse(warehouseId).catch(() => []),
-                    ),
-                  ).then((results) => {
-                    const allReceptions = results.flat().filter((r): r is ReceptionDoc => r !== undefined);
+                  accessibleWarehouseIds.map((warehouseId) =>
+                    fsServices?.receptions?.getByWarehouse(warehouseId).catch(() => []),
+                  ),
+                )
+                  .then((results) => {
+                    const allReceptions = results
+                      .flat()
+                      .filter((r): r is ReceptionDoc => r !== undefined);
                     const converted = allReceptions.map(toReceptionView);
                     setListaLocal(converted);
                     setLoadingFs(false);

@@ -61,7 +61,8 @@ vi.mock("@/hooks/useAuthorization", () => ({
   useAuthorization: () => ({
     canQuery: firestoreScenario.enabled,
     warehouseIds: ["wh_tehuacan_1", "wh_tehuacan_2"],
-    canAccessWarehouse: (warehouseId: string) => ["wh_tehuacan_1", "wh_tehuacan_2"].includes(warehouseId),
+    canAccessWarehouse: (warehouseId: string) =>
+      ["wh_tehuacan_1", "wh_tehuacan_2"].includes(warehouseId),
     hasAnyRole: () => firestoreScenario.admin,
   }),
   isPermissionDenied: () => false,
