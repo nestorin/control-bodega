@@ -22,7 +22,7 @@
     "seed:suppliers": "tsx scripts/seed-suppliers.ts",
     "migrate:supplier-types": "tsx scripts/migrate-supplier-types.ts",
     "seed:conversions": "tsx scripts/seed-conversions.ts",
-    "lint": "oxfmt --check",
+    "lint": "oxfmt --check --ignore-path .oxfmtignore",
     "typecheck": "tsc --noEmit --skipLibCheck",
     "seed:expiries": "tsx scripts/seed-expiries.ts",
     "audit:legacy": "tsx scripts/audit-legacy-firestore.ts",
