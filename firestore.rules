@@ -315,7 +315,12 @@ service cloud.firestore {
                hasOnlyChanged(['status', 'updatedAt'])) ||
               (resource.data.status == 'IN_PROGRESS' && request.resource.data.status == 'CONFIRMED' &&
                hasOnlyChanged(['status', 'receivedAt', 'updatedAt'])))
-            )
+            ) ||
+            // Operators can update plannedPallets when capturing pallets during IN_PROGRESS
+            (isOperatorOrAbove(orgId) &&
+             resource.data.status == 'IN_PROGRESS' &&
+             request.resource.data.status == 'IN_PROGRESS' &&
+             hasOnlyChanged(['plannedPallets', 'updatedAt']))
           );
 
         // Cancellation, hiding and deletion require audited backend commands.
