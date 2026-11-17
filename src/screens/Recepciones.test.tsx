@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import type { ComponentProps } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ReceptionProvider, UIProvider, useReceptionContext } from "@/context";
 
 const firestoreScenario = vi.hoisted(() => ({
   enabled: false,
@@ -17,6 +19,16 @@ const firestoreScenario = vi.hoisted(() => ({
 }));
 const downloadTarimaQrBatch = vi.hoisted(() => vi.fn());
 const mutateReception = vi.hoisted(() => vi.fn(async () => undefined));
+const routerNavigate = vi.hoisted(() => vi.fn());
+
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return {
+    ...actual,
+    useLocation: () => ({ pathname: "/" }),
+    useNavigate: () => routerNavigate,
+  };
+});
 
 vi.mock("@/config/featureFlags", () => ({
   isFeatureEnabled: () => firestoreScenario.enabled,
@@ -97,12 +109,61 @@ vi.mock("@/hooks/useFirestore", async () => {
 
 import Recepciones from "./Recepciones";
 
+function ReceptionStateProbe() {
+  const { currentScreen, currentReception, editReceptionData, sessionState } =
+    useReceptionContext();
+  // The edit path stores the Firestore document, whose canonical identifier is `id`.
+  const editReceptionId =
+    editReceptionData?.receptionId ??
+    (editReceptionData && "id" in editReceptionData ? String(editReceptionData.id) : "");
+
+  return (
+    <>
+      <span data-testid="current-screen">{currentScreen}</span>
+      <span data-testid="session-state">{sessionState}</span>
+      <span data-testid="current-reception-id">{currentReception?.receptionId ?? ""}</span>
+      <span data-testid="current-planned-pallets-count">
+        {currentReception?.plannedPallets?.length ?? 0}
+      </span>
+      <span data-testid="edit-reception-id">{editReceptionId}</span>
+    </>
+  );
+}
+
+function renderRecepciones(props: ComponentProps<typeof Recepciones> = {}) {
+  return render(
+    <UIProvider>
+      <ReceptionProvider initialState={{ currentScreen: "recepciones" }}>
+        <ReceptionStateProbe />
+        <Recepciones {...props} />
+      </ReceptionProvider>
+    </UIProvider>,
+  );
+}
+
 describe("Recepciones presentation", () => {
+  beforeEach(() => {
+    firestoreScenario.enabled = false;
+    firestoreScenario.receptions = [];
+    firestoreScenario.reception = null;
+    firestoreScenario.pallets = [];
+    firestoreScenario.admin = false;
+    firestoreScenario.mutationOptions = {
+      canDelete: false,
+      canCancel: false,
+      canRestore: false,
+      canHide: false,
+      canShow: false,
+    };
+    routerNavigate.mockClear();
+    downloadTarimaQrBatch.mockClear();
+    mutateReception.mockClear();
+  });
   it("renders local reception cards and keeps selection wired", () => {
     const onSelectTarima = vi.fn();
     const onEdit = vi.fn();
 
-    render(<Recepciones onSelectTarima={onSelectTarima} onEdit={onEdit} />);
+    renderRecepciones({ onSelectTarima, onEdit });
 
     expect(screen.getByText("OC-24891")).toBeInTheDocument();
     expect(screen.getAllByText("Completada").length).toBeGreaterThan(0);
@@ -118,7 +179,7 @@ describe("Recepciones presentation", () => {
   it("supports keyboard activation of a reception card", () => {
     const onSelectTarima = vi.fn();
 
-    render(<Recepciones onSelectTarima={onSelectTarima} onEdit={vi.fn()} />);
+    renderRecepciones({ onSelectTarima, onEdit: vi.fn() });
 
     fireEvent.keyDown(screen.getByRole("button", { name: "Abrir recepción OC-24850" }), {
       key: "Enter",
@@ -145,7 +206,7 @@ describe("Recepciones presentation", () => {
     const onSelectTarima = vi.fn();
     const onEdit = vi.fn();
 
-    render(<Recepciones onSelectTarima={onSelectTarima} onEdit={onEdit} onResume={onResume} />);
+    renderRecepciones({ onSelectTarima, onEdit, onResume });
 
     const resume = await screen.findByRole("button", { name: "Reanudar recepción REC-2026-1" });
     expect(screen.getByText("El Florido")).toBeInTheDocument();
@@ -180,7 +241,7 @@ describe("Recepciones presentation", () => {
     firestoreScenario.reception = firestoreScenario.receptions[0];
     firestoreScenario.pallets = [{ qrIdentifier: "TQR-REC-2026-1-001", palletNumber: 1 }];
     const print = vi.spyOn(window, "print").mockImplementation(() => {});
-    render(<Recepciones onSelectTarima={vi.fn()} onEdit={vi.fn()} />);
+    renderRecepciones({ onSelectTarima: vi.fn(), onEdit: vi.fn() });
 
     await screen.findByText("REC-2026-1");
     fireEvent.click(screen.getAllByTitle("Opciones")[0]);
@@ -213,7 +274,7 @@ describe("Recepciones presentation", () => {
     ];
     firestoreScenario.reception = firestoreScenario.receptions[0];
     firestoreScenario.pallets = [];
-    render(<Recepciones onSelectTarima={vi.fn()} onEdit={vi.fn()} />);
+    renderRecepciones({ onSelectTarima: vi.fn(), onEdit: vi.fn() });
 
     await screen.findByText("REC-2026-1");
     fireEvent.click(screen.getAllByTitle("Opciones")[0]);
@@ -235,7 +296,7 @@ describe("Recepciones presentation", () => {
       { id: "cancelled", status: "CANCELLED", folio: "REC-C" },
       { id: "hidden", status: "DRAFT", hiddenAt: {}, folio: "REC-H" },
     ];
-    render(<Recepciones onSelectTarima={vi.fn()} onEdit={vi.fn()} />);
+    renderRecepciones({ onSelectTarima: vi.fn(), onEdit: vi.fn() });
 
     expect(await screen.findByText("REC-A")).toBeInTheDocument();
     expect(screen.queryByText("REC-C")).not.toBeInTheDocument();
@@ -260,7 +321,7 @@ describe("Recepciones presentation", () => {
       canShow: false,
     };
     firestoreScenario.receptions = [{ id: "draft", status: "DRAFT", folio: "REC-D" }];
-    render(<Recepciones onSelectTarima={vi.fn()} onEdit={vi.fn()} />);
+    renderRecepciones({ onSelectTarima: vi.fn(), onEdit: vi.fn() });
 
     await screen.findByText("REC-D");
     fireEvent.click(screen.getByTitle("Opciones"));
@@ -282,7 +343,7 @@ describe("Recepciones presentation", () => {
     firestoreScenario.enabled = true;
     firestoreScenario.admin = false;
     firestoreScenario.receptions = [{ id: "draft", status: "DRAFT", folio: "REC-D" }];
-    render(<Recepciones onSelectTarima={vi.fn()} onEdit={vi.fn()} />);
+    renderRecepciones({ onSelectTarima: vi.fn(), onEdit: vi.fn() });
 
     await screen.findByText("REC-D");
     fireEvent.click(screen.getByTitle("Opciones"));
@@ -291,5 +352,109 @@ describe("Recepciones presentation", () => {
 
     firestoreScenario.enabled = false;
     firestoreScenario.receptions = [];
+  });
+
+  it("resumes an IN_PROGRESS reception through state and replaces the URL", async () => {
+    firestoreScenario.enabled = true;
+    const reception = {
+      id: "reception-in-progress",
+      folio: "REC-RESUME-1",
+      supplierName: "El Florido",
+      warehouseId: "warehouse-north",
+      status: "IN_PROGRESS",
+      scheduledDate: "2026-09-19",
+      plannedPallets: [
+        {
+          qrIdentifier: "TQR-1-001",
+          palletNumber: 1,
+          productName: "Agua",
+          quantity: 10,
+          unit: "cajas",
+          status: "PLANNED",
+          lineIndex: 0,
+        },
+      ],
+    };
+    firestoreScenario.receptions = [reception];
+    firestoreScenario.reception = reception;
+
+    renderRecepciones();
+    fireEvent.click(await screen.findByRole("button", { name: "Reanudar recepción REC-RESUME-1" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("current-screen")).toHaveTextContent("captura-tarima");
+      expect(screen.getByTestId("session-state")).toHaveTextContent("pallets");
+      expect(screen.getByTestId("current-reception-id")).toHaveTextContent("reception-in-progress");
+      expect(screen.getByTestId("current-planned-pallets-count")).toHaveTextContent("1");
+    });
+    expect(routerNavigate).toHaveBeenCalledWith("/captura-tarima", { replace: true });
+  });
+
+  it("resumes a DRAFT reception in the edit screen and replaces the URL", async () => {
+    firestoreScenario.enabled = true;
+    const reception = {
+      id: "reception-draft",
+      folio: "REC-RESUME-2",
+      supplierName: "El Florido",
+      warehouseId: "warehouse-north",
+      status: "DRAFT",
+      scheduledDate: "2026-09-19",
+      plannedPallets: [
+        {
+          qrIdentifier: "TQR-2-001",
+          palletNumber: 1,
+          productName: "Agua",
+          quantity: 10,
+          unit: "cajas",
+          status: "PLANNED",
+          lineIndex: 0,
+        },
+      ],
+    };
+    firestoreScenario.receptions = [reception];
+    firestoreScenario.reception = reception;
+
+    renderRecepciones();
+    fireEvent.click(await screen.findByRole("button", { name: "Reanudar recepción REC-RESUME-2" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("current-screen")).toHaveTextContent("editar-recepcion");
+      expect(screen.getByTestId("edit-reception-id")).toHaveTextContent("reception-draft");
+    });
+    expect(routerNavigate).toHaveBeenCalledWith("/editar-recepcion", { replace: true });
+  });
+
+  it("does not resume a non-resumable reception document", async () => {
+    firestoreScenario.enabled = true;
+    const listedReception = {
+      id: "reception-confirmed",
+      folio: "REC-RESUME-3",
+      supplierName: "El Florido",
+      warehouseId: "warehouse-north",
+      status: "DRAFT",
+      plannedPallets: [
+        {
+          qrIdentifier: "TQR-3-001",
+          palletNumber: 1,
+          productName: "Agua",
+          quantity: 10,
+          unit: "cajas",
+          status: "PLANNED",
+          lineIndex: 0,
+        },
+      ],
+    };
+    firestoreScenario.receptions = [listedReception];
+    // Simulate a stale row: the authoritative document is already confirmed.
+    firestoreScenario.reception = { ...listedReception, status: "CONFIRMED" };
+
+    renderRecepciones();
+    fireEvent.click(await screen.findByRole("button", { name: "Reanudar recepción REC-RESUME-3" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "La recepción seleccionada no se puede reanudar.",
+    );
+    expect(screen.getByTestId("current-screen")).toHaveTextContent("recepciones");
+    expect(routerNavigate).not.toHaveBeenCalled();
   });
 });

@@ -6,7 +6,14 @@ import type { ReceptionDoc } from "@/services/firestore/types";
 import { WAREHOUSE_IDS } from "@/config/warehouses";
 import { useAuthorization, isPermissionDenied } from "@/hooks/useAuthorization";
 import { Panel, StatusBadge, TouchTarget } from "@/components/ui";
+import { useReceptionContext, useUIContext } from "@/context";
 import { mapReceptionListItem } from "@/domains/reception/receptionLifecycle";
+import {
+  mapReceptionDocToReceptionData,
+  resolveResumeTarget,
+  type ResumeTargetScreen,
+} from "@/domains/reception/receptionResume";
+import type { ReceptionData } from "@/types";
 import { QRCodeSVG } from "qrcode.react";
 import { downloadTarimaQrBatch } from "@/services/tarimaQrDownload";
 import "./Recepciones.css";
@@ -478,13 +485,9 @@ export default function Recepciones({
   onEdit?: (id: string) => void;
   onResume?: (id: string) => void;
 }) {
-  const navigate = useNavigate();
-  // ============================================
-  // Legacy Props Fallback (for migration period)
-  // ============================================
-  const onSelectTarimaLegacy = onSelectTarima ?? (() => navigate("editar-recepcion"));
-  const onEditLegacy = onEdit ?? (() => navigate("editar-recepcion"));
-  const onResumeLegacy = onResume ?? (() => navigate("nueva-step1"));
+  const routerNavigate = useNavigate();
+  const { navigate, editReception, setCurrentReception, transition } = useReceptionContext();
+  const { closeSidebarOnMobile } = useUIContext();
 
   const { canQuery, canAccessWarehouse, hasAnyRole } = useAuthorization();
   const useFirestore = isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery;
@@ -511,6 +514,8 @@ export default function Recepciones({
   const [errorFs, setErrorFs] = useState<string | null>(null);
   const [qrActionError, setQrActionError] = useState<string | null>(null);
   const [qrActionBusy, setQrActionBusy] = useState<string | null>(null);
+  const [resumeBusyId, setResumeBusyId] = useState<string | null>(null);
+  const [resumeError, setResumeError] = useState<string | null>(null);
   const [qrPrintSet, setQrPrintSet] = useState<{ folio: string; identifiers: string[] } | null>(
     null,
   );
@@ -614,6 +619,74 @@ export default function Recepciones({
     }
   }
 
+  async function navigateToReception(
+    recId: string,
+    intent: ResumeTargetScreen | "resume",
+  ): Promise<void> {
+    const permissionError = "Conectate con permisos de almacén para continuar una recepción.";
+    setResumeBusyId(recId);
+    setResumeError(null);
+
+    try {
+      if (!fsServices || !canQueryNorthWarehouse) {
+        throw new Error(permissionError);
+      }
+
+      const doc = await fsServices.receptions.getById(recId);
+      if (!doc) throw new Error("No se encontró la recepción seleccionada.");
+
+      const target = intent === "resume" ? resolveResumeTarget(doc.status) : intent;
+      if (!target) {
+        throw new Error("La recepción seleccionada no se puede reanudar.");
+      }
+
+      if (target === "editar-recepcion") {
+        editReception(doc.id, doc as unknown as ReceptionData);
+      } else {
+        setCurrentReception(mapReceptionDocToReceptionData(doc));
+        transition("pallets");
+      }
+
+      navigate(target, "recepciones");
+      routerNavigate(`/${target}`, { replace: true });
+      closeSidebarOnMobile();
+    } catch (error) {
+      setResumeError(
+        isPermissionDenied(error)
+          ? permissionError
+          : error instanceof Error
+            ? error.message
+            : "No se pudo continuar la recepción.",
+      );
+    } finally {
+      setResumeBusyId((currentId) => (currentId === recId ? null : currentId));
+    }
+  }
+
+  function handleSelectTarima(recId: string) {
+    if (onSelectTarima) {
+      onSelectTarima(recId);
+      return;
+    }
+    void navigateToReception(recId, "editar-recepcion");
+  }
+
+  function handleEdit(recId: string) {
+    if (onEdit) {
+      onEdit(recId);
+      return;
+    }
+    void navigateToReception(recId, "editar-recepcion");
+  }
+
+  function handleResume(recId: string) {
+    if (onResume) {
+      onResume(recId);
+      return;
+    }
+    void navigateToReception(recId, "resume");
+  }
+
   async function loadMutationOptions(receptionId: string) {
     if (!canManage || !fsServices) return;
     setOptionsBusy(receptionId);
@@ -671,6 +744,17 @@ export default function Recepciones({
         >
           {qrActionError}
           <button type="button" className="ml-3 underline" onClick={() => setQrActionError(null)}>
+            Cerrar
+          </button>
+        </div>
+      )}
+      {resumeError && (
+        <div
+          role="alert"
+          className="mx-4 mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 md:mx-7"
+        >
+          {resumeError}
+          <button type="button" className="ml-3 underline" onClick={() => setResumeError(null)}>
             Cerrar
           </button>
         </div>
@@ -831,11 +915,11 @@ export default function Recepciones({
               tabIndex={0}
               aria-label={`Abrir recepción ${rec.displayId || rec.id}`}
               className="flex items-center justify-between px-4 md:px-5 py-3 md:py-4 w-full hover:shadow-[0px_12px_20px_rgba(22,52,63,0.12)] transition-shadow touch-target cursor-pointer"
-              onClick={() => onSelectTarimaLegacy(rec.id)}
+              onClick={() => handleSelectTarima(rec.id)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  onSelectTarimaLegacy(rec.id);
+                  handleSelectTarima(rec.id);
                 }
               }}
             >
@@ -914,10 +998,12 @@ export default function Recepciones({
                   <button
                     type="button"
                     aria-label={`Reanudar recepción ${rec.displayId || rec.id}`}
+                    aria-busy={resumeBusyId === rec.id}
+                    disabled={resumeBusyId === rec.id}
                     className="text-xs font-bold text-[#3276a8] underline"
                     onClick={(event) => {
                       event.stopPropagation();
-                      onResumeLegacy(rec.id);
+                      handleResume(rec.id);
                     }}
                   >
                     Reanudar
@@ -925,7 +1011,7 @@ export default function Recepciones({
                 )}
                 <RowMenu
                   canEdit={rec.estado === "Borrador"}
-                  onEdit={() => onEditLegacy(rec.id)}
+                  onEdit={() => handleEdit(rec.id)}
                   onPrint={() => void handleReceptionQrAction(rec.id, "print")}
                   onDownload={() => void handleReceptionQrAction(rec.id, "download")}
                   canManage={canManage}
