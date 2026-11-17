@@ -1,0 +1,8 @@
+# Ignore parallel session files
+src/App.tsx
+src/components/layout/**
+src/context/ReceptionContext.tsx
+src/screens/RecepcionCompletada.tsx
+firebase.json
+# Invalid GraphQL comment file
+dataconnect/connector/warehouse.gql
