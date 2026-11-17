@@ -8,11 +8,17 @@ export function useAuthorization() {
   const authState = useAuth();
   const canQuery = !authState.loading && authState.accessStatus === "ACTIVE" && !!authState.profile;
 
+  // Get user's accessible warehouse IDs from profile
+  const warehouseIds = authState.profile?.warehouseIds ?? [];
+
   return {
     ...authState,
     canQuery,
+    warehouseIds,
     hasAnyRole: (roles: UserProfile["role"][]) =>
       canQuery && roles.some((role) => authState.hasRole([role])),
+    canAccessWarehouse: (warehouseId: string) =>
+      canQuery && authState.profile ? warehouseIds.includes(warehouseId) : false,
   };
 }
 

@@ -490,10 +490,13 @@ export default function Recepciones({
   const { navigate, editReception, setCurrentReception, transition } = useReceptionContext();
   const { closeSidebarOnMobile } = useUIContext();
 
-  const { canQuery, canAccessWarehouse, hasAnyRole } = useAuthorization();
+  const { canQuery, canAccessWarehouse, warehouseIds, hasAnyRole } = useAuthorization();
   const useFirestore = isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery;
-  const canQueryNorthWarehouse = useFirestore && canAccessWarehouse(WAREHOUSE_IDS.NORTH);
   const canManage = useFirestore && hasAnyRole(["ADMIN", "SUPER_ADMIN"]);
+
+  // User's accessible warehouses (fallback to NORTH for backward compat)
+  const accessibleWarehouseIds = warehouseIds.length > 0 ? warehouseIds : [WAREHOUSE_IDS.NORTH];
+  const canQueryAnyWarehouse = useFirestore && accessibleWarehouseIds.length > 0;
 
   // Firestore services
   const [fsServices, setFsServices] = useState(() =>
@@ -529,15 +532,23 @@ export default function Recepciones({
 
   // Load Firestore data when feature flag is enabled
   useEffect(() => {
-    if (!canQueryNorthWarehouse || !fsServices) return;
+    if (!canQueryAnyWarehouse || !fsServices) return;
 
     setLoadingFs(true);
     setErrorFs(null);
 
-    fsServices.receptions
-      .getByWarehouse(WAREHOUSE_IDS.NORTH)
-      .then((receptions: any[]) => {
-        const converted = receptions.map(toReceptionView);
+    // Load receptions from all accessible warehouses
+    Promise.all(
+      accessibleWarehouseIds.map((warehouseId) =>
+        fsServices.receptions.getByWarehouse(warehouseId).catch((err) => {
+          console.error(`Error loading receptions from ${warehouseId}:`, err);
+          return [];
+        }),
+      ),
+    )
+      .then((results) => {
+        const allReceptions = results.flat();
+        const converted = allReceptions.map(toReceptionView);
         setListaLocal(converted);
         setLoadingFs(false);
       })
@@ -545,12 +556,12 @@ export default function Recepciones({
         console.error("Error loading receptions:", err);
         setErrorFs(
           isPermissionDenied(err)
-            ? "No tenés permisos para consultar las recepciones de este almacén."
+            ? "No tenés permisos para consultar las recepciones de tus almacenes."
             : err.message,
         );
         setLoadingFs(false);
       });
-  }, [canQueryNorthWarehouse, fsServices]);
+  }, [canQueryAnyWarehouse, fsServices, accessibleWarehouseIds]);
 
   useEffect(() => {
     if (!qrPrintSet) return;
@@ -581,7 +592,7 @@ export default function Recepciones({
     setQrActionBusy(recId);
     setQrActionError(null);
     try {
-      if (!fsServices || !canQueryNorthWarehouse) {
+      if (!fsServices || !canQueryAnyWarehouse) {
         throw new Error(
           "Conectate con permisos de almacén para acceder a los QR de esta recepción.",
         );
@@ -590,7 +601,7 @@ export default function Recepciones({
       if (!reception) throw new Error("No se encontró la recepción seleccionada.");
 
       const registeredPallets = await fsServices.pallets.getByReception(reception.id, [
-        WAREHOUSE_IDS.NORTH,
+        reception.warehouseId,
       ]);
       const identifiers = [
         ...new Set([
@@ -730,8 +741,13 @@ export default function Recepciones({
         delete next[mutationTarget.id];
         return next;
       });
-      const receptions = await fsServices.receptions.getByWarehouse(WAREHOUSE_IDS.NORTH);
-      setListaLocal(receptions.map(toReceptionView));
+      // Refresh from all accessible warehouses
+      const allReceptions: any[] = [];
+      for (const warehouseId of accessibleWarehouseIds) {
+        const warehouseReceptions = await fsServices.receptions.getByWarehouse(warehouseId);
+        allReceptions.push(...warehouseReceptions);
+      }
+      setListaLocal(allReceptions.map(toReceptionView));
     } catch (error) {
       setErrorFs(error instanceof Error ? error.message : "No se pudo actualizar la recepción.");
     } finally {
@@ -901,10 +917,13 @@ export default function Recepciones({
               onClick={() => {
                 setLoadingFs(true);
                 setErrorFs(null);
-                fsServices?.receptions
-                  .getByWarehouse(WAREHOUSE_IDS.NORTH)
-                  .then((r: any[]) => {
-                    const converted = r.map(toReceptionView);
+                Promise.all(
+                    accessibleWarehouseIds.map((warehouseId) =>
+                      fsServices?.receptions?.getByWarehouse(warehouseId).catch(() => []),
+                    ),
+                  ).then((results) => {
+                    const allReceptions = results.flat().filter((r): r is ReceptionDoc => r !== undefined);
+                    const converted = allReceptions.map(toReceptionView);
                     setListaLocal(converted);
                     setLoadingFs(false);
                   })
