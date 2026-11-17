@@ -644,6 +644,12 @@ export default function Recepciones({
       if (target === "editar-recepcion") {
         editReception(doc.id, doc as unknown as ReceptionData);
       } else {
+        // Advance reception to IN_PROGRESS in Firestore so rules allow plannedPallets updates
+        await fsServices.receptions.advanceToInProgress(
+          doc.id,
+          "user",
+          `op-resume-${Date.now()}`,
+        );
         const mergedData = await loadReceptionDataForResume(fsServices, recId, [
           WAREHOUSE_IDS.NORTH,
         ]);

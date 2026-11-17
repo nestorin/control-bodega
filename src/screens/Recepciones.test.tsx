@@ -22,6 +22,7 @@ const firestoreScenario = vi.hoisted(() => ({
 }));
 const downloadTarimaQrBatch = vi.hoisted(() => vi.fn());
 const mutateReception = vi.hoisted(() => vi.fn(async () => undefined));
+const advanceToInProgress = vi.hoisted(() => vi.fn(async () => undefined));
 const routerNavigate = vi.hoisted(() => vi.fn());
 
 vi.mock("react-router-dom", async () => {
@@ -46,6 +47,7 @@ vi.mock("@/services/firestore", () => ({
       getById: vi.fn(async () => firestoreScenario.reception),
       mutationOptions: vi.fn(async () => firestoreScenario.mutationOptions),
       mutateReception,
+      advanceToInProgress,
     },
     pallets: { getByReception: vi.fn(async () => firestoreScenario.pallets) },
   }),
