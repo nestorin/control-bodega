@@ -319,26 +319,32 @@ service cloud.firestore {
         allow update: if isMemberOf(orgId) &&
           canAccessWarehouse(orgId, resource.data.warehouseId) &&
           warehouseAssignmentUnchanged() &&
-          isValidReception(request.resource.data) &&
           (
-            // The creator may attach only validated preview metadata to a draft.
-            (isOperatorOrAbove(orgId) && isValidDraftPreviewUpdate()) ||
-            // Operators can advance: DRAFT -> IN_PROGRESS -> CONFIRMED
-            (isOperatorOrAbove(orgId) &&
-             request.resource.data.status in ['IN_PROGRESS', 'CONFIRMED'] &&
-             request.resource.data.status != 'CANCELLED' &&
-             // Can't go backwards
-             ((resource.data.status == 'DRAFT' && request.resource.data.status == 'IN_PROGRESS' &&
-               hasOnlyChanged(['status', 'updatedAt'])) ||
-              (resource.data.status == 'IN_PROGRESS' && request.resource.data.status == 'CONFIRMED' &&
-               hasOnlyChanged(['status', 'receivedAt', 'updatedAt'])))
-            ) ||
-            // Operators can update plannedPallets when capturing pallets during IN_PROGRESS
+            // Schema-validated lifecycle and draft-preview updates.
+            (isValidReception(request.resource.data) &&
+             ((isOperatorOrAbove(orgId) && isValidDraftPreviewUpdate()) ||
+              // Operators can advance: DRAFT -> IN_PROGRESS -> CONFIRMED
+              (isOperatorOrAbove(orgId) &&
+               request.resource.data.status in ['IN_PROGRESS', 'CONFIRMED'] &&
+               request.resource.data.status != 'CANCELLED' &&
+               // Can't go backwards
+               ((resource.data.status == 'DRAFT' && request.resource.data.status == 'IN_PROGRESS' &&
+                 hasOnlyChanged(['status', 'updatedAt'])) ||
+                (resource.data.status == 'IN_PROGRESS' && request.resource.data.status == 'CONFIRMED' &&
+                 hasOnlyChanged(['status', 'receivedAt', 'updatedAt'])))))) ||
+            // Operators can update plannedPallets when capturing pallets during IN_PROGRESS.
+            // This branch intentionally validates only the capture patch so legacy reception
+            // documents with fields outside the current schema remain writable.
             (isOperatorOrAbove(orgId) &&
              resource.data.status == 'IN_PROGRESS' &&
              request.resource.data.status == 'IN_PROGRESS' &&
-             (hasOnlyChanged(['plannedPallets']) || hasOnlyChanged(['plannedPallets', 'updatedAt']))
-          ));
+             request.resource.data.id == resource.data.id &&
+             request.resource.data.organizationId == resource.data.organizationId &&
+             request.resource.data.warehouseId == resource.data.warehouseId &&
+             request.resource.data.plannedPallets is list &&
+             request.resource.data.plannedPallets.size() <= 500 &&
+             (hasOnlyChanged(['plannedPallets']) || hasOnlyChanged(['plannedPallets', 'updatedAt'])))
+          );
 
         // Cancellation, hiding and deletion require audited backend commands.
         allow delete: if false;
