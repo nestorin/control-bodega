@@ -629,12 +629,19 @@ export default function Recepciones({
     setResumeError(null);
 
     try {
-      if (!fsServices || !canQueryNorthWarehouse) {
+      if (!fsServices) {
         throw new Error(permissionError);
       }
 
       const doc = await fsServices.receptions.getById(recId);
       if (!doc) throw new Error("No se encontró la recepción seleccionada.");
+
+      // Check access to the reception's actual warehouse
+      const receptionWarehouseId = doc.warehouseId;
+      const canAccessReceptionWarehouse = canAccessWarehouse(receptionWarehouseId);
+      if (!canAccessReceptionWarehouse) {
+        throw new Error(permissionError);
+      }
 
       const target = intent === "resume" ? resolveResumeTarget(doc.status) : intent;
       if (!target) {
@@ -647,7 +654,7 @@ export default function Recepciones({
         // Advance reception to IN_PROGRESS in Firestore so rules allow plannedPallets updates
         await fsServices.receptions.advanceToInProgress(doc.id, "user", `op-resume-${Date.now()}`);
         const mergedData = await loadReceptionDataForResume(fsServices, recId, [
-          WAREHOUSE_IDS.NORTH,
+          receptionWarehouseId,
         ]);
         setCurrentReception(mergedData);
         transition("pallets");
