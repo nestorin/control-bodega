@@ -538,13 +538,34 @@ export default function CapturaTarima({
 
       // Persist to Firestore
       if (useFirestore && fsServices && currentReception?.receptionId) {
+        const operationId = checkpointOperationId(
+          currentReception.receptionId,
+          currentTarima.numero,
+        );
         await fsServices.receptions.savePalletCapture(
           currentReception.receptionId,
           currentTarima.id,
           lotToSave,
           expiryToSave,
-          checkpointOperationId(currentReception.receptionId, currentTarima.numero),
+          operationId,
         );
+
+        // Update reception document's plannedPallets so confirm_reception sees all pallets as activated
+        if (profile?.userId) {
+          const updatedPlannedPallets = (currentReception.plannedPallets ?? []).map((pallet) =>
+            pallet.qrIdentifier === currentTarima.id
+              ? { ...pallet, status: "RECEIVED" as const }
+              : pallet,
+          );
+          const updatedReception = { ...currentReception, plannedPallets: updatedPlannedPallets };
+          setCurrentReception(updatedReception);
+          await fsServices.receptions.updateReception(
+            currentReception.receptionId,
+            { plannedPallets: updatedPlannedPallets },
+            profile.userId,
+            operationId,
+          );
+        }
       }
 
       // Update inventory
