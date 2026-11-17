@@ -234,11 +234,13 @@ service cloud.firestore {
               'actorUserId', 'createdAt', 'updatedAt'
             ]) &&
             data.keys().hasOnly([
-              'id', 'organizationId', 'warehouseId', 'purchaseOrderId',
-              'supplierId', 'status', 'operationId', 'receivedAt',
-              'actorUserId', 'evidencePhotos', 'invoicePreviewPath',
-              'invoicePreviewUrl', 'draftExpiresAt', 'plannedPallets',
-              'createdAt', 'updatedAt',
+              'id', 'organizationId', 'warehouseId', 'evidenceId', 'folio',
+              'scheduledDate', 'purchaseOrderId', 'purchaseOrderNumber',
+              'supplierId', 'supplierCode', 'supplierName', 'logisticsProvider',
+              'productName', 'palletCount', 'plannedPallets', 'version',
+              'status', 'operationId', 'receivedAt', 'actorUserId',
+              'evidencePhotos', 'invoicePreviewPath', 'invoicePreviewUrl',
+              'draftExpiresAt', 'createdAt', 'updatedAt',
               'cancelledFromStatus', 'cancelledAt', 'cancelledBy', 'hiddenAt', 'hiddenBy'
             ]) &&
             data.id == receptionId &&
@@ -251,10 +253,22 @@ service cloud.firestore {
             data.actorUserId is string && data.actorUserId.size() > 0 &&
             data.actorUserId.size() <= 128 &&
             data.createdAt is timestamp && data.updatedAt is timestamp &&
+            (!('evidenceId' in data) || (data.evidenceId is string && data.evidenceId.size() <= 160)) &&
+            (!('folio' in data) || (data.folio is string && data.folio.size() <= 160)) &&
+            (!('scheduledDate' in data) || (data.scheduledDate is string && data.scheduledDate.size() <= 64)) &&
             (!('purchaseOrderId' in data) ||
               (data.purchaseOrderId is string && data.purchaseOrderId.size() <= 128)) &&
+            (!('purchaseOrderNumber' in data) ||
+              (data.purchaseOrderNumber is string && data.purchaseOrderNumber.size() <= 128)) &&
             (!('supplierId' in data) ||
               (data.supplierId is string && data.supplierId.size() <= 128)) &&
+            (!('supplierCode' in data) || (data.supplierCode is string && data.supplierCode.size() <= 128)) &&
+            (!('supplierName' in data) || (data.supplierName is string && data.supplierName.size() <= 256)) &&
+            (!('logisticsProvider' in data) ||
+              (data.logisticsProvider is string && data.logisticsProvider.size() <= 256)) &&
+            (!('productName' in data) || (data.productName is string && data.productName.size() <= 256)) &&
+            (!('palletCount' in data) || (data.palletCount is number && data.palletCount >= 0 && data.palletCount <= 500)) &&
+            (!('version' in data) || (data.version is number && data.version >= 0)) &&
             (!('receivedAt' in data) || data.receivedAt is timestamp) &&
             (!('draftExpiresAt' in data) || data.draftExpiresAt is timestamp) &&
             (!('plannedPallets' in data) ||
