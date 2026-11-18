@@ -26,7 +26,6 @@ import { useReceptionFlow } from "@/hooks/useReceptionFlow";
 import { QRCodeSVG } from "qrcode.react";
 import type { Producto, Proveedor } from "./Configuracion";
 import { ReceptionProductCard } from "./ProgramacionRecepcion";
-import { useNavigate } from "react-router-dom";
 
 const ORG_ID = "org_exepa_001";
 
@@ -76,8 +75,6 @@ export default function EditarRecepcion({
   onSave,
 }: Props) {
   const { user, canQuery } = useAuthorization();
-  const navigate = useNavigate();
-
   const {
     catalogoProveedores,
     catalogoProductos,
@@ -91,8 +88,8 @@ export default function EditarRecepcion({
   const recId = recIdProp ?? editReceptionData?.receptionId;
   const supplierCatalog = suppliers ?? catalogoProveedores;
   const productCatalog = products ?? catalogoProductos;
-  const handleBack = onBack ?? (() => navigate("/recepciones"));
-  const handleSaveSuccess = onSave ?? (() => navigate("/recepciones"));
+  const handleBack = onBack ?? (() => window.location.assign("/recepciones"));
+  const handleSaveSuccess = onSave ?? (() => window.location.assign("/recepciones"));
 
   const services = useMemo(() => (db ? createFirestoreServices(db, ORG_ID) : null), []);
   const [reception, setReception] = useState<ReceptionDoc | null>(null);
