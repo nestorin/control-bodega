@@ -550,22 +550,38 @@ export default function CapturaTarima({
           operationId,
         );
 
-        // Update reception document's plannedPallets so confirm_reception sees all pallets as activated
-        if (profile?.userId) {
-          const updatedPlannedPallets = (currentReception.plannedPallets ?? []).map((pallet) =>
-            pallet.qrIdentifier === currentTarima.id
-              ? { ...pallet, status: "RECEIVED" as const }
-              : pallet,
-          );
-          const updatedReception = { ...currentReception, plannedPallets: updatedPlannedPallets };
-          setCurrentReception(updatedReception);
-          await fsServices.receptions.updateReception(
-            currentReception.receptionId,
-            { plannedPallets: updatedPlannedPallets },
-            profile.userId,
-            operationId,
+        // The client must not write plannedPallets after a checkpoint: it races
+        // with the server-owned capture state and is rejected for legacy docs by
+        // Firestore Rules. Activate the validated checkpoint through the callable
+        // that atomically updates the plan, pallet, inventory movement and lot.
+        if (!profile?.userId || !currentTarima.productId || !currentReception.warehouseId) {
+          throw new Error(
+            "No se pudo identificar la tarima, el usuario o el almacén de la recepción.",
           );
         }
+        await fsServices.pallets.createPalletsForReception(
+          currentReception.receptionId,
+          [
+            {
+              warehouseId: currentReception.warehouseId,
+              productId: currentTarima.productId,
+              qrIdentifier: currentTarima.id,
+              quantity: currentTarima.cajas,
+              unit: currentTarima.unidad,
+              lot: lotToSave,
+              expiryDate: new Date(`${expiryToSave}T00:00:00.000Z`),
+              status: "CREATED",
+            },
+          ],
+          profile.userId,
+          `${operationId}-activate`,
+        );
+        const updatedPlannedPallets = (currentReception.plannedPallets ?? []).map((pallet) =>
+          pallet.qrIdentifier === currentTarima.id
+            ? { ...pallet, status: "RECEIVED" as const, activated: true }
+            : pallet,
+        );
+        setCurrentReception({ ...currentReception, plannedPallets: updatedPlannedPallets });
       }
 
       // Update inventory

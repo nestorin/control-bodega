@@ -523,6 +523,10 @@ def edit_reception(req: https_fn.CallableRequest):
             "productName": payload["productName"],
             "palletCount": len(planned_pallets),
             "plannedPallets": planned_pallets,
+            # The draft can only be edited with a non-empty, canonical pallet
+            # plan. Advancing here makes the persisted state the sole authority
+            # for showing the resume action; it is never client-selected.
+            "status": "IN_PROGRESS",
             "version": current_version + 1,
             "updatedAt": now,
         })
@@ -539,7 +543,7 @@ def edit_reception(req: https_fn.CallableRequest):
         audit_ref = root.collection("audit_events").document()
         transaction.set(audit_ref, {
             "organizationId": ORG_ID, "warehouseId": warehouse_id,
-            "entityType": "reception", "entityId": reception_id, "action": "EDIT_DRAFT",
+            "entityType": "reception", "entityId": reception_id, "action": "EDIT_DRAFT_AND_START",
             "actorUserId": actor["userId"], "operationId": operation_id,
             "occurredAt": now, "schemaVersion": 1,
         })
@@ -551,6 +555,7 @@ def edit_reception(req: https_fn.CallableRequest):
             "supplierCode": payload["supplierCode"], "supplierName": payload["supplierName"],
             "logisticsProvider": payload["logisticsProvider"], "productName": payload["productName"],
             "palletCount": len(planned_pallets), "plannedPallets": planned_pallets,
+            "status": "IN_PROGRESS",
             "version": current_version + 1, "idempotent": False,
         }
         transaction.set(operation_ref, {

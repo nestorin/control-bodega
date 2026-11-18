@@ -909,6 +909,8 @@ class ReceptionLinesQueryRegressionTests(unittest.TestCase):
         deleted_paths = [reference.path for reference in transaction.deletes]
         self.assertIn(old_line_reference.path, deleted_paths)
         self.assertEqual(result["receptionId"], reception_id)
+        self.assertEqual(result["status"], "IN_PROGRESS")
+        self.assertEqual(transaction.updates[0][1]["status"], "IN_PROGRESS")
         self.assertFalse(result["idempotent"])
 
 

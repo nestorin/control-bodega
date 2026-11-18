@@ -132,7 +132,7 @@ describe("EditarRecepcion", () => {
       name: "Proveedor real",
       code: "P-01",
     });
-    mockServices.editReception.mockResolvedValue(receptionDraft);
+    mockServices.editReception.mockResolvedValue({ ...receptionDraft, status: "IN_PROGRESS" });
   });
 
   it("loads canonical data and persists allowed draft changes through edit_reception", async () => {
@@ -148,30 +148,7 @@ describe("EditarRecepcion", () => {
         />
         <LocationReader />
       </>,
-      {
-        editReceptionData: receptionDraft,
-        currentReception: {
-          ...receptionDraft,
-          hasOC: true,
-          ocFolio: receptionDraft.folio,
-          tarimas: receptionDraft.palletCount,
-          proveedor: receptionDraft.supplierName,
-          proveedorLogistico: receptionDraft.logisticsProvider,
-          receptionId: receptionDraft.id,
-          fechaRecepcion: receptionDraft.scheduledDate,
-          productos: receptionDraft.plannedPallets.map((p, i) => ({
-            productId: p.productId,
-            codigo: null,
-            nombre: p.productName,
-            unidad: p.unit,
-            cantidad: p.quantity,
-            precio: 0,
-            importe: 0,
-            estadoMatch: "confirmado" as const,
-          })),
-          conversionesTabla: [],
-        },
-      },
+      { editReceptionData: receptionDraft },
     );
 
     expect(await screen.findByRole("heading", { name: "REC-1001" })).toBeInTheDocument();
@@ -200,17 +177,27 @@ describe("EditarRecepcion", () => {
     ]);
     expect(args[5]).toBe(4);
 
-    // After saving a DRAFT, continueToEvidence should navigate to captura-evidencia
-    // instead of calling onSave (which goes back to recepciones list)
+    // A component mounted through the actual list route only has editReceptionData,
+    // not currentReception. A successful save must return to the canonical list so
+    // the now-IN_PROGRESS reception exposes its resume action.
     await waitFor(() => {
-      console.log("navigateMock calls:", navigateMock.mock.calls);
-      expect(navigateMock).toHaveBeenCalled();
+      expect(onSave).toHaveBeenCalledOnce();
     });
-    // Check the last call was to captura-evidencia
-    const lastCall = navigateMock.mock.calls[navigateMock.mock.calls.length - 1];
-    expect(lastCall[0]).toBe("captura-evidencia");
-    // onSave should NOT be called for DRAFTs (new flow continues to evidence)
-    expect(onSave).not.toHaveBeenCalled();
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it("returns to the canonical reception list when no legacy back callback is provided", async () => {
+    renderWithAppProviders(
+      <EditarRecepcion recId="reception-1" suppliers={suppliers} products={products} />,
+      {
+        editReceptionData: receptionDraft,
+        initialEntries: ["/editar-recepcion"],
+      },
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Volver" }));
+
+    expect(navigateMock).toHaveBeenCalledWith("/recepciones");
   });
 
   it("renders accurate in-progress reception data as read-only", async () => {

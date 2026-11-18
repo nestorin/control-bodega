@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   createFirestoreServices,
   type PlannedReceptionPalletDraft,
@@ -82,14 +83,15 @@ export default function EditarRecepcion({
     catalogosLoading,
     catalogosError,
   } = useCatalogos();
-  const { editReceptionData, continueToEvidence } = useReceptionFlow();
+  const { editReceptionData } = useReceptionFlow();
+  const navigate = useNavigate();
 
   // Legacy prop fallbacks: App passes no props, so the context/hook state wins.
   const recId = recIdProp ?? editReceptionData?.receptionId;
   const supplierCatalog = suppliers ?? catalogoProveedores;
   const productCatalog = products ?? catalogoProductos;
-  const handleBack = onBack ?? (() => window.location.assign("/recepciones"));
-  const handleSaveSuccess = onSave ?? (() => window.location.assign("/recepciones"));
+  const handleBack = onBack ?? (() => navigate("/recepciones"));
+  const handleSaveSuccess = onSave ?? (() => navigate("/recepciones"));
 
   const services = useMemo(() => (db ? createFirestoreServices(db, ORG_ID) : null), []);
   const [reception, setReception] = useState<ReceptionDoc | null>(null);
@@ -323,12 +325,9 @@ export default function EditarRecepcion({
       );
       setReception(updated);
 
-      // After saving a DRAFT, continue to evidence capture instead of going back to list
-      if (editable && updated.status === "DRAFT") {
-        continueToEvidence();
-      } else {
-        handleSaveSuccess();
-      }
+      // The list is the canonical resume boundary. It reads the persisted
+      // IN_PROGRESS state and exposes the capture continuation with complete data.
+      handleSaveSuccess();
     } catch (saveError) {
       setError(receptionErrorMessage(saveError));
     } finally {

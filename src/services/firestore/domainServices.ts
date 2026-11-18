@@ -394,6 +394,7 @@ export class ReceptionService extends BaseService<ReceptionDoc> {
       productName?: string;
       palletCount?: number;
       version?: number;
+      status?: ReceptionDoc["status"];
       plannedPallets?: ReceptionDoc["plannedPallets"];
     };
     if (response?.receptionId !== receptionId || !Array.isArray(response.plannedPallets)) {
@@ -413,6 +414,7 @@ export class ReceptionService extends BaseService<ReceptionDoc> {
       productName: response.productName ?? data.productName,
       palletCount: response.palletCount ?? response.plannedPallets.length,
       plannedPallets: response.plannedPallets,
+      status: response.status ?? data.status,
       version: response.version,
     } as unknown as ReceptionDoc;
   }
