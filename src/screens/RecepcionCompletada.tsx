@@ -7,6 +7,8 @@ import { useOfflineQueue } from "@/hooks/useFirestore";
 import { useAuthorization } from "@/hooks/useAuthorization";
 import { useReceptionFlow } from "@/hooks/useReceptionFlow";
 
+// jsPDF se importa perezosamente en la funcion de generacion PDF
+
 const assetPathPrefix = "/assets";
 const imgWarehouse = `${assetPathPrefix}/8c4fa.svg`;
 const imgIndicador = `${assetPathPrefix}/08d70.svg`;
@@ -25,6 +27,9 @@ export default function RecepcionCompletada() {
   const { transition } = useReceptionFlow();
   const [tarimasCount, setTarimasCount] = useState(currentReception?.tarimas ?? 20);
   const [incidencias, setIncidencias] = useState(0);
+  const [pdfGenerando, setPdfGenerando] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [fsServices, setFsServices] = useState<ReturnType<typeof createFirestoreServices> | null>(
     null,
   );
@@ -71,6 +76,8 @@ export default function RecepcionCompletada() {
   // Fallback data
   const ocFolio = currentReception?.ocFolio ?? "OC-24891";
   const tarimasTotal = currentReception?.tarimas ?? 20;
+  const tarimaNoun = tarimasTotal === 1 ? "tarima" : "tarimas";
+  const tarimaStatus = tarimasTotal === 1 ? "registrada" : "registradas";
   const proveedor = currentReception?.proveedor ?? "Distribuidora del Norte";
   const proveedorLogistico = currentReception?.proveedorLogistico ?? "Logística Veloz";
   const fecha = "19 Sep 2026 · 09:42";
@@ -132,14 +139,14 @@ export default function RecepcionCompletada() {
               className="font-extrabold text-[#8e592e] text-[11px] whitespace-nowrap"
               style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
             >
-              {tarimasTotal} TARIMAS ✓
+              {tarimasTotal} {tarimaNoun.toUpperCase()} ✓
             </p>
           </div>
           <p
             className="font-extrabold text-[#172126] text-[26px] whitespace-nowrap text-center"
             style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
           >
-            {tarimasTotal} tarimas registradas
+            {tarimasTotal} {tarimaNoun} {tarimaStatus}
           </p>
           <div className="bg-[#e2f5ec] flex gap-[7px] items-center px-[11px] py-[7px] rounded-full">
             <img alt="" className="size-[7px]" src={imgIndicador} />
@@ -156,7 +163,7 @@ export default function RecepcionCompletada() {
               className="font-extrabold text-[#172126] text-[9px] whitespace-nowrap"
               style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
             >
-              {ocFolio} · {tarimasTotal} TARIMAS
+              {ocFolio} · {tarimasTotal} {tarimaNoun.toUpperCase()}
             </p>
             <p
               className="text-[#607078] text-[8px] whitespace-nowrap"
