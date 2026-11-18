@@ -91,8 +91,8 @@ export default function EditarRecepcion({
   const recId = recIdProp ?? editReceptionData?.receptionId;
   const supplierCatalog = suppliers ?? catalogoProveedores;
   const productCatalog = products ?? catalogoProductos;
-  const handleBack = onBack ?? (() => navigate("recepciones"));
-  const handleSaveSuccess = onSave ?? (() => navigate("recepciones"));
+  const handleBack = onBack ?? (() => navigate("/recepciones"));
+  const handleSaveSuccess = onSave ?? (() => navigate("/recepciones"));
 
   const services = useMemo(() => (db ? createFirestoreServices(db, ORG_ID) : null), []);
   const [reception, setReception] = useState<ReceptionDoc | null>(null);

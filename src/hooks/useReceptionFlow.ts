@@ -80,7 +80,9 @@ export function useReceptionFlow(): UseReceptionFlowReturn {
       // Keep ReceptionContext.currentScreen in sync: AppLayout renders the
       // active screen from it (screens navigate through this hook).
       ctxNavigate(screen, nav);
-      navigate(screen);
+      // MainApp owns top-level routes. Use an absolute path so navigation
+      // from nested URLs never appends the destination to the current path.
+      navigate(`/${screen}`);
       closeSidebarOnMobile();
       // Note: Active nav update is handled by UIContext or screen components
       // The nav parameter is kept for API compatibility
