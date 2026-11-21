@@ -474,8 +474,13 @@ service cloud.firestore {
           canAccessWarehouse(orgId, resource.data.warehouseId) &&
           warehouseAssignmentUnchanged() &&
           isOperatorOrAbove(orgId) &&
-          hasOnlyChanged(['status', 'lines', 'updatedAt']) &&
-          ((resource.data.status == 'PROGRAMMED' && request.resource.data.status == 'IN_PROGRESS') ||
+          ((resource.data.status == 'PROGRAMMED' && request.resource.data.status == 'PROGRAMMED' &&
+            hasOnlyChanged([
+              'folio', 'cliente', 'bodega', 'lines', 'tarimasEscaneadas',
+              'evidencia', 'paso', 'fechaProgramada', 'updatedAt'
+            ])) ||
+           (hasOnlyChanged(['status', 'lines', 'updatedAt']) &&
+            (resource.data.status == 'PROGRAMMED' && request.resource.data.status == 'IN_PROGRESS')) ||
            (resource.data.status == 'IN_PROGRESS' && request.resource.data.status == 'IN_PROGRESS') ||
            (isSupervisorOrAdmin(orgId) && request.resource.data.status == 'CANCELLED'));
         allow delete: if isSupervisorOrAdmin(orgId);

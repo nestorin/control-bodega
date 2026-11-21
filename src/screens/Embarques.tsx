@@ -1129,12 +1129,14 @@ function Paso2({
   onNext,
   useFirestore,
   fsServices,
+  activeWarehouseId,
 }: {
   embarque: Embarque;
   onChange: (e: Embarque) => void;
   onNext: () => void;
   useFirestore: boolean;
   fsServices: any;
+  activeWarehouseId: string;
 }) {
   const [qrInput, setQrInput] = useState("");
   const [caducidadAlert, setCaducidadAlert] = useState<string | null>(null);
@@ -1161,7 +1163,7 @@ function Paso2({
     if (!useFirestore || !fsServices?.lotesCaducidades) return;
 
     try {
-      const lots = await fsServices.lotesCaducidades.getByProduct(WAREHOUSE_IDS.NORTH, producto.id);
+      const lots = await fsServices.lotesCaducidades.getByProduct(activeWarehouseId, producto.id);
       setCaducidadAlert(buildUpcomingExpiryAlert(lots));
     } catch (err) {
       // A scan should still succeed if the optional alert query is unavailable.
@@ -1954,7 +1956,8 @@ export default function Embarques({
     }[],
   ) => void;
 }) {
-  const { canQuery } = useAuthorization();
+  const { canQuery, warehouseIds = [] } = useAuthorization();
+  const activeWarehouseId = warehouseIds[0] ?? WAREHOUSE_IDS.NORTH;
   // Feature flag
   const useFirestore = isFeatureEnabled("USE_FIRESTORE_EMBARQUES") && !!db && canQuery;
 
@@ -2028,7 +2031,7 @@ export default function Embarques({
     setErrorFs(null);
 
     fsServices.shipments
-      .getByWarehouse(WAREHOUSE_IDS.NORTH)
+      .getByWarehouse(activeWarehouseId)
       .then((shipments: any[]) => {
         const converted = shipments.map((s: any) => fromFirestoreShipment(s, catalogoProductos));
         setEmbarques((current) => {
@@ -2076,7 +2079,7 @@ export default function Embarques({
       fsServices.shipments
         .createShipment(
           {
-            warehouseId: WAREHOUSE_IDS.NORTH,
+            warehouseId: activeWarehouseId,
             lines,
             folio: "",
             cliente: "",
@@ -2200,7 +2203,7 @@ export default function Embarques({
       // Buscar el almacén por nombre para obtener su ID
       // En producción esto vendría de un catálogo real
       const almacenId =
-        activeEmbarque.bodega === "Tehuacan-1" ? WAREHOUSE_IDS.NORTH : WAREHOUSE_IDS.SOUTH;
+        activeWarehouseId;
 
       const productosParaInventario = activeEmbarque.productos
         .map((p) => ({
@@ -2258,7 +2261,7 @@ export default function Embarques({
         proveedorId: activeEmbarque.cliente,
         proveedorNombre: activeEmbarque.cliente,
         fecha: new Date(activeEmbarque.fechaCreacion),
-        almacenDestinoId: WAREHOUSE_IDS.NORTH,
+        almacenDestinoId: activeWarehouseId,
         items: activeEmbarque.productos.map((p) => ({
           productoId: p.id,
           productoNombre: p.nombre,
@@ -2480,7 +2483,7 @@ export default function Embarques({
                 setLoadingFs(true);
                 setErrorFs(null);
                 fsServices?.shipments
-                  .getByWarehouse(WAREHOUSE_IDS.NORTH)
+                  .getByWarehouse(activeWarehouseId)
                   .then((s: any[]) => {
                     setEmbarques(s.map((sh: any) => fromFirestoreShipment(sh, catalogoProductos)));
                     setLoadingFs(false);
@@ -2818,6 +2821,7 @@ export default function Embarques({
             onNext={goNextPaso}
             useFirestore={useFirestore}
             fsServices={fsServices}
+            activeWarehouseId={activeWarehouseId}
           />
         )}
         {activeEmbarque.paso === 3 && (
@@ -2901,6 +2905,7 @@ export default function Embarques({
                 onNext={goNextPaso}
                 useFirestore={useFirestore}
                 fsServices={fsServices}
+                activeWarehouseId={activeWarehouseId}
               />
             )}
             {activeEmbarque!.paso === 3 && (

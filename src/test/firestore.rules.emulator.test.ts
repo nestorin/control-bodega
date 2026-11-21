@@ -529,6 +529,36 @@ describe("Firestore security rules (emulator)", () => {
     );
   });
 
+  rulesTest("allows operators to save shipment preparation fields", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `organizations/${orgId}/shipments/shipment-prep`), {
+        organizationId: orgId,
+        warehouseId: wh1,
+        status: "PROGRAMMED",
+        lines: [],
+        folio: "",
+        cliente: "",
+        bodega: "Tehuacan-1",
+        tarimasEscaneadas: [],
+        evidencia: {},
+        paso: 1,
+      });
+    });
+
+    const db = testEnv.authenticatedContext("operator-1").firestore();
+    await assertSucceeds(
+      updateDoc(doc(db, `organizations/${orgId}/shipments/shipment-prep`), {
+        folio: "FAC-QA-001",
+        cliente: "Cliente QA",
+        bodega: "Tehuacan-1",
+        lines: [],
+        tarimasEscaneadas: [],
+        evidencia: {},
+        paso: 2,
+      }),
+    );
+  });
+
   rulesTest("denies creating a shipment directly in a terminal status", async () => {
     const db = testEnv!.authenticatedContext("operator-1").firestore();
     await assertFails(
