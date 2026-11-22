@@ -2088,6 +2088,9 @@ export default function Embarques({
             evidencia: {},
             paso: 1,
             fechaCreacion: nuevo.fechaCreacion,
+            // Initial preparation is a draft. Stock validation belongs to the
+            // authorized completion operation, not to creating the draft.
+            validateStock: false,
           } as any,
           "user",
           "op-" + Date.now(),
