@@ -16,6 +16,7 @@ import { WAREHOUSE_IDS } from "@/config/warehouses";
 import { buildUpcomingExpiryAlert } from "@/services/expiryAlerts";
 import { mergeCanonicalConversions, type EmbarqueConversion } from "@/services/conversiones";
 import { normalizeShipmentProducts } from "@/services/domain/shipmentProductSelection";
+import { useQrScanner } from "@/hooks/useQrScanner";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1143,6 +1144,17 @@ function Paso2({
   const [error, setError] = useState<string | null>(null);
   const [showCerrar, setShowCerrar] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [activeQr, setActiveQr] = useState<string | null>(null);
+  const {
+    qrReaderRef,
+    isScanning,
+    scanError,
+    startScanning,
+    stopScanning,
+    clearError: clearScannerError,
+  } = useQrScanner();
+
+  useEffect(() => () => stopScanning(), [stopScanning]);
 
   const tarimasTotales = totalTarimas(embarque.productos);
 
@@ -1171,8 +1183,8 @@ function Paso2({
     }
   }
 
-  async function handleScan() {
-    const id = qrInput.trim().toUpperCase();
+  async function handleScan(scannedId?: string) {
+    const id = (scannedId ?? qrInput).trim().toUpperCase();
     if (!id) return;
     setError(null);
     setCaducidadAlert(null);
@@ -1225,6 +1237,8 @@ function Paso2({
         };
         onChange(updated);
         await checkCaducidades(producto);
+        setActiveQr(id);
+        stopScanning();
       } catch (err: any) {
         setError(err.message || "Error al escanear tarima");
       } finally {
@@ -1249,6 +1263,8 @@ function Paso2({
     };
     onChange(updated);
     await checkCaducidades(producto);
+    setActiveQr(id);
+    stopScanning();
 
     const total = updated.tarimasEscaneadas.length;
     setShowCerrar(total >= tarimasTotales);
@@ -1271,6 +1287,48 @@ function Paso2({
       <ProgressBar paso={2} />
 
       {/* QR Scanner */}
+      <SectionCard>
+        <p className="mb-3 text-sm text-gray-600">
+          {activeQr ? `ID validado: ${activeQr}` : "Escaneá una tarima para validar su salida."}
+        </p>
+        <div className="relative aspect-video bg-[#172126] rounded-xl overflow-hidden">
+          <video ref={qrReaderRef} className="w-full h-full object-cover" playsInline muted />
+          {scanError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-red-50 p-4">
+              <div className="text-center">
+                <p className="text-red-700 mb-2">{scanError}</p>
+                <button
+                  onClick={() => {
+                    clearScannerError();
+                    startScanning((code) => void handleScan(code));
+                  }}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Reintentar
+                </button>
+              </div>
+            </div>
+          )}
+          {!isScanning && !scanError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+              <button
+                onClick={() => startScanning((code) => void handleScan(code))}
+                className="px-6 py-3 bg-[#f2b84b] rounded-xl shadow-lg text-[#16343f] font-bold hover:bg-[#e0a83f] transition-colors"
+              >
+                Activar cámara
+              </button>
+            </div>
+          )}
+        </div>
+        {activeQr && (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 p-3">
+            <span className="font-medium text-green-800">✓ QR validado para salida</span>
+            <span className="font-mono text-sm text-green-700">{activeQr}</span>
+          </div>
+        )}
+      </SectionCard>
+
+      {/* Manual Input — same fallback as reception capture */}
       <SectionCard>
         <p
           className="font-bold text-[#172126] text-[18px] mb-1"

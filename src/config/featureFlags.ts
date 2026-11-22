@@ -7,7 +7,9 @@ export const FEATURE_FLAGS = {
   // production even when the hosting build omits local .env files.
   USE_FIRESTORE_CATALOGOS: import.meta.env.VITE_FIRESTORE_CATALOGOS !== "false",
   USE_FIRESTORE_LABELING_CATALOGOS: import.meta.env.VITE_FIRESTORE_LABELING_CATALOGOS !== "false",
-  USE_FIRESTORE_RECEPCIONES: import.meta.env.VITE_FIRESTORE_RECEPCIONES === "true",
+  // Recepciones are persisted through the callable backend. Keep the
+  // canonical path enabled in production unless explicitly disabled.
+  USE_FIRESTORE_RECEPCIONES: import.meta.env.VITE_FIRESTORE_RECEPCIONES !== "false",
   USE_FIRESTORE_EVIDENCIAS: import.meta.env.VITE_FIRESTORE_EVIDENCIAS === "true",
   USE_FIRESTORE_INVENTARIO: import.meta.env.VITE_FIRESTORE_INVENTARIO === "true",
   // Lote projections are the canonical inventory read model. Keep this on by
