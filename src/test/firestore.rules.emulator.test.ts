@@ -559,6 +559,50 @@ describe("Firestore security rules (emulator)", () => {
     );
   });
 
+  rulesTest("accepts legacy scalar warehouse membership aliases for shipment create", async () => {
+    await testEnv!.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `organizations/${orgId}/users/legacy-create`), {
+        ...membership("legacy-create", "OPERATOR", "Tehuacan-1"),
+      });
+    });
+
+    const db = testEnv!.authenticatedContext("legacy-create").firestore();
+    await assertSucceeds(
+      setDoc(doc(db, `organizations/${orgId}/shipments/shipment-legacy-create`), {
+        id: "shipment-legacy-create",
+        organizationId: orgId,
+        warehouseId: wh1,
+        status: "PROGRAMMED",
+        lines: [],
+      }),
+    );
+  });
+
+  rulesTest("accepts legacy list warehouse membership aliases for shipment update", async () => {
+    await testEnv!.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `organizations/${orgId}/users/legacy-update`), {
+        ...membership("legacy-update", "OPERATOR", null),
+        warehouseIds: ["ALM-001"],
+      });
+      await setDoc(doc(db, `organizations/${orgId}/shipments/shipment-legacy-update`), {
+        id: "shipment-legacy-update",
+        organizationId: orgId,
+        warehouseId: wh1,
+        status: "PROGRAMMED",
+        lines: [],
+      });
+    });
+
+    const db = testEnv!.authenticatedContext("legacy-update").firestore();
+    await assertSucceeds(
+      updateDoc(doc(db, `organizations/${orgId}/shipments/shipment-legacy-update`), {
+        status: "IN_PROGRESS",
+        lines: [],
+      }),
+    );
+  });
+
   rulesTest("denies creating a shipment directly in a terminal status", async () => {
     const db = testEnv!.authenticatedContext("operator-1").firestore();
     await assertFails(

@@ -42,6 +42,23 @@ service cloud.firestore {
       return warehouseId is string && warehouseId in ['wh_tehuacan_1', 'wh_tehuacan_2'];
     }
 
+    // Membership records written by older clients may still contain display
+    // names or legacy warehouse codes. Requests themselves must always use
+    // canonical warehouse IDs; aliases are accepted only when comparing a
+    // membership's stored scope to that canonical request ID.
+    function membershipWarehouseMatches(legacyOrCanonicalId, canonicalId) {
+      return legacyOrCanonicalId is string && (
+        (canonicalId == 'wh_tehuacan_1' &&
+          legacyOrCanonicalId in [
+            'wh_tehuacan_1', 'Tehuacan-1', 'ALM-001', 'almacen-001', 'warehouse-1'
+          ]) ||
+        (canonicalId == 'wh_tehuacan_2' &&
+          legacyOrCanonicalId in [
+            'wh_tehuacan_2', 'Tehuacan-2', 'ALM-002', 'almacen-002', 'warehouse-2'
+          ])
+      );
+    }
+
     function isUserCreatedWarehouseId(warehouseId) {
       return warehouseId is string && warehouseId.matches('^ALM-\\d{3}$');
     }
@@ -56,10 +73,14 @@ service cloud.firestore {
       return isValidWarehouseId(warehouseId) && isMemberOf(orgId) && (
         membership.data.role in ['SUPER_ADMIN', 'ADMIN'] ||
         (membership.data.warehouseId != null &&
-          isValidWarehouseId(membership.data.warehouseId) &&
-          membership.data.warehouseId == warehouseId) ||
+          membershipWarehouseMatches(membership.data.warehouseId, warehouseId)) ||
         (membership.data.warehouseIds is list &&
-          membership.data.warehouseIds.hasAny([warehouseId]))
+          ((warehouseId == 'wh_tehuacan_1' && membership.data.warehouseIds.hasAny([
+            'wh_tehuacan_1', 'Tehuacan-1', 'ALM-001', 'almacen-001', 'warehouse-1'
+          ])) ||
+          (warehouseId == 'wh_tehuacan_2' && membership.data.warehouseIds.hasAny([
+            'wh_tehuacan_2', 'Tehuacan-2', 'ALM-002', 'almacen-002', 'warehouse-2'
+          ]))))
       );
     }
 
