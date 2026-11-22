@@ -2202,8 +2202,7 @@ export default function Embarques({
     if (onReducirInventario && activeEmbarque.bodega) {
       // Buscar el almacén por nombre para obtener su ID
       // En producción esto vendría de un catálogo real
-      const almacenId =
-        activeWarehouseId;
+      const almacenId = activeWarehouseId;
 
       const productosParaInventario = activeEmbarque.productos
         .map((p) => ({
