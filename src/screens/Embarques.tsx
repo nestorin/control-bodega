@@ -1956,8 +1956,8 @@ export default function Embarques({
     }[],
   ) => void;
 }) {
-  const { canQuery, warehouseIds = [] } = useAuthorization();
-  const activeWarehouseId = warehouseIds[0] ?? WAREHOUSE_IDS.NORTH;
+  const { canQuery, profile, warehouseIds = [] } = useAuthorization();
+  const activeWarehouseId = warehouseIds[0] ?? profile?.warehouseId ?? WAREHOUSE_IDS.NORTH;
   // Feature flag
   const useFirestore = isFeatureEnabled("USE_FIRESTORE_EMBARQUES") && !!db && canQuery;
 
@@ -2138,22 +2138,21 @@ export default function Embarques({
         });
       }
 
+      const shipmentUpdate: Record<string, unknown> = {
+        lines,
+        folio: updated.folio,
+        cliente: updated.cliente,
+        bodega: updated.bodega,
+        tarimasEscaneadas: updated.tarimasEscaneadas,
+        evidencia: updated.evidencia,
+        paso: updated.paso,
+      };
+      if (updated.fechaProgramada !== undefined) {
+        shipmentUpdate.fechaProgramada = updated.fechaProgramada;
+      }
+
       fsServices.shipments
-        .update(
-          updated.id,
-          {
-            lines,
-            folio: updated.folio,
-            cliente: updated.cliente,
-            bodega: updated.bodega,
-            tarimasEscaneadas: updated.tarimasEscaneadas,
-            evidencia: updated.evidencia,
-            paso: updated.paso,
-            fechaProgramada: updated.fechaProgramada,
-          } as any,
-          "user",
-          "op-" + Date.now(),
-        )
+        .update(updated.id, shipmentUpdate as any, "user", "op-" + Date.now())
         .catch((err: Error) => {
           console.error("Error updating shipment:", err);
           setErrorFs(err.message);
