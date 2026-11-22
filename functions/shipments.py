@@ -1,4 +1,5 @@
 """Authoritative shipment confirmation transaction for Firestore."""
+from hashlib import sha256
 from firebase_functions import https_fn
 from firebase_admin import firestore, get_app, initialize_app
 
@@ -13,6 +14,10 @@ except ValueError:
 
 ORG_ID = "org_exepa_001"
 WAREHOUSE_IDS = {"wh_tehuacan_1", "wh_tehuacan_2"}
+WAREHOUSE_ALIASES = {
+    "wh_tehuacan_1": {"wh_tehuacan_1", "Tehuacan-1", "ALM-001", "almacen-001", "warehouse-1"},
+    "wh_tehuacan_2": {"wh_tehuacan_2", "Tehuacan-2", "ALM-002", "almacen-002", "warehouse-2"},
+}
 # SUPER_ADMIN is a real Firestore membership role: firestore.rules grants it the
 # same authority as ADMIN, receptions.py already accepts it, and production
 # memberships carry it.
@@ -20,6 +25,12 @@ ALLOWED_ROLES = {"OPERATOR", "SUPERVISOR", "AUDITOR", "ADMIN", "SUPER_ADMIN"}
 
 def _error(message: str) -> https_fn.HttpsError:
     return https_fn.HttpsError("failed-precondition", message)
+
+
+def _lot_projection_id(warehouse_id, product_id, lot, expiry_date):
+    """Match the deterministic lot projection id created by receptions."""
+    projection_key = "\0".join((warehouse_id, product_id, lot, expiry_date))
+    return f"lot-{sha256(projection_key.encode('utf-8')).hexdigest()[:32]}"
 
 
 def _validate_completion_status(status: object) -> None:
@@ -172,20 +183,38 @@ def confirm_shipment(req: https_fn.CallableRequest):
                 raise _error(f"Insufficient stock for {product_id}")
 
         if pallet_ids:
-            pallet_query = (
-                db.collection_group("pallets")
-                .where("organizationId", "==", ORG_ID)
-                .where("warehouseId", "==", warehouse_id)
-                .where("id", "in", pallet_ids[:30])
-            )
-            pallet_snapshots = read_documents(transaction, pallet_query)
+            # The scanner submits printed QR identifiers (TQR-...). Resolve
+            # those directly; legacy callers may still submit internal pallet ids.
+            if all(pallet_id.startswith("TQR-") for pallet_id in pallet_ids):
+                pallet_query = db.collection_group("pallets").where(
+                    "qrIdentifier", "in", pallet_ids[:30]
+                )
+                pallet_snapshots = [
+                    snapshot for snapshot in read_documents(transaction, pallet_query)
+                    if (snapshot.to_dict() or {}).get("organizationId") == ORG_ID
+                    and (snapshot.to_dict() or {}).get("warehouseId") in WAREHOUSE_ALIASES[warehouse_id]
+                ]
+            else:
+                pallet_query = (
+                    db.collection_group("pallets")
+                    .where("organizationId", "==", ORG_ID)
+                    .where("warehouseId", "==", warehouse_id)
+                    .where("id", "in", pallet_ids[:30])
+                )
+                pallet_snapshots = read_documents(transaction, pallet_query)
             pallets_by_id = {
-                (snapshot.to_dict() or {}).get("id"): snapshot.to_dict() or {}
+                key: item
                 for snapshot in pallet_snapshots
+                for item in [snapshot.to_dict() or {}]
+                for key in (item.get("id"), item.get("qrIdentifier"))
+                if key
             }
             pallet_refs_by_id = {
-                (snapshot.to_dict() or {}).get("id"): snapshot.reference
+                key: snapshot.reference
                 for snapshot in pallet_snapshots
+                for item in [snapshot.to_dict() or {}]
+                for key in (item.get("id"), item.get("qrIdentifier"))
+                if key
             }
             found = set(pallets_by_id)
             if found != set(pallet_ids):
@@ -194,6 +223,41 @@ def confirm_shipment(req: https_fn.CallableRequest):
             _claim_scanned_pallets(
                 transaction, lines, pallets_by_id, pallet_refs_by_id, shipment_id
             )
+
+        # Keep the lot read model aligned with the authoritative movement
+        # ledger. Each scanned pallet contributes its boxes to the shipment.
+        lot_deltas = {}
+        lot_refs = {}
+        for pallet_id in pallet_ids:
+            pallet = pallets_by_id[pallet_id]
+            lot = pallet.get("lot")
+            expiry = pallet.get("expiryDate")
+            product_id = pallet.get("productId")
+            quantity = pallet.get("quantity")
+            if not all(isinstance(value, str) and value for value in (lot, product_id)):
+                raise _error("Scanned pallet is missing lot traceability")
+            if hasattr(expiry, "to_datetime"):
+                expiry = expiry.to_datetime().date().isoformat()
+            elif hasattr(expiry, "isoformat"):
+                expiry = expiry.date().isoformat() if hasattr(expiry, "date") else expiry.isoformat()
+            if not isinstance(expiry, str) or not expiry:
+                raise _error("Scanned pallet is missing expiry traceability")
+            projection_id = _lot_projection_id(warehouse_id, product_id, lot, expiry)
+            lot_refs[projection_id] = db.document(
+                f"organizations/{ORG_ID}/lotes_caducidades/{projection_id}"
+            )
+            lot_deltas[projection_id] = lot_deltas.get(projection_id, 0) + int(quantity or 0)
+        for projection_id, delta in lot_deltas.items():
+            lot_snapshot = read_document(transaction, lot_refs[projection_id])
+            if lot_snapshot is None or not lot_snapshot.exists:
+                raise _error("Lot projection not found for scanned pallet")
+            current_boxes = int((lot_snapshot.to_dict() or {}).get("cajas", 0))
+            if current_boxes < delta:
+                raise _error("Lot projection has insufficient boxes")
+            transaction.update(lot_refs[projection_id], {
+                "cajas": current_boxes - delta,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            })
 
         transaction.update(shipment_ref, {"status": "COMPLETED"})
         for lock_ref in lock_refs:

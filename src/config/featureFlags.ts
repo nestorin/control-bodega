@@ -10,7 +10,9 @@ export const FEATURE_FLAGS = {
   USE_FIRESTORE_RECEPCIONES: import.meta.env.VITE_FIRESTORE_RECEPCIONES === "true",
   USE_FIRESTORE_EVIDENCIAS: import.meta.env.VITE_FIRESTORE_EVIDENCIAS === "true",
   USE_FIRESTORE_INVENTARIO: import.meta.env.VITE_FIRESTORE_INVENTARIO === "true",
-  USE_FIRESTORE_LOTES: import.meta.env.VITE_FIRESTORE_LOTES === "true",
+  // Lote projections are the canonical inventory read model. Keep this on by
+  // default so production builds without local .env files do not render an empty inventory screen.
+  USE_FIRESTORE_LOTES: import.meta.env.VITE_FIRESTORE_LOTES !== "false",
   USE_FIRESTORE_EMBARQUES: import.meta.env.VITE_FIRESTORE_EMBARQUES === "true",
   USE_FIRESTORE_OFFLINE_QUEUE: import.meta.env.VITE_FIRESTORE_OFFLINE_QUEUE === "true",
   USE_NEW_RECEPTION_FLOW: import.meta.env.VITE_USE_NEW_RECEPTION_FLOW !== "false",
