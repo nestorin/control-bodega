@@ -10,7 +10,10 @@ export type ResumeTargetScreen = Extract<Screen, "editar-recepcion" | "captura-t
  * persisted documents to the same context state and target screen.
  */
 export function resolveResumeTarget(status: ReceptionDoc["status"]): ResumeTargetScreen | null {
-  if (status === "DRAFT") return "editar-recepcion";
+  // "Reanudar" is the operational continuation action. Editing remains a
+  // separate row-menu action; a draft must enter pallet capture and transition
+  // to IN_PROGRESS before the capture screen is shown.
+  if (status === "DRAFT") return "captura-tarima";
   if (status === "IN_PROGRESS") return "captura-tarima";
   return null;
 }

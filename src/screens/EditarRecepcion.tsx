@@ -12,7 +12,6 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   createFirestoreServices,
   type PlannedReceptionPalletDraft,
@@ -83,15 +82,20 @@ export default function EditarRecepcion({
     catalogosLoading,
     catalogosError,
   } = useCatalogos();
-  const { editReceptionData } = useReceptionFlow();
-  const navigate = useNavigate();
+  const { editReceptionData, navigate: navigateToScreen } = useReceptionFlow();
 
   // Legacy prop fallbacks: App passes no props, so the context/hook state wins.
   const recId = recIdProp ?? editReceptionData?.receptionId;
   const supplierCatalog = suppliers ?? catalogoProveedores;
   const productCatalog = products ?? catalogoProductos;
-  const handleBack = onBack ?? (() => navigate("/recepciones"));
-  const handleSaveSuccess = onSave ?? (() => navigate("/recepciones"));
+  // App uses ReceptionContext as the source of truth for the rendered screen.
+  // Updating only the URL leaves the editor mounted, so route both through the
+  // context and the router when a legacy callback is not supplied.
+  const goToRecepciones = () => {
+    navigateToScreen("recepciones", "recepciones");
+  };
+  const handleBack = onBack ?? goToRecepciones;
+  const handleSaveSuccess = onSave ?? goToRecepciones;
 
   const services = useMemo(() => (db ? createFirestoreServices(db, ORG_ID) : null), []);
   const [reception, setReception] = useState<ReceptionDoc | null>(null);

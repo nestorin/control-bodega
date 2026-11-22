@@ -15,7 +15,7 @@ import { useAuthorization, isPermissionDenied } from "@/hooks/useAuthorization";
 import { useUIContext } from "@/context";
 import { InventoryGridTab } from "@/components/inventario/InventoryGridTab";
 import type { LotCaducidadDoc } from "@/services/firestore/types";
-import { WAREHOUSE_IDS } from "@/config/warehouses";
+import { getWarehouseName, normalizeWarehouseId, WAREHOUSE_IDS } from "@/config/warehouses";
 import {
   buildInventoryImportRows,
   parseInventoryImport,
@@ -92,7 +92,11 @@ export default function LotesCaducidades() {
   // ============================================
   // New Architecture Hooks
   // ============================================
-  const { user, canQuery } = useAuthorization();
+  const { user, canQuery, profile, warehouseIds } = useAuthorization();
+  const activeWarehouseId =
+    normalizeWarehouseId(profile?.warehouseId) ??
+    normalizeWarehouseId(warehouseIds[0]) ??
+    WAREHOUSE_IDS.NORTH;
   const { closeSidebarOnMobile } = useUIContext();
 
   const [lotes, setLotes] = useState<LoteRow[]>([]);
@@ -113,7 +117,7 @@ export default function LotesCaducidades() {
   const [importPreview, setImportPreview] = useState<InventoryImportPreview | null>(null);
   const [importFileName, setImportFileName] = useState("");
   const [importBuffer, setImportBuffer] = useState<ArrayBuffer | null>(null);
-  const [importWarehouseId, setImportWarehouseId] = useState<string>(WAREHOUSE_IDS.NORTH);
+  const [importWarehouseId, setImportWarehouseId] = useState<string>(activeWarehouseId);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
 
@@ -141,7 +145,7 @@ export default function LotesCaducidades() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fsServices.lotesCaducidades.getByWarehouse(WAREHOUSE_IDS.NORTH);
+      const res = await fsServices.lotesCaducidades.getByWarehouse(activeWarehouseId);
       const mapped: LoteRow[] = res.map((l) => ({
         ...l,
         diasParaCaducar: getDiasParaCaducar(l.expiryDate),
@@ -161,7 +165,11 @@ export default function LotesCaducidades() {
     } finally {
       setLoading(false);
     }
-  }, [fsServices]);
+  }, [fsServices, activeWarehouseId]);
+
+  useEffect(() => {
+    setImportWarehouseId(activeWarehouseId);
+  }, [activeWarehouseId]);
 
   useEffect(() => {
     loadLotes();
@@ -418,7 +426,7 @@ export default function LotesCaducidades() {
               Inventario
             </h1>
             <p className="text-[12px] text-[#607078]" style={{ fontFamily: "'Inter',sans-serif" }}>
-              Control de inventario por lote · Tehuacan-1
+              Control de inventario por lote · {getWarehouseName(activeWarehouseId) ?? activeWarehouseId}
             </p>
           </div>
         </div>
