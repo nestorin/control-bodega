@@ -17,6 +17,7 @@ import { buildUpcomingExpiryAlert } from "@/services/expiryAlerts";
 import { mergeCanonicalConversions, type EmbarqueConversion } from "@/services/conversiones";
 import { normalizeShipmentProducts } from "@/services/domain/shipmentProductSelection";
 import { useQrScanner } from "@/hooks/useQrScanner";
+import { Panel } from "@/components/ui";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1287,11 +1288,11 @@ function Paso2({
       <ProgressBar paso={2} />
 
       {/* QR Scanner */}
-      <SectionCard>
+      <Panel className="mb-4">
         <p className="mb-3 text-sm text-gray-600">
-          {activeQr ? `ID validado: ${activeQr}` : "Escaneá una tarima para validar su salida."}
+          {activeQr ? `ID: ${activeQr}` : "Preparando..."}
         </p>
-        <div className="relative aspect-video bg-[#172126] rounded-xl overflow-hidden">
+        <div className="relative aspect-video bg-gray-100 rounded-xl overflow-hidden">
           <video ref={qrReaderRef} className="w-full h-full object-cover" playsInline muted />
           {scanError && (
             <div className="absolute inset-0 flex items-center justify-center bg-red-50 p-4">
@@ -1313,7 +1314,7 @@ function Paso2({
             <div className="absolute inset-0 flex items-center justify-center bg-black/50">
               <button
                 onClick={() => startScanning((code) => void handleScan(code))}
-                className="px-6 py-3 bg-[#f2b84b] rounded-xl shadow-lg text-[#16343f] font-bold hover:bg-[#e0a83f] transition-colors"
+                className="px-6 py-3 bg-white rounded-xl shadow-lg text-gray-900 font-medium hover:bg-gray-100 transition-colors"
               >
                 Activar cámara
               </button>
@@ -1322,14 +1323,14 @@ function Paso2({
         </div>
         {activeQr && (
           <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 p-3">
-            <span className="font-medium text-green-800">✓ QR validado para salida</span>
+            <span className="font-medium text-green-800">✓ QR Detectado</span>
             <span className="font-mono text-sm text-green-700">{activeQr}</span>
           </div>
         )}
-      </SectionCard>
+      </Panel>
 
       {/* Manual Input — same fallback as reception capture */}
-      <SectionCard>
+      <Panel className="mb-4">
         <p
           className="font-bold text-[#172126] text-[18px] mb-1"
           style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}
@@ -1426,7 +1427,7 @@ function Paso2({
             </p>
           </div>
         )}
-      </SectionCard>
+      </Panel>
 
       {/* Per-product progress */}
       <SectionCard>

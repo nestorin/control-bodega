@@ -885,7 +885,14 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
   }
 
   async function handleGuardar({ showCodes = true }: { showCodes?: boolean } = {}) {
-    if (saved && !isEditingSavedReception) {
+    // A program saved without QR codes must still be allowed to continue into
+    // code generation. Once the canonical pallet plan exists, the operation
+    // is already complete and the button only reports its resumable state.
+    if (saved && !isEditingSavedReception && plannedPallets.length === 0 && !showCodes) {
+      setNotices(["La programación ya está guardada y disponible para reanudar en Recepciones."]);
+      return;
+    }
+    if (saved && !isEditingSavedReception && plannedPallets.length > 0) {
       if (showCodes) setStep(3);
       else
         setNotices(["La programación ya está guardada y disponible para reanudar en Recepciones."]);
@@ -973,7 +980,9 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
           scheduledDate: fechaRecepcion,
           purchaseOrderNumber: selectedOcrOrder?.folio || folio.trim() || undefined,
           supplierCode: getSupplierKey(),
-          plannedPallets: buildPalletPlan(),
+          // “Guardar programación” persists the reception as DRAFT first;
+          // only “Generar Códigos” materializes the canonical QR pallet plan.
+          plannedPallets: showCodes ? buildPalletPlan() : undefined,
         });
 
         if (persistence.lines.length === 0) {
@@ -983,7 +992,7 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
 
         try {
           const reception =
-            isEditingSavedReception && savedReceptionId
+            savedReceptionId && (isEditingSavedReception || saved)
               ? await fsServices.receptions.editReception(
                   savedReceptionId,
                   persistence.reception,
@@ -998,10 +1007,11 @@ export default function ProgramacionRecepcion({ onBack, onFinish, catalogos }: P
                   operationId,
                 );
           receptionId = reception.id;
-          if (!reception.plannedPallets?.length)
+          if (showCodes && !reception.plannedPallets?.length)
             throw new Error("El servidor no devolvió el plan canónico de tarimas");
-          setPlannedPallets(reception.plannedPallets);
-          nextQrCodes = reception.plannedPallets.map((pallet) => pallet.qrIdentifier);
+          const canonicalPlan = reception.plannedPallets ?? [];
+          setPlannedPallets(canonicalPlan);
+          nextQrCodes = canonicalPlan.map((pallet) => pallet.qrIdentifier);
           setCanonicalStickerHeader({
             receptionId: reception.id,
             folio: reception.folio || folio,

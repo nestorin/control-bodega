@@ -137,7 +137,19 @@ export function ScannerTarimas({
         if (!tarimaExistente) {
           // Tarima nueva - obtener auto-fill
           isNew = true;
-          const autoFill = await getAutoFillData(embarqueId);
+          // Prefer the last locally saved pallet as the immediate source of
+          // truth. The remote query can lag or fail while the shipment is
+          // being scanned, which previously left every subsequent form blank.
+          const previous = [...tarimas]
+            .reverse()
+            .find((item) => item.lote || item.caducidad);
+          const remoteAutoFill = await getAutoFillData(embarqueId).catch(
+            (): { lote?: string; caducidad?: Date } => ({}),
+          );
+          const autoFill = {
+            lote: remoteAutoFill.lote ?? previous?.lote,
+            caducidad: remoteAutoFill.caducidad ?? previous?.caducidad,
+          };
 
           // Crear tarima temporal para el formulario
           tarimaExistente = {
