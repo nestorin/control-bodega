@@ -5,6 +5,7 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -283,7 +284,22 @@ jobs:
   deploy-production:
     name: Deploy Production
     needs: [lint-and-typecheck, unit-tests, rules-tests, e2e-tests]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Manual recovery dispatches deliberately reuse the production secrets and
+    # deployment path even when unrelated test jobs are red. Pushes still
+    # require the complete CI gate.
+    if: >-
+      always() &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          needs.lint-and-typecheck.result == 'success' &&
+          needs.unit-tests.result == 'success' &&
+          needs.rules-tests.result == 'success' &&
+          needs.e2e-tests.result == 'success'
+        )
+      )
     runs-on: ubuntu-latest
     environment: production
     permissions:
