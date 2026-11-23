@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import type { Producto as CatalogoProducto, Proveedor } from "./Configuracion";
 import { useOcr } from "../hooks/useOcr";
 import { isFeatureEnabled } from "@/config/featureFlags";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { createFirestoreServices } from "@/services/firestore";
 import { useAuthorization, isPermissionDenied } from "@/hooks/useAuthorization";
 import type { ShipmentDoc, ShipmentLine } from "@/services/firestore/types";
@@ -18,6 +18,10 @@ import { mergeCanonicalConversions, type EmbarqueConversion } from "@/services/c
 import { normalizeShipmentProducts } from "@/services/domain/shipmentProductSelection";
 import { useQrScanner } from "@/hooks/useQrScanner";
 import { Panel } from "@/components/ui";
+import {
+  uploadShipmentEvidence,
+  type ShipmentEvidenceFileSlot,
+} from "@/services/shipmentEvidence";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,12 +50,13 @@ interface TarimaEscaneada {
 }
 
 interface Evidencia {
-  fotosEmbarque: string[];
-  fotoCaja: string;
-  transportista: string;
-  fotoSelloInterno: string;
-  fotoSelloCaja: string;
-  fotoDocumento: string;
+  loadedTrailer: string[];
+  trailerBox: string;
+  carrier: string;
+  internalSeal: string;
+  externalSeal: string;
+  signedDocument: string;
+  invoice: string;
 }
 
 interface Embarque {
@@ -61,7 +66,7 @@ interface Embarque {
   bodega: string;
   productos: Producto[];
   tarimasEscaneadas: TarimaEscaneada[];
-  evidencia: Partial<Evidencia>;
+  evidencePhotos: Partial<Evidencia>;
   status: EmbarqueStatus;
   paso: Paso;
   fechaCreacion: string;
@@ -77,7 +82,7 @@ interface FirestoreShipment {
   warehouseId: string;
   lines: ShipmentLine[];
   tarimasEscaneadas: TarimaEscaneada[];
-  evidencia: Partial<Evidencia>;
+  evidencePhotos: Partial<Evidencia>;
   status: ShipmentDoc["status"];
   paso: Paso;
   fechaCreacion: string;
@@ -131,7 +136,7 @@ const EMBARQUES_INICIALES: Embarque[] = [
         timestamp: "09:22",
       },
     ],
-    evidencia: { transportista: "Roberto Méndez" },
+    evidencePhotos: { carrier: "Roberto Méndez" },
     status: "completado",
     paso: 3,
     fechaCreacion: "2026-09-20",
@@ -154,7 +159,7 @@ const EMBARQUES_INICIALES: Embarque[] = [
       },
     ],
     tarimasEscaneadas: [{ id: "TAR-0041", productoNombre: "Pepsi 3 lts", timestamp: "14:05" }],
-    evidencia: {},
+    evidencePhotos: {},
     status: "en-proceso",
     paso: 2,
     fechaCreacion: "2026-09-26",
@@ -177,7 +182,7 @@ const EMBARQUES_INICIALES: Embarque[] = [
       },
     ],
     tarimasEscaneadas: [],
-    evidencia: {},
+    evidencePhotos: {},
     status: "programado",
     paso: 1,
     fechaCreacion: "2026-09-27",
@@ -230,7 +235,7 @@ function fromFirestoreShipment(
     bodega: fs.bodega,
     productos,
     tarimasEscaneadas: fs.tarimasEscaneadas,
-    evidencia: fs.evidencia,
+    evidencePhotos: fs.evidencePhotos ?? {},
     status: statusMap[fs.status] || "programado",
     paso: fs.paso,
     fechaCreacion: fs.fechaCreacion,
@@ -643,6 +648,7 @@ export function Paso1({
   catalogoProductos,
   catalogoConversiones,
   conversionSource,
+  onInvoiceUpload,
 }: {
   embarque: Embarque;
   onChange: (e: Embarque) => void;
@@ -650,6 +656,7 @@ export function Paso1({
   catalogoProductos: CatalogoProducto[];
   catalogoConversiones: EmbarqueConversion[];
   conversionSource: "loading" | "firestore" | "fallback";
+  onInvoiceUpload: (file: File) => Promise<void>;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const { runOcr, loading, result, error, clear } = useOcr();
@@ -684,13 +691,14 @@ export function Paso1({
   const canContinue =
     embarque.folio.trim() &&
     embarque.cliente.trim() &&
+    embarque.evidencePhotos.invoice &&
     normalizeShipmentProducts(embarque.productos, catalogoProductos) !== null;
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      await runOcr(file, "cfdi");
+      await Promise.all([runOcr(file, "cfdi"), onInvoiceUpload(file)]);
     } catch {
       // error handled by hook
     }
@@ -737,6 +745,11 @@ export function Paso1({
               Limpiar
             </button>
           </div>
+        )}
+        {embarque.evidencePhotos.invoice && (
+          <p className="mb-3 text-xs font-semibold text-[#16845b]">
+            Factura almacenada como evidencia del embarque.
+          </p>
         )}
         <input
           ref={fileRef}
@@ -1575,14 +1588,17 @@ function PhotoSlot({
   label,
   icon,
   value,
-  onChange,
+  onUpload,
 }: {
   label: string;
   icon: React.ReactNode;
   value: string;
-  onChange: (v: string) => void;
+  onUpload: (file: File) => Promise<void>;
 }) {
   const ref = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const borderColor = value ? "#16845b" : "#dce4e7";
   const bgColor = value ? "#e2f5ec" : "transparent";
   const iconBgColor = value ? "#16845b" : "#edf1f3";
@@ -1601,7 +1617,18 @@ function PhotoSlot({
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];
-          if (f) onChange(URL.createObjectURL(f));
+          if (f) {
+            const nextPreview = URL.createObjectURL(f);
+            setPreview(nextPreview);
+            setUploading(true);
+            setUploadError(null);
+            void onUpload(f)
+              .catch((error) => {
+                setPreview(null);
+                setUploadError(error instanceof Error ? error.message : "No se pudo subir la foto");
+              })
+              .finally(() => setUploading(false));
+          }
         }}
       />
       <button
@@ -1641,8 +1668,13 @@ function PhotoSlot({
         >
           {value ? "Foto capturada" : "Tomar foto"}
         </p>
-        {value && <img src={value} alt="" className="ml-auto size-10 rounded-[6px] object-cover" />}
+        {uploading ? (
+          <span className="ml-auto text-[11px] text-[#607078]">Subiendo…</span>
+        ) : preview ? (
+          <img src={preview} alt="" className="ml-auto size-10 rounded-[6px] object-cover" />
+        ) : null}
       </button>
+      {uploadError && <p className="mt-1 text-xs text-red-700">{uploadError}</p>}
     </div>
   );
 }
@@ -1668,20 +1700,45 @@ function Paso3({
   onChange,
   onFinish,
   proveedores,
+  onUploadEvidence,
 }: {
   embarque: Embarque;
   onChange: (e: Embarque) => void;
   onFinish: () => void;
   proveedores: Proveedor[];
+  onUploadEvidence: (slot: ShipmentEvidenceFileSlot, file: File) => Promise<void>;
 }) {
-  const ev = embarque.evidencia;
+  const ev = embarque.evidencePhotos;
+  const [loadedPreviews, setLoadedPreviews] = useState<string[]>([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(0);
 
   function set(field: keyof Evidencia, val: string) {
-    onChange({ ...embarque, evidencia: { ...ev, [field]: val } });
+    onChange({ ...embarque, evidencePhotos: { ...ev, [field]: val } });
   }
 
   const canFinish =
-    ev.fotoCaja && ev.transportista && ev.fotoSelloInterno && ev.fotoSelloCaja && ev.fotoDocumento;
+    ev.invoice &&
+    (ev.loadedTrailer?.length ?? 0) > 0 &&
+    ev.trailerBox &&
+    ev.carrier &&
+    ev.internalSeal &&
+    ev.externalSeal &&
+    ev.signedDocument &&
+    uploading === 0;
+
+  async function upload(slot: ShipmentEvidenceFileSlot, file: File) {
+    setUploading((count) => count + 1);
+    setUploadError(null);
+    try {
+      await onUploadEvidence(slot, file);
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "No se pudo subir la evidencia");
+      throw error;
+    } finally {
+      setUploading((count) => count - 1);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -1706,7 +1763,7 @@ function Paso3({
           <div className="w-full">
             <Label>Fotos del embarque cargado en la caja del tráiler</Label>
             <div className="flex gap-2 flex-wrap">
-              {(ev.fotosEmbarque ?? []).map((src, i) => (
+              {loadedPreviews.map((src, i) => (
                 <img
                   key={i}
                   src={src}
@@ -1736,14 +1793,11 @@ function Paso3({
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (f) {
-                      const prev = ev.fotosEmbarque ?? [];
-                      onChange({
-                        ...embarque,
-                        evidencia: {
-                          ...ev,
-                          fotosEmbarque: [...prev, URL.createObjectURL(f)],
-                        },
-                      });
+                      const preview = URL.createObjectURL(f);
+                      setLoadedPreviews((current) => [...current, preview]);
+                      void upload("loadedTrailer", f).catch(() =>
+                        setLoadedPreviews((current) => current.filter((item) => item !== preview)),
+                      );
                     }
                   }}
                 />
@@ -1754,15 +1808,15 @@ function Paso3({
           <PhotoSlot
             label="Foto del número de caja del tráiler"
             icon={camIcon}
-            value={ev.fotoCaja ?? ""}
-            onChange={(v) => set("fotoCaja", v)}
+            value={ev.trailerBox ?? ""}
+            onUpload={(file) => upload("trailerBox", file)}
           />
 
           <div className="w-full">
             <Label>Transportista</Label>
             <TransportistaAutocomplete
-              value={ev.transportista ?? ""}
-              onChange={(v) => set("transportista", v)}
+              value={ev.carrier ?? ""}
+              onChange={(v) => set("carrier", v)}
               proveedores={proveedores}
             />
           </div>
@@ -1770,21 +1824,22 @@ function Paso3({
           <PhotoSlot
             label="Foto del sello interno"
             icon={camIcon}
-            value={ev.fotoSelloInterno ?? ""}
-            onChange={(v) => set("fotoSelloInterno", v)}
+            value={ev.internalSeal ?? ""}
+            onUpload={(file) => upload("internalSeal", file)}
           />
           <PhotoSlot
             label="Foto del sello puesto en la caja del tráiler"
             icon={camIcon}
-            value={ev.fotoSelloCaja ?? ""}
-            onChange={(v) => set("fotoSelloCaja", v)}
+            value={ev.externalSeal ?? ""}
+            onUpload={(file) => upload("externalSeal", file)}
           />
           <PhotoSlot
             label="Foto del documento firmado por el operador"
             icon={camIcon}
-            value={ev.fotoDocumento ?? ""}
-            onChange={(v) => set("fotoDocumento", v)}
+            value={ev.signedDocument ?? ""}
+            onUpload={(file) => upload("signedDocument", file)}
           />
+          {uploadError && <p className="text-sm text-red-700">{uploadError}</p>}
         </div>
       </SectionCard>
 
@@ -2038,6 +2093,7 @@ export default function Embarques({
   // shipment. Keep that local draft outside the request closure so the stale
   // response cannot replace the editor's only active record.
   const activeLocalDraftRef = useRef<Embarque | null>(null);
+  const shipmentCreatePromiseRef = useRef<Promise<string> | null>(null);
   const [filterStatus, setFilterStatus] = useState<EmbarqueStatus | "todos">("todos");
   const [loadingFs, setLoadingFs] = useState(false);
   const [errorFs, setErrorFs] = useState<string | null>(null);
@@ -2125,7 +2181,7 @@ export default function Embarques({
       bodega: "Tehuacan-1",
       productos: [newProducto()],
       tarimasEscaneadas: [],
-      evidencia: {},
+      evidencePhotos: {},
       status: programado ? "programado" : "en-proceso",
       paso: 1,
       fechaCreacion: new Date().toISOString().slice(0, 10),
@@ -2135,7 +2191,7 @@ export default function Embarques({
     // If using Firestore, create there too
     if (useFirestore && fsServices) {
       const lines = toShipmentLines(nuevo.productos);
-      fsServices.shipments
+      shipmentCreatePromiseRef.current = fsServices.shipments
         .createShipment(
           {
             warehouseId: activeWarehouseId,
@@ -2144,7 +2200,7 @@ export default function Embarques({
             cliente: "",
             bodega: "Tehuacan-1",
             tarimasEscaneadas: [],
-            evidencia: {},
+            evidencePhotos: {},
             paso: 1,
             fechaCreacion: nuevo.fechaCreacion,
             // Initial preparation is a draft. Stock validation belongs to the
@@ -2165,10 +2221,12 @@ export default function Embarques({
             return prev.map((e) => (e.id === id ? { ...e, id: created.id } : e));
           });
           setActiveId(created.id);
+          return created.id as string;
         })
         .catch((err: Error) => {
           console.error("Error creating shipment:", err);
           setErrorFs(err.message);
+          throw err;
         });
     }
 
@@ -2177,7 +2235,7 @@ export default function Embarques({
     setView("crear");
   }
 
-  function updateActive(updated: Embarque) {
+  async function updateActive(updated: Embarque): Promise<void> {
     if (activeLocalDraftRef.current?.id === updated.id) {
       activeLocalDraftRef.current = updated;
     }
@@ -2206,20 +2264,79 @@ export default function Embarques({
         cliente: updated.cliente,
         bodega: updated.bodega,
         tarimasEscaneadas: updated.tarimasEscaneadas,
-        evidencia: updated.evidencia,
+        evidencePhotos: updated.evidencePhotos,
         paso: updated.paso,
       };
       if (updated.fechaProgramada !== undefined) {
         shipmentUpdate.fechaProgramada = updated.fechaProgramada;
       }
 
-      fsServices.shipments
-        .update(updated.id, shipmentUpdate as any, "user", "op-" + Date.now())
-        .catch((err: Error) => {
-          console.error("Error updating shipment:", err);
-          setErrorFs(err.message);
-        });
+      try {
+        await fsServices.shipments.update(
+          updated.id,
+          shipmentUpdate as any,
+          "user",
+          "op-" + Date.now(),
+        );
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error("Error updating shipment");
+        console.error("Error updating shipment:", error);
+        setErrorFs(error.message);
+        throw error;
+      }
     }
+  }
+
+  async function resolveShipmentId(shipmentId: string): Promise<string> {
+    if (shipmentId.startsWith("EMB-") && shipmentCreatePromiseRef.current) {
+      return shipmentCreatePromiseRef.current;
+    }
+    return shipmentId;
+  }
+
+  async function uploadAndPersistShipmentEvidence(
+    slot: ShipmentEvidenceFileSlot,
+    file: File,
+  ): Promise<void> {
+    if (!storage || !fsServices || !useFirestore || !activeEmbarque) {
+      throw new Error("Firestore y Storage deben estar disponibles para guardar evidencia");
+    }
+    const shipmentId = await resolveShipmentId(activeEmbarque.id);
+    const path = await uploadShipmentEvidence(
+      storage,
+      ORG_ID,
+      activeWarehouseId,
+      shipmentId,
+      slot,
+      file,
+    );
+    const current = embarques.find((shipment) => shipment.id === shipmentId) ?? {
+      ...activeEmbarque,
+      id: shipmentId,
+    };
+    const evidencePhotos = {
+      ...current.evidencePhotos,
+      ...(slot === "loadedTrailer"
+        ? { loadedTrailer: [...(current.evidencePhotos.loadedTrailer ?? []), path] }
+        : { [slot]: path }),
+    };
+    // Persist via backend callable (validates paths and auth)
+    await fsServices.shipments.saveEvidence(
+      shipmentId,
+      evidencePhotos as {
+        loadedTrailer: string[];
+        trailerBox: string;
+        internalSeal: string;
+        externalSeal: string;
+        signedDocument: string;
+        invoice: string;
+        carrier: string;
+      },
+      "user",
+      `op-evidence-${Date.now()}`,
+    );
+    // Update local state for immediate UI feedback
+    await updateActive({ ...current, evidencePhotos });
   }
 
   function goNextPaso() {
@@ -2229,11 +2346,18 @@ export default function Embarques({
     updateActive(updated);
   }
 
-  function finishEmbarque() {
+  async function finishEmbarque() {
     if (!activeEmbarque) return;
 
     // If using Firestore, complete the shipment with atomic transaction
     if (useFirestore && fsServices) {
+      try {
+        // The evidence update must be committed before completion changes the
+        // shipment lifecycle and closes the update window in security rules.
+        await updateActive(activeEmbarque);
+      } catch {
+        return;
+      }
       httpsCallable(
         getFunctions(),
         "confirm_shipment",
@@ -2797,7 +2921,7 @@ export default function Embarques({
           </SectionCard>
         </div>
 
-        {activeEmbarque.evidencia.transportista && (
+        {activeEmbarque.evidencePhotos.carrier && (
           <SectionCard>
             <p
               className="font-bold text-[#172126] text-[14px] mb-2"
@@ -2807,7 +2931,7 @@ export default function Embarques({
             </p>
             <p className="text-[13px] text-[#607078]" style={{ fontFamily: "'Inter', sans-serif" }}>
               Transportista:{" "}
-              <strong className="text-[#172126]">{activeEmbarque.evidencia.transportista}</strong>
+              <strong className="text-[#172126]">{activeEmbarque.evidencePhotos.carrier}</strong>
             </p>
           </SectionCard>
         )}
@@ -2856,6 +2980,7 @@ export default function Embarques({
             catalogoProductos={catalogoProductos}
             catalogoConversiones={effectiveConversiones}
             conversionSource={conversionSource}
+            onInvoiceUpload={(file) => uploadAndPersistShipmentEvidence("invoice", file)}
             onNext={() => {
               const withTarimas = {
                 ...activeEmbarque,
@@ -2890,6 +3015,7 @@ export default function Embarques({
             onChange={updateActive}
             onFinish={finishEmbarque}
             proveedores={catalogoProveedores}
+            onUploadEvidence={uploadAndPersistShipmentEvidence}
           />
         )}
       </div>
@@ -2940,6 +3066,7 @@ export default function Embarques({
                 catalogoProductos={catalogoProductos}
                 catalogoConversiones={effectiveConversiones}
                 conversionSource={conversionSource}
+                onInvoiceUpload={(file) => uploadAndPersistShipmentEvidence("invoice", file)}
                 onNext={() => {
                   const withTarimas = {
                     ...activeEmbarque!,
@@ -2974,6 +3101,7 @@ export default function Embarques({
                 onChange={updateActive}
                 onFinish={finishEmbarque}
                 proveedores={catalogoProveedores}
+                onUploadEvidence={uploadAndPersistShipmentEvidence}
               />
             )}
           </div>

@@ -29,6 +29,10 @@ const pdfMock = vi.hoisted(() => {
     addImage(...args: unknown[]) {
       state.images.push(args);
     }
+    splitTextToSize(text: string, maxWidth: number) {
+      // Simple mock: split by double space (our delimiter)
+      return text.split("  ").filter(Boolean);
+    }
     output() {
       return new Blob(["%PDF mock"], { type: "application/pdf" });
     }

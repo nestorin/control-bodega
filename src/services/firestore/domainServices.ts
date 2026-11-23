@@ -435,6 +435,21 @@ export class ReceptionService extends BaseService<ReceptionDoc> {
       trailer?: string;
       product?: string;
       documentation?: string;
+      purchaseOrder?: string;
+      supplierInvoice?: string;
+    },
+    operationId: string,
+  ): Promise<void> {
+    const save = httpsCallable(getFunctions(), "save_evidence");
+    await save({ receptionId, evidencePhotos, operationId });
+  }
+
+  // Save final document (signed by encargado and entregador)
+  async saveFinalDocument(
+    receptionId: string,
+    evidencePhotos: {
+      documentSignedByEncargado: string;
+      documentSignedByEntregador: string;
     },
     operationId: string,
   ): Promise<void> {
@@ -899,6 +914,25 @@ export class ShipmentService extends BaseService<ShipmentDoc> {
     );
 
     return this.getById(shipmentId) as Promise<ShipmentDoc>;
+  }
+
+  // Save shipment evidence photos (storage paths) via callable
+  async saveEvidence(
+    shipmentId: string,
+    evidencePhotos: {
+      loadedTrailer: string[];
+      trailerBox: string;
+      internalSeal: string;
+      externalSeal: string;
+      signedDocument: string;
+      invoice: string;
+      carrier: string;
+    },
+    actorUserId: string,
+    operationId: string,
+  ): Promise<void> {
+    const saveShipmentEvidence = httpsCallable(getFunctions(), "save_shipment_evidence");
+    await saveShipmentEvidence({ shipmentId, evidencePhotos, operationId });
   }
 
   // Complete shipment (step 3 - COMPLETED) with atomic stock reduction

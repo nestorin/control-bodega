@@ -214,6 +214,17 @@ function useProtectedEvidenceImage(path: string | null) {
   return src;
 }
 
+function ProtectedEvidenceThumbnail({ path, label }: { path: string; label: string }) {
+  const src = useProtectedEvidenceImage(path);
+  if (!src) return null;
+  return (
+    <div className="flex flex-col gap-1">
+      <img src={src} alt={label} className="h-24 w-full rounded-lg object-cover" />
+      <span className="text-[10px] font-semibold text-[#607078]">{label}</span>
+    </div>
+  );
+}
+
 export default function EvidenciaDetalle() {
   // ============================================
   // New Architecture Hooks
@@ -264,6 +275,8 @@ export default function EvidenciaDetalle() {
 
   const trailerPhoto = useProtectedEvidenceImage(draft?.fotoTrailer ?? null);
   const productPhoto = useProtectedEvidenceImage(draft?.fotoProducto ?? null);
+  const purchaseOrderPhoto = useProtectedEvidenceImage(draft?.purchaseOrderPhoto ?? null);
+  const supplierInvoicePhoto = useProtectedEvidenceImage(draft?.supplierInvoicePhoto ?? null);
 
   function field(key: keyof EvidenciaData) {
     return String(draft?.[key] ?? "");
@@ -307,6 +320,12 @@ export default function EvidenciaDetalle() {
         receivedPalletCount: draft?.tarimas,
         trailerPhoto,
         productPhoto,
+        purchaseOrderPhoto,
+        supplierInvoicePhoto,
+        operationType: draft?.source,
+        warehouse: draft?.warehouse,
+        responsible: draft?.responsible,
+        invoiceReference: draft?.invoiceReference,
         pallets: draft?.pallets || [],
       });
       downloadBlob(
@@ -322,21 +341,18 @@ export default function EvidenciaDetalle() {
   }
 
   async function downloadDocument() {
-    if (!storage || !draft?.documento || !draft?.receptionId) return;
+    if (!storage || !draft?.documento) return;
     setDownloadError(null);
     try {
       const path = draft!.documento;
       if (
-        !/^organizations\/org_exepa_001\/warehouses\/[^/]+\/receptions\/[^/]+\/evidence\/documentation\.(pdf|jpg|png|webp)$/.test(
-          path,
-        ) ||
-        !path.includes(`/receptions/${draft!.receptionId}/`)
+        !/^organizations\/org_exepa_001\/warehouses\/[^/]+\/(receptions|shipments)\/[^/]+\/evidence\/(documentation|purchase-order|supplier-invoice|invoice|signed-document)\.(pdf|jpg|jpeg|png|webp)$/.test(path)
       ) {
         throw new Error("Invalid evidence document path");
       }
       const blob = await getBlob(ref(storage, path));
       const extension = path.split(".").pop() || "pdf";
-      downloadBlob(blob, `Documento-${draft!.receptionId}.${extension}`);
+      downloadBlob(blob, `Documento-${draft!.receptionId || draft!.shipmentId || draft!.id}.${extension}`);
     } catch (error) {
       console.error("Evidence document download failed:", error);
       setDownloadError("No se pudo descargar la orden de compra o factura.");
@@ -372,6 +388,18 @@ export default function EvidenciaDetalle() {
               </p>
             </div>
           </div>
+
+          {(draft?.evidenceImages?.length ?? 0) > 0 && (
+            <div className="grid grid-cols-2 gap-3">
+              {draft!.evidenceImages!.map((path, index) => (
+                <ProtectedEvidenceThumbnail
+                  key={`${path}-${index}`}
+                  path={path}
+                  label={`Evidencia ${index + 1}`}
+                />
+              ))}
+            </div>
+          )}
 
           {editing && (
             <div className="bg-[#fff8e6] border border-[#f2b84b] rounded-[10px] px-3 py-2 w-full">

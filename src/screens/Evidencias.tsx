@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { isFeatureEnabled } from "@/config/featureFlags";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
+import { getBlob, ref } from "firebase/storage";
 import { createFirestoreServices } from "@/services/firestore";
-import { WAREHOUSE_IDS } from "@/config/warehouses";
 import { useAuthorization } from "@/hooks/useAuthorization";
 import { generateEvidencePdf, type EvidencePalletRow } from "@/services/evidencePdf";
 import { downloadBlob } from "@/services/pdfGenerator";
@@ -79,6 +79,15 @@ export type EvidenciaData = (typeof evidenciasDataLocal)[0] & {
   evidenceId?: string;
   purchaseOrderNumber?: string;
   pallets?: EvidencePalletRow[];
+  source?: "reception" | "shipment";
+  shipmentId?: string;
+  evidenceImages?: string[];
+  purchaseOrderPhoto?: string | null;
+  supplierInvoicePhoto?: string | null;
+  carrier?: string;
+  warehouse?: string;
+  responsible?: string;
+  invoiceReference?: string;
 };
 
 export function mapReceptionEvidence(reception: any): EvidenciaData {
@@ -105,6 +114,18 @@ export function mapReceptionEvidence(reception: any): EvidenciaData {
     fotoTrailer: reception.evidencePhotos?.trailer || null,
     fotoProducto: reception.evidencePhotos?.product || null,
     documento: reception.evidencePhotos?.documentation || null,
+    purchaseOrderPhoto: reception.evidencePhotos?.purchaseOrder || null,
+    supplierInvoicePhoto: reception.evidencePhotos?.supplierInvoice || null,
+    evidenceImages: [
+      reception.evidencePhotos?.trailer,
+      reception.evidencePhotos?.product,
+      reception.evidencePhotos?.purchaseOrder,
+      reception.evidencePhotos?.supplierInvoice,
+    ].filter(Boolean),
+    source: "reception",
+    warehouse: reception.warehouseId || "Sin dato",
+    responsible: reception.actorUserId || "Sin dato",
+    invoiceReference: reception.supplierInvoiceNumber || "Factura adjunta",
     proveedor: reception.supplierName || reception.supplierCode || "Sin proveedor",
     proveedorLogistico: reception.logisticsProvider || "Sin dato",
     item: reception.productName || "Sin producto",
@@ -145,6 +166,62 @@ export function mapReceptionEvidence(reception: any): EvidenciaData {
       lot: pallet.lot,
       expiryDate: pallet.expiryDate,
     })),
+  };
+}
+
+export function mapShipmentEvidence(shipment: any): EvidenciaData {
+  const evidence = shipment.evidencePhotos || {};
+  const images = [
+    ...(Array.isArray(evidence.loadedTrailer) ? evidence.loadedTrailer : []),
+    evidence.trailerBox,
+    evidence.internalSeal,
+    evidence.externalSeal,
+    evidence.signedDocument,
+    evidence.invoice,
+  ].filter((value): value is string => typeof value === "string" && value.length > 0);
+  const dateValue = shipment.updatedAt?.toDate?.() || shipment.createdAt?.toDate?.();
+  const requiredComplete =
+    Boolean(evidence.invoice) &&
+    Boolean(evidence.loadedTrailer?.length) &&
+    Boolean(evidence.trailerBox) &&
+    Boolean(evidence.internalSeal) &&
+    Boolean(evidence.externalSeal) &&
+    Boolean(evidence.signedDocument);
+  return {
+    id: `EV-${shipment.id}`,
+    evidenceId: `EV-${shipment.id}`,
+    shipmentId: shipment.id,
+    source: "shipment",
+    fotoTrailer: evidence.loadedTrailer?.[0] || evidence.trailerBox || null,
+    fotoProducto: evidence.externalSeal || evidence.signedDocument || null,
+    documento: evidence.invoice || null,
+    supplierInvoicePhoto: evidence.invoice || null,
+    evidenceImages: images,
+    carrier: evidence.carrier || "Sin dato",
+    warehouse: shipment.warehouseId || "Sin dato",
+    responsible: shipment.actorUserId || shipment.updatedBy || "Sin dato",
+    invoiceReference: shipment.folio || "Factura adjunta",
+    proveedor: shipment.clientName || shipment.cliente || "Sin cliente",
+    proveedorLogistico: evidence.carrier || "Sin dato",
+    item: Array.isArray(shipment.lines)
+      ? shipment.lines.map((line: any) => line.productId).filter(Boolean).join(", ") || "Sin producto"
+      : "Sin producto",
+    tarimas: Array.isArray(shipment.lines)
+      ? shipment.lines.reduce(
+          (total: number, line: any) => total + (line.palletsScanned?.length || line.quantity || 0),
+          0,
+        )
+      : 0,
+    caducidad: "No aplica",
+    lote: "No aplica",
+    ocFolio: shipment.folio || shipment.id,
+    purchaseOrderNumber: shipment.folio || shipment.id,
+    fecha: dateValue?.toLocaleDateString?.("es-ES") || shipment.fechaCreacion || "",
+    hora: dateValue?.toLocaleTimeString?.("es-ES") || "",
+    estado: requiredComplete ? "Completa" : "Incompleta",
+    color: requiredComplete ? "#16845b" : "#c54b45",
+    bg: requiredComplete ? "#e2f5ec" : "#fce9e7",
+    img: requiredComplete ? imgIndicador : imgIndicadorRed,
   };
 }
 
@@ -318,7 +395,7 @@ function RowMenu({
 interface Props {}
 
 export default function Evidencias() {
-  const { canQuery } = useAuthorization();
+  const { canQuery, warehouseIds = [], profile } = useAuthorization();
   const { setSelectedEvidencia, navigate } = useReceptionFlow();
   const useFirestore = isFeatureEnabled("USE_FIRESTORE_EVIDENCIAS") && !!db && canQuery;
 
@@ -329,6 +406,9 @@ export default function Evidencias() {
   const [loadingFs, setLoadingFs] = useState(false);
   const [errorFs, setErrorFs] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const authorizedWarehouseIds = Array.from(
+    new Set(warehouseIds.length ? warehouseIds : profile?.warehouseId ? [profile.warehouseId] : []),
+  );
 
   // Estados de filtro
   const [searchText, setSearchText] = useState("");
@@ -342,34 +422,62 @@ export default function Evidencias() {
     }
   }, [useFirestore]);
 
-  // Load Firestore data when feature flag is enabled
-  useEffect(() => {
+  const loadEvidences = useCallback(async () => {
     if (!useFirestore || !fsServices) return;
-
     setLoadingFs(true);
     setErrorFs(null);
+    try {
+      const warehouseResults = await Promise.all(
+        authorizedWarehouseIds.map(async (warehouseId) => {
+          const [receptions, shipments] = await Promise.all([
+            fsServices.receptions.getByWarehouse(warehouseId),
+            fsServices.shipments.getByWarehouse(warehouseId),
+          ]);
+          return {
+            receptions: receptions
+              .filter((record: any) => record.evidencePhotos && Object.keys(record.evidencePhotos).length)
+              .map(mapReceptionEvidence),
+            shipments: shipments
+              .filter((record: any) => record.evidencePhotos && Object.keys(record.evidencePhotos).length)
+              .map(mapShipmentEvidence),
+          };
+        }),
+      );
+      const merged = warehouseResults.flatMap(({ receptions, shipments }) => [
+        ...receptions,
+        ...shipments,
+      ]);
+      setListaLocal(merged);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error("No se pudieron cargar las evidencias");
+      console.error("Error loading evidencias:", error);
+      setErrorFs(error.message);
+    } finally {
+      setLoadingFs(false);
+    }
+  }, [useFirestore, fsServices, authorizedWarehouseIds.join("|")]);
 
-    fsServices.receptions
-      .getByWarehouse(WAREHOUSE_IDS.NORTH)
-      .then((receptions: any[]) => {
-        const converted = receptions
-          .filter((r: any) => r.evidencePhotos?.trailer || r.evidencePhotos?.product)
-          .map(mapReceptionEvidence);
-        setListaLocal(converted);
-        setLoadingFs(false);
-      })
-      .catch((err: Error) => {
-        console.error("Error loading evidencias:", err);
-        setErrorFs(err.message);
-        setLoadingFs(false);
-      });
-  }, [useFirestore, fsServices]);
+  // Load reception and shipment evidence for every authorized warehouse.
+  useEffect(() => {
+    void loadEvidences();
+  }, [loadEvidences]);
 
   const lista: EvidenciaData[] = listaLocal;
 
   async function downloadEvidence(evidence: EvidenciaData) {
     setDownloadError(null);
     try {
+      const objectUrls: string[] = [];
+      const resolveImage = async (path?: string | null) => {
+        if (!path) return null;
+        if (path.startsWith("blob:") || path.startsWith("data:") || path.startsWith("http")) {
+          return path;
+        }
+        if (!storage || !path.startsWith("organizations/")) return null;
+        const url = URL.createObjectURL(await getBlob(ref(storage, path)));
+        objectUrls.push(url);
+        return url;
+      };
       let pallets = evidence.pallets || [];
       if (fsServices && evidence.receptionId) {
         const docs = await fsServices.pallets.getByReception(evidence.receptionId, [
@@ -387,6 +495,13 @@ export default function Evidencias() {
           expiryDate: pallet.expiryDate,
         }));
       }
+      const [trailerPhoto, productPhoto, purchaseOrderPhoto, supplierInvoicePhoto] =
+        await Promise.all([
+          resolveImage(evidence.fotoTrailer),
+          resolveImage(evidence.fotoProducto),
+          resolveImage(evidence.purchaseOrderPhoto),
+          resolveImage(evidence.supplierInvoicePhoto),
+        ]);
       const blob = await generateEvidencePdf({
         evidenceId: evidence.evidenceId || evidence.id,
         receptionId: evidence.receptionId || evidence.ocFolio,
@@ -398,13 +513,20 @@ export default function Evidencias() {
         lot: evidence.lote,
         expiryDate: evidence.caducidad,
         receivedPalletCount: evidence.receptionId ? pallets.length : evidence.tarimas,
-        trailerPhoto: evidence.fotoTrailer,
-        productPhoto: evidence.fotoProducto,
+        trailerPhoto,
+        productPhoto,
+        purchaseOrderPhoto,
+        supplierInvoicePhoto,
+        operationType: evidence.source,
+        warehouse: evidence.warehouse,
+        responsible: evidence.responsible,
+        invoiceReference: evidence.invoiceReference,
         pallets,
       });
       const filename =
         "Evidencia-" + (evidence.evidenceId || evidence.id).replace(/[^a-zA-Z0-9-]/g, "-") + ".pdf";
       downloadBlob(blob, filename);
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
     } catch (error) {
       console.error("Evidence PDF generation failed:", error);
       setDownloadError("No se pudo descargar la evidencia. Verificá las fotos y la conexión.");
@@ -515,21 +637,7 @@ export default function Evidencias() {
             onClick={() => {
               setLoadingFs(true);
               setErrorFs(null);
-              fsServices?.receptions
-                .getByWarehouse(WAREHOUSE_IDS.NORTH)
-                .then((r: any[]) => {
-                  const converted = r
-                    .filter(
-                      (rec: any) => rec.evidencePhotos?.trailer || rec.evidencePhotos?.product,
-                    )
-                    .map(mapReceptionEvidence);
-                  setListaLocal(converted);
-                  setLoadingFs(false);
-                })
-                .catch((e: Error) => {
-                  setErrorFs(e.message);
-                  setLoadingFs(false);
-                });
+              void loadEvidences();
             }}
             className="ml-2 underline text-[11px]"
           >
@@ -573,6 +681,11 @@ export default function Evidencias() {
                 >
                   {ev.proveedor}
                 </p>
+                {ev.source && (
+                  <span className="rounded-full bg-[#edf4fa] px-2 py-0.5 text-[10px] font-bold uppercase text-[#3276a8]">
+                    {ev.source === "shipment" ? "Embarque" : "Recepción"}
+                  </span>
+                )}
               </div>
               <p
                 className="font-semibold text-[#172126] text-[13px]"
@@ -585,18 +698,15 @@ export default function Evidencias() {
                   className="text-[#607078] text-[12px]"
                   style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
                 >
-                  {ev.tarimas} tarimas · Cad. {ev.caducidad} · {ev.fecha}
+                  {ev.tarimas} tarimas · {ev.source === "shipment" ? `Transportista ${ev.carrier || "Sin dato"}` : `Cad. ${ev.caducidad}`} · {ev.fecha}
                 </p>
                 <span
                   className="bg-[#e7f0f2] text-[#3276a8] text-[11px] font-bold px-2 py-0.5 rounded-full"
                   style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
                 >
                   📷{" "}
-                  {ev.fotoTrailer && ev.fotoProducto
-                    ? 2
-                    : ev.fotoTrailer || ev.fotoProducto
-                      ? 1
-                      : 0}{" "}
+                  {ev.evidenceImages?.length ??
+                    (ev.fotoTrailer && ev.fotoProducto ? 2 : ev.fotoTrailer || ev.fotoProducto ? 1 : 0)}{" "}
                   foto{!ev.fotoTrailer || !ev.fotoProducto ? "" : "s"}
                 </span>
                 {ev.estado === "Incompleta" && (

@@ -50,7 +50,12 @@ describe("CapturaEvidencia document upload", () => {
     fireEvent.change(files[1], {
       target: { files: [new File(["product"], "product.jpg", { type: "image/jpeg" })] },
     });
-    fireEvent.change(screen.getByLabelText("Orden de compra o factura (opcional)"), {
+    // 3rd photo slot is now the supplier invoice (camera)
+    fireEvent.change(files[2], {
+      target: { files: [new File(["invoice"], "invoice.jpg", { type: "image/jpeg" })] },
+    });
+    // Purchase order (optional) - 4th file input
+    fireEvent.change(screen.getByLabelText("Orden de compra (opcional)"), {
       target: { files: [new File(["pdf"], "order.pdf", { type: "application/pdf" })] },
     });
     fireEvent.click(screen.getByRole("button", { name: "Guardar evidencia" }));
@@ -61,10 +66,12 @@ describe("CapturaEvidencia document upload", () => {
         "organizations/org_exepa_001/warehouses/warehouse-1/receptions/reception-1/evidence/trailer.jpg",
       product:
         "organizations/org_exepa_001/warehouses/warehouse-1/receptions/reception-1/evidence/product.jpg",
-      documentation:
-        "organizations/org_exepa_001/warehouses/warehouse-1/receptions/reception-1/evidence/documentation.pdf",
+      purchaseOrder:
+        "organizations/org_exepa_001/warehouses/warehouse-1/receptions/reception-1/evidence/purchase-order.pdf",
+      supplierInvoice:
+        "organizations/org_exepa_001/warehouses/warehouse-1/receptions/reception-1/evidence/supplier-invoice.jpg",
     });
-    expect(mocks.uploadBytes).toHaveBeenCalledTimes(3);
+    expect(mocks.uploadBytes).toHaveBeenCalledTimes(4);
   });
 
   it("rejects unsupported documents before upload", async () => {
@@ -76,7 +83,7 @@ describe("CapturaEvidencia document upload", () => {
         currentReception={{ warehouseId: "warehouse-1" }}
       />,
     );
-    fireEvent.change(screen.getByLabelText("Orden de compra o factura (opcional)"), {
+    fireEvent.change(screen.getByLabelText("Orden de compra (opcional)"), {
       target: { files: [new File(["text"], "order.txt", { type: "text/plain" })] },
     });
     expect(screen.getByText(/El documento debe ser PDF/)).toBeInTheDocument();

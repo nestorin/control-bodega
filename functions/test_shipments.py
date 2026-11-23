@@ -15,6 +15,19 @@ from shipments import (
 )
 
 
+def _shipment_evidence(org_id, warehouse_id, shipment_id):
+    prefix = f"organizations/{org_id}/warehouses/{warehouse_id}/shipments/{shipment_id}/evidence/"
+    return {
+        "loadedTrailer": [prefix + "loaded-one.jpg"],
+        "trailerBox": prefix + "trailer-box.jpg",
+        "internalSeal": prefix + "internal-seal.jpg",
+        "externalSeal": prefix + "external-seal.jpg",
+        "signedDocument": prefix + "signed-document.jpg",
+        "invoice": prefix + "invoice.jpg",
+        "carrier": "Carrier",
+    }
+
+
 class _Snapshot:
     def __init__(self, data=None, reference=None):
         self.exists = data is not None
@@ -198,6 +211,7 @@ class ShipmentTransactionReadRegressionTests(unittest.TestCase):
                 "organizationId": org_id,
                 "warehouseId": warehouse_id,
                 "status": "IN_PROGRESS",
+                "evidencePhotos": _shipment_evidence(org_id, warehouse_id, shipment_id),
                 "lines": [{
                     "productId": product_id,
                     "quantity": 1,
@@ -271,6 +285,7 @@ class ShipmentMovementTimestampTests(unittest.TestCase):
                 "organizationId": org_id,
                 "warehouseId": warehouse_id,
                 "status": "IN_PROGRESS",
+                "evidencePhotos": _shipment_evidence(org_id, warehouse_id, shipment_id),
                 "lines": [{
                     "productId": product_id,
                     "quantity": 1,
@@ -336,6 +351,7 @@ class ShipmentSuperAdminMembershipTests(unittest.TestCase):
                 "organizationId": org_id,
                 "warehouseId": warehouse_id,
                 "status": "IN_PROGRESS",
+                "evidencePhotos": _shipment_evidence(org_id, warehouse_id, shipment_id),
                 "lines": [{
                     "productId": product_id,
                     "quantity": 1,

@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, it } from "vitest";
 const orgId = "org_exepa_001";
 const warehouseId = "wh_tehuacan_1";
 const receptionId = "storage-reception";
+const shipmentId = "storage-shipment";
 const evidencePath = `organizations/${orgId}/warehouses/${warehouseId}/receptions/${receptionId}/evidence/trailer.jpg`;
 
 let testEnv: RulesTestEnvironment;
@@ -36,6 +37,11 @@ beforeAll(async () => {
       status: "ACTIVE",
       role: "ALMACENISTA",
       warehouseId,
+    });
+    await setDoc(doc(db, `organizations/${orgId}/shipments/${shipmentId}`), {
+      organizationId: orgId,
+      warehouseId,
+      status: "IN_PROGRESS",
     });
   });
 });
@@ -120,6 +126,28 @@ describe("Storage security rules (emulator)", () => {
         {
           contentType: "application/pdf",
         },
+      ),
+    );
+  });
+
+  it("allows scoped shipment images and rejects wrong warehouses and file names", async () => {
+    const storage = testEnv.authenticatedContext("warehouse-user").storage();
+    const shipmentPath = `organizations/${orgId}/warehouses/${warehouseId}/shipments/${shipmentId}/evidence/invoice.jpg`;
+    await assertSucceeds(
+      uploadBytes(ref(storage, shipmentPath), new Uint8Array([1]), { contentType: "image/jpeg" }),
+    );
+    await assertFails(
+      uploadBytes(
+        ref(storage, shipmentPath.replace(warehouseId, "wh_tehuacan_2")),
+        new Uint8Array([1]),
+        { contentType: "image/jpeg" },
+      ),
+    );
+    await assertFails(
+      uploadBytes(
+        ref(storage, shipmentPath.replace("invoice.jpg", "arbitrary.jpg")),
+        new Uint8Array([1]),
+        { contentType: "image/jpeg" },
       ),
     );
   });

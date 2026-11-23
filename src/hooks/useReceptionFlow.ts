@@ -32,6 +32,7 @@ interface UseReceptionFlowReturn {
   startNewReception: (data: ReceptionData) => void;
   continueToEvidence: () => void;
   continueToPallets: () => void;
+  continueToFinalDocument: () => void;
   completeReception: () => void;
   editReception: (id: string, data: ReceptionData) => void;
   viewTarimaDetalle: (tarima: Tarima) => void;
@@ -118,7 +119,17 @@ export function useReceptionFlow(): UseReceptionFlowReturn {
     navigateWithSidebar("captura-tarima");
   }, [currentReception, transition, navigateWithSidebar]);
 
-  // Complete the reception (from Completada or CapturaTarima)
+  // Continue from Pallets to Final Document capture
+  const continueToFinalDocument = useCallback(() => {
+    if (!currentReception) {
+      console.warn("[useReceptionFlow] Cannot continue to final document: no current reception");
+      return;
+    }
+    transition("finalDocument");
+    navigateWithSidebar("captura-documento-final");
+  }, [currentReception, transition, navigateWithSidebar]);
+
+  // Complete the reception (from FinalDocument or Completada)
   const completeReception = useCallback(() => {
     transition("completed");
     navigateWithSidebar("completada");
@@ -166,6 +177,7 @@ export function useReceptionFlow(): UseReceptionFlowReturn {
     startNewReception,
     continueToEvidence,
     continueToPallets,
+    continueToFinalDocument,
     completeReception,
     editReception,
     viewTarimaDetalle,

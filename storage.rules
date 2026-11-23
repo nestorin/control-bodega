@@ -46,6 +46,12 @@ service firebase.storage {
         reception.data.warehouseId == warehouseId;
     }
 
+    function shipmentIsInScope(orgId, warehouseId, shipmentId) {
+      let shipment = firestore.get(/databases/(default)/documents/organizations/$(orgId)/shipments/$(shipmentId));
+      return shipment.data != null && shipment.data.organizationId == orgId &&
+        shipment.data.warehouseId == warehouseId;
+    }
+
     function validEvidenceUpload() {
       return request.resource.size <= 10 * 1024 * 1024 &&
         request.resource.contentType.matches('image/(jpeg|png|webp)');
@@ -59,15 +65,27 @@ service firebase.storage {
     // Canonical path. The warehouse segment is checked against the reception document.
     match /organizations/{orgId}/warehouses/{warehouseId}/receptions/{receptionId}/evidence/{fileName} {
       allow read: if receptionIsInScope(orgId, warehouseId, receptionId) &&
-        (fileName.matches('^(invoice-preview|trailer|product|documentation)\\.(jpg|jpeg|png|webp)$') ||
-         fileName == 'documentation.pdf');
+        (fileName.matches('^(invoice-preview|trailer|product|documentation|purchase-order|supplier-invoice)\\.(jpg|jpeg|png|webp)$') ||
+         fileName.matches('^(documentation|purchase-order)\\.pdf$'));
       allow create, update: if receptionIsInScope(orgId, warehouseId, receptionId) &&
         hasRole(orgId, ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'AUXILIAR_ALMACENISTA', 'ALMACENISTA', 'SUPERVISOR', 'OPERATOR']) &&
-        fileName.matches('^(invoice-preview|trailer|product|documentation)\\.(jpg|jpeg|png|webp)$') && validEvidenceUpload();
+        fileName.matches('^(invoice-preview|trailer|product|documentation|purchase-order|supplier-invoice)\\.(jpg|jpeg|png|webp)$') && validEvidenceUpload();
       allow create, update: if receptionIsInScope(orgId, warehouseId, receptionId) &&
         hasRole(orgId, ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'AUXILIAR_ALMACENISTA', 'ALMACENISTA', 'SUPERVISOR', 'OPERATOR']) &&
-        fileName == 'documentation.pdf' && validDocumentUpload();
+        fileName.matches('^(documentation|purchase-order)\\.pdf$') && validDocumentUpload();
       allow delete: if receptionIsInScope(orgId, warehouseId, receptionId) &&
+        hasRole(orgId, ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'SUPERVISOR']);
+    }
+
+
+    match /organizations/{orgId}/warehouses/{warehouseId}/shipments/{shipmentId}/evidence/{fileName} {
+      allow read: if shipmentIsInScope(orgId, warehouseId, shipmentId) &&
+        fileName.matches('^(loaded-[A-Za-z0-9-]+|trailer-box|internal-seal|external-seal|signed-document|invoice)\\.(jpg|jpeg|png|webp)$');
+      allow create, update: if shipmentIsInScope(orgId, warehouseId, shipmentId) &&
+        hasRole(orgId, ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'AUXILIAR_ALMACENISTA', 'ALMACENISTA', 'SUPERVISOR', 'OPERATOR']) &&
+        fileName.matches('^(loaded-[A-Za-z0-9-]+|trailer-box|internal-seal|external-seal|signed-document|invoice)\\.(jpg|jpeg|png|webp)$') &&
+        validEvidenceUpload();
+      allow delete: if shipmentIsInScope(orgId, warehouseId, shipmentId) &&
         hasRole(orgId, ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'SUPERVISOR']);
     }
 

@@ -20,7 +20,13 @@ export interface EvidencePdfInput {
   receivedPalletCount: number;
   trailerPhoto?: string | null;
   productPhoto?: string | null;
+  purchaseOrderPhoto?: string | null;
+  supplierInvoicePhoto?: string | null;
   pallets: EvidencePalletRow[];
+  operationType?: "reception" | "shipment";
+  warehouse?: string;
+  responsible?: string;
+  invoiceReference?: string;
 }
 
 export interface EvidencePdfViewModel {
@@ -35,6 +41,12 @@ export interface EvidencePdfViewModel {
   palletRows: Array<{ pallet: string; lot: string; expiry: string }>;
   trailerPhoto?: string;
   productPhoto?: string;
+  purchaseOrderPhoto?: string;
+  supplierInvoicePhoto?: string;
+  operationType: "reception" | "shipment";
+  warehouse: string;
+  responsible: string;
+  invoiceReference: string;
 }
 
 function formatExpiry(value: EvidencePalletRow["expiryDate"]): string {
@@ -64,6 +76,12 @@ export function buildEvidencePdfViewModel(input: EvidencePdfInput): EvidencePdfV
     })),
     trailerPhoto: input.trailerPhoto || undefined,
     productPhoto: input.productPhoto || undefined,
+    purchaseOrderPhoto: input.purchaseOrderPhoto || undefined,
+    supplierInvoicePhoto: input.supplierInvoicePhoto || undefined,
+    operationType: input.operationType || "reception",
+    warehouse: input.warehouse || "Sin dato",
+    responsible: input.responsible || "Sin dato",
+    invoiceReference: input.invoiceReference || "Sin dato",
   };
 }
 
@@ -85,6 +103,10 @@ export async function generateEvidencePdf(input: EvidencePdfInput): Promise<Blob
   const photos = [
     view.trailerPhoto ? { label: "Mercancía en tráiler", url: view.trailerPhoto } : null,
     view.productPhoto ? { label: "Producto y caducidad", url: view.productPhoto } : null,
+    view.purchaseOrderPhoto ? { label: "Orden de compra", url: view.purchaseOrderPhoto } : null,
+    view.supplierInvoicePhoto
+      ? { label: "Factura del proveedor", url: view.supplierInvoicePhoto }
+      : null,
   ].filter((photo): photo is { label: string; url: string } => photo !== null);
   const missingPhotos = [
     !view.trailerPhoto ? "Mercancía en tráiler" : null,
@@ -104,7 +126,7 @@ export async function generateEvidencePdf(input: EvidencePdfInput): Promise<Blob
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(19);
   pdf.setTextColor(...primary);
-  pdf.text("EVIDENCIA DE RECEPCIÓN", margin, y);
+  pdf.text(view.operationType === "shipment" ? "EVIDENCIA DE EMBARQUE" : "EVIDENCIA DE RECEPCIÓN", margin, y);
   y += 9;
   pdf.setFontSize(13);
   pdf.text("BODEGA Exapa", margin, y);
@@ -116,34 +138,43 @@ export async function generateEvidencePdf(input: EvidencePdfInput): Promise<Blob
   pdf.text("ID de recepción: " + view.receptionId, margin + contentWidth * 0.5, y);
   y += 6;
   pdf.text("Fecha: " + (view.date || "Sin dato"), margin, y);
-  y += 7;
-  pdf.setDrawColor(205, 216, 220);
-  pdf.line(margin, y, width - margin, y);
-  y += 8;
+  y += 10;
 
+  // INFORMACIÓN DE LA MERCANCÍA - inline format matching user's PDF
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(11);
   pdf.setTextColor(...primary);
   pdf.text("INFORMACIÓN DE LA MERCANCÍA", margin, y);
   y += 7;
-  const rows: Array<[string, string]> = [
+  pdf.setFontSize(9);
+  
+  // Build inline info string: **Ítem:** X **Proveedor:** Y **Proveedor logístico:** Z **Orden de compra:** A **Lote:** B **Tarimas recibidas:** C **Caducidad:** D
+  const infoParts: Array<[string, string]> = [
     ["Ítem", view.item],
     ["Proveedor", view.supplier],
     ["Proveedor logístico", view.logisticsProvider],
     ["Orden de compra", view.purchaseOrderNumber],
+    ["Lote", view.palletRows.length > 0 ? view.palletRows[0].lot : (view.invoiceReference || "Sin dato")],
     ["Tarimas recibidas", String(view.receivedPalletCount) + " tarimas"],
+    ["Caducidad", view.palletRows.length > 0 ? view.palletRows[0].expiry : "Sin dato"],
   ];
-  pdf.setFontSize(9);
-  for (const [label, value] of rows) {
-    pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(...muted);
-    pdf.text(label + ":", margin, y);
-    pdf.setFont("helvetica", "normal");
-    pdf.setTextColor(...primary);
-    pdf.text(value || "Sin dato", margin + 39, y);
-    y += 5.5;
+  
+  let infoText = "";
+  for (const [label, value] of infoParts) {
+    infoText += "**" + label + ":** " + (value || "Sin dato") + "  ";
   }
-  y += 3;
+  
+  // Render inline info with bold labels
+  const infoLines = pdf.splitTextToSize(infoText, contentWidth);
+  pdf.setFont("helvetica", "normal");
+  pdf.setTextColor(...primary);
+  for (const line of infoLines) {
+    pdf.text(line, margin, y);
+    y += 5;
+  }
+  y += 5;
+
+  // DETALLE POR TARIMA
   pdf.setFont("helvetica", "bold");
   pdf.text("DETALLE POR TARIMA", margin, y);
   y += 6;
@@ -171,7 +202,9 @@ export async function generateEvidencePdf(input: EvidencePdfInput): Promise<Blob
     pdf.text(row.expiry, margin + 100, y);
     y += 5;
   }
-  y += 6;
+  y += 8;
+
+  // FOTOS DE EVIDENCIA
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(11);
   pdf.text("FOTOS DE EVIDENCIA", margin, y);

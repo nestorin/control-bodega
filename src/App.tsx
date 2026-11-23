@@ -15,6 +15,7 @@ import Home from "./screens/Home";
 import Login from "./screens/Login";
 import Unauthorized from "./screens/Unauthorized";
 import CapturaEvidencia from "./screens/CapturaEvidencia";
+import CapturaDocumentoFinal from "./screens/CapturaDocumentoFinal";
 import ProgramacionRecepcion from "./screens/ProgramacionRecepcion";
 import NuevaRecepcionStep1 from "./screens/NuevaRecepcionStep1";
 import NuevaRecepcionStep2 from "./screens/NuevaRecepcionStep2";
@@ -75,6 +76,7 @@ type Screen =
   | "nueva-step1"
   | "nueva-step2"
   | "captura-tarima"
+  | "captura-documento-final"
   | "completada"
   | "recepciones"
   | "tarima-detalle"
@@ -778,6 +780,12 @@ function AppLayout() {
         : "RECEPCIÓN · OC-24891",
       title: "Captura de tarima",
     },
+    "captura-documento-final": {
+      subtitle: currentReception
+        ? `RECEPCIÓN · ${currentReception.ocFolio}`
+        : "RECEPCIÓN · OC-24891",
+      title: "Documento final",
+    },
     completada: {
       subtitle: currentReception
         ? `RECEPCIÓN · ${currentReception.ocFolio}`
@@ -1395,6 +1403,7 @@ function AppLayout() {
           {screen === "nueva-step2" && <NuevaRecepcionStep2 />}
 
           {screen === "captura-tarima" && <CapturaTarima />}
+          {screen === "captura-documento-final" && <CapturaDocumentoFinal />}
           {screen === "completada" && <RecepcionCompletada />}
           {screen === "impresion" && <ImpresionEtiquetas />}
           {screen === "recepciones" && <Recepciones />}

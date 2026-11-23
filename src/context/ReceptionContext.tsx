@@ -77,7 +77,8 @@ function receptionReducer(state: ReceptionState, action: ReceptionAction): Recep
         idle: ["planning", "editing"],
         planning: ["evidence", "pallets", "idle"],
         evidence: ["pallets", "planning", "idle"],
-        pallets: ["completed", "evidence", "idle"],
+        pallets: ["finalDocument", "evidence", "idle"],
+        finalDocument: ["completed", "pallets", "idle"],
         completed: ["idle", "editing"],
         editing: ["pallets", "completed", "idle"],
       };

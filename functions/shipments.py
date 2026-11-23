@@ -38,6 +38,22 @@ def _validate_completion_status(status: object) -> None:
         raise _error("Only IN_PROGRESS shipments can be completed")
 
 
+def _validate_shipment_evidence(shipment: dict, shipment_id: str, warehouse_id: str) -> None:
+    evidence = shipment.get("evidencePhotos")
+    if not isinstance(evidence, dict):
+        raise _error("Shipment evidence is required")
+    required = {"trailerBox", "internalSeal", "externalSeal", "signedDocument", "invoice", "carrier"}
+    if any(not isinstance(evidence.get(field), str) or not evidence.get(field) for field in required):
+        raise _error("Shipment evidence is incomplete")
+    loaded = evidence.get("loadedTrailer")
+    if not isinstance(loaded, list) or not loaded or any(not isinstance(path, str) for path in loaded):
+        raise _error("Loaded trailer evidence is required")
+    prefix = f"organizations/{ORG_ID}/warehouses/{warehouse_id}/shipments/{shipment_id}/evidence/"
+    image_paths = [*loaded, *(evidence[field] for field in required if field != "carrier")]
+    if any(not path.startswith(prefix) or path.startswith("blob:") for path in image_paths):
+        raise _error("Shipment evidence path is invalid")
+
+
 def _validate_scanned_pallet_products(lines: list, pallets_by_id: dict) -> None:
     for line in lines:
         for pallet_id in line["palletsScanned"]:
@@ -117,6 +133,7 @@ def confirm_shipment(req: https_fn.CallableRequest):
                 return {"shipmentId": shipment_id, "status": "COMPLETED", "idempotent": True}
             raise _error("Shipment confirmation already has another operation")
         _validate_completion_status(shipment.get("status"))
+        _validate_shipment_evidence(shipment, shipment_id, warehouse_id)
 
         lines = shipment.get("lines")
         if not isinstance(lines, list) or not lines or len(lines) > 30:
@@ -300,5 +317,84 @@ def confirm_shipment(req: https_fn.CallableRequest):
             "operationId": operation_id,
         })
         return {"shipmentId": shipment_id, "status": "COMPLETED", "idempotent": False}
+
+
+@https_fn.on_call(cors=CORS_OPTS, enforce_app_check=True)
+def save_shipment_evidence(req: https_fn.CallableRequest):
+    """Persist shipment evidence photos (storage paths) to the shipment document."""
+    if req.auth is None:
+        raise https_fn.HttpsError("unauthenticated", "Authentication required")
+    data = req.data or {}
+    shipment_id = data.get("shipmentId")
+    operation_id = data.get("operationId")
+    evidence = data.get("evidencePhotos")
+    if not isinstance(shipment_id, str) or not shipment_id:
+        raise https_fn.HttpsError("invalid-argument", "shipmentId is required")
+    if not isinstance(operation_id, str) or not operation_id:
+        raise https_fn.HttpsError("invalid-argument", "operationId is required")
+    if len(operation_id) > 128:
+        raise https_fn.HttpsError("invalid-argument", "operationId is too long")
+    if not isinstance(evidence, dict):
+        raise https_fn.HttpsError("invalid-argument", "evidencePhotos is required")
+
+    db = firestore.client()
+    uid = req.auth.uid
+    shipment_ref = db.document(f"organizations/{ORG_ID}/shipments/{shipment_id}")
+    membership_ref = db.document(f"organizations/{ORG_ID}/users/{uid}")
+    operation_ref = db.document(f"organizations/{ORG_ID}/shipment_operations/{operation_id}")
+
+    @firestore.transactional
+    def _transaction(transaction):
+        membership = read_document(transaction, membership_ref)
+        if membership is None or not membership.exists:
+            raise _error("Organization membership required")
+        member = membership.to_dict() or {}
+        if (
+            member.get("userId") != uid
+            or member.get("organizationId") != ORG_ID
+            or member.get("status") != "ACTIVE"
+            or member.get("role") not in ALLOWED_ROLES
+        ):
+            raise _error("Active organization membership required")
+
+        shipment_snapshot = read_document(transaction, shipment_ref)
+        if shipment_snapshot is None or not shipment_snapshot.exists:
+            raise https_fn.HttpsError("not-found", "Shipment not found")
+        shipment = shipment_snapshot.to_dict() or {}
+        if shipment.get("organizationId") != ORG_ID:
+            raise _error("Shipment organization is invalid")
+        warehouse_id = shipment.get("warehouseId")
+        if warehouse_id not in WAREHOUSE_IDS:
+            raise _error("Shipment warehouse is not canonical")
+        if not _warehouse_allowed(member, warehouse_id):
+            raise https_fn.HttpsError("permission-denied", "Warehouse access denied")
+
+        # Validate evidence paths
+        required = {"trailerBox", "internalSeal", "externalSeal", "signedDocument", "invoice", "carrier"}
+        if any(not isinstance(evidence.get(field), str) or not evidence.get(field) for field in required):
+            raise _error("Shipment evidence is incomplete")
+        loaded = evidence.get("loadedTrailer")
+        if not isinstance(loaded, list) or not loaded or any(not isinstance(path, str) for path in loaded):
+            raise _error("Loaded trailer evidence is required")
+        prefix = f"organizations/{ORG_ID}/warehouses/{warehouse_id}/shipments/{shipment_id}/evidence/"
+        image_paths = [*loaded, *(evidence[field] for field in required if field != "carrier")]
+        if any(not path.startswith(prefix) or path.startswith("blob:") for path in image_paths):
+            raise _error("Shipment evidence path is invalid")
+
+        previous = read_document(transaction, operation_ref)
+        if previous is not None and previous.exists:
+            previous_data = previous.to_dict() or {}
+            if previous_data.get("operationId") == operation_id:
+                return {"shipmentId": shipment_id, "idempotent": True}
+            raise _error("Shipment evidence already has another operation")
+
+        transaction.update(shipment_ref, {"evidencePhotos": evidence, "updatedAt": firestore.SERVER_TIMESTAMP})
+        audit_ref = db.collection(f"organizations/{ORG_ID}/audit_events").document()
+        transaction.set(audit_ref, {"organizationId": ORG_ID, "warehouseId": warehouse_id,
+            "entityType": "shipment", "entityId": shipment_id, "action": "SAVE_EVIDENCE",
+            "actorUserId": uid, "operationId": operation_id})
+        transaction.set(operation_ref, {"kind": "save_shipment_evidence", "result": {"shipmentId": shipment_id},
+            "actorUserId": uid, "createdAt": firestore.SERVER_TIMESTAMP})
+        return {"shipmentId": shipment_id, "idempotent": False}
 
     return _transaction(db.transaction())

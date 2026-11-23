@@ -20,6 +20,7 @@ export const screenOrder: Screen[] = [
   "nueva-step2",
   "captura-evidencia",
   "captura-tarima",
+  "captura-documento-final",
   "completada",
   "recepciones",
   "tarima-detalle",
@@ -159,6 +160,10 @@ export function createHeaderConfig(
     "captura-tarima": {
       subtitle: `RECEPCIÓN · ${folio}`,
       title: "Captura de tarima",
+    },
+    "captura-documento-final": {
+      subtitle: `RECEPCIÓN · ${folio}`,
+      title: "Documento final",
     },
     completada: {
       subtitle: `RECEPCIÓN · ${folio}`,
@@ -318,6 +323,10 @@ export const staticHeaderConfig: Partial<Record<Screen, HeaderConfig>> = {
   "nueva-step2": {
     subtitle: "NUEVA RECEPCIÓN",
     title: "Detalles de recepción",
+  },
+  "captura-documento-final": {
+    subtitle: "NUEVA RECEPCIÓN",
+    title: "Documento final",
   },
   "escanear-qr": {
     subtitle: "TARIMA QR",

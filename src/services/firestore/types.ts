@@ -157,6 +157,8 @@ export interface ReceptionDoc extends BaseDoc {
     trailer?: string;
     product?: string;
     documentation?: string;
+    purchaseOrder?: string;
+    supplierInvoice?: string;
   };
   invoicePreviewPath?: string;
   invoicePreviewUrl?: string;
@@ -239,9 +241,13 @@ export interface ShipmentDoc extends BaseDoc {
   status: "PROGRAMMED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
   lines: ShipmentLine[];
   evidencePhotos?: {
-    trailer?: string;
-    product?: string;
-    documentation?: string;
+    loadedTrailer?: string[];
+    trailerBox?: string;
+    internalSeal?: string;
+    externalSeal?: string;
+    signedDocument?: string;
+    invoice?: string;
+    carrier?: string;
   };
 }
 

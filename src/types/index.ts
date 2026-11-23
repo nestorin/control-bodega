@@ -23,6 +23,7 @@ export type Screen =
   | "nueva-step1"
   | "nueva-step2"
   | "captura-tarima"
+  | "captura-documento-final"
   | "completada"
   | "recepciones"
   | "tarima-detalle"
@@ -77,6 +78,7 @@ export type ReceptionSessionPhase =
   | "planning"
   | "evidence"
   | "pallets"
+  | "finalDocument"
   | "completed"
   | "editing";
 
@@ -189,6 +191,15 @@ export interface EvidenciaData {
   evidenceId?: string;
   purchaseOrderNumber?: string;
   pallets?: EvidencePalletRow[];
+  source?: "reception" | "shipment";
+  shipmentId?: string;
+  evidenceImages?: string[];
+  purchaseOrderPhoto?: string | null;
+  supplierInvoicePhoto?: string | null;
+  carrier?: string;
+  warehouse?: string;
+  responsible?: string;
+  invoiceReference?: string;
 }
 
 /** Evidence pallet row for PDF generation */

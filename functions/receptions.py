@@ -26,6 +26,13 @@ MAX_TRANSACTION_WRITES = 500
 CREATE_RECEPTION_FIXED_WRITES = 3  # reception, audit event, operation record
 MAX_PLANNED_PALLETS = 999
 MAX_EVIDENCE_URL = 4096
+EVIDENCE_FIELDS = {
+    "trailer": "trailer.",
+    "product": "product.",
+    "documentation": "documentation.",
+    "purchaseOrder": "purchase-order.",
+    "supplierInvoice": "supplier-invoice.",
+}
 EVIDENCE_BUCKET = "exepa-almacen-safe.firebasestorage.app"
 _MONTH_KEYS_ES = (
     "Ene", "Feb", "Mar", "Abr", "May", "Jun",
@@ -763,6 +770,15 @@ def _update_reception(req, action):
         reception = snapshot.to_dict() or {}
         warehouse_id = reception.get("warehouseId")
         actor = _check_actor(req, db, warehouse_id)
+        if action == "evidence":
+            if not set(evidence).issubset(EVIDENCE_FIELDS):
+                raise https_fn.HttpsError("invalid-argument", "evidencePhotos has unknown fields")
+            prefix = f"organizations/{ORG_ID}/warehouses/{warehouse_id}/receptions/{reception_id}/evidence/"
+            for field, path in evidence.items():
+                if path is None:
+                    continue
+                if not path.startswith(prefix + EVIDENCE_FIELDS[field]):
+                    raise https_fn.HttpsError("invalid-argument", "evidencePhotos path is invalid")
         previous = _transaction_snapshot(transaction, operation_ref)
         if previous is not None and previous.exists:
             return _operation_result(previous, action, digest)
