@@ -3,6 +3,7 @@ import { isFeatureEnabled } from "@/config/featureFlags";
 import { db, storage } from "@/lib/firebase";
 import { getBlob, ref } from "firebase/storage";
 import { createFirestoreServices } from "@/services/firestore";
+import { WAREHOUSE_IDS } from "@/config/warehouses";
 import { useAuthorization } from "@/hooks/useAuthorization";
 import { generateEvidencePdf, type EvidencePalletRow } from "@/services/evidencePdf";
 import { downloadBlob } from "@/services/pdfGenerator";

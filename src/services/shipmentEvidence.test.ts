@@ -14,7 +14,14 @@ describe("shipment evidence storage", () => {
   it("builds a warehouse-scoped persistent path", () => {
     const file = new File(["photo"], "invoice.png", { type: "image/png" });
     expect(
-      shipmentEvidencePath("org-1", "warehouse-2", "shipment-3", "invoice", file, "fixed"),
+      shipmentEvidencePath(
+        "org-1",
+        "warehouse-2",
+        "shipment-3",
+        "invoice",
+        file,
+        "00000000-0000-4000-8000-000000000001",
+      ),
     ).toBe(
       "organizations/org-1/warehouses/warehouse-2/shipments/shipment-3/evidence/invoice.png",
     );
