@@ -21,3 +21,4 @@ from receptions import (
 
 # Firebase Functions Gen2 detecta automáticamente las funciones decoradas
 # en este módulo principal
+from labeling import addBatchLine, createBatch

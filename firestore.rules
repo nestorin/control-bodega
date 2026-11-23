@@ -39,7 +39,9 @@ service cloud.firestore {
 
     // Warehouse IDs are stable references. Display names must not be used as IDs.
     function isCanonicalWarehouseId(warehouseId) {
-      return warehouseId is string && warehouseId in ['wh_tehuacan_1', 'wh_tehuacan_2'];
+      return warehouseId is string && warehouseId in [
+        'wh_tehuacan_1', 'wh_tehuacan_2', 'piloto-1'
+      ];
     }
 
     // Membership records written by older clients may still contain display
@@ -55,7 +57,8 @@ service cloud.firestore {
         (canonicalId == 'wh_tehuacan_2' &&
           legacyOrCanonicalId in [
             'wh_tehuacan_2', 'Tehuacan-2', 'ALM-002', 'almacen-002', 'warehouse-2'
-          ])
+          ]) ||
+        (canonicalId == 'piloto-1' && legacyOrCanonicalId == 'piloto-1')
       );
     }
 
@@ -80,6 +83,9 @@ service cloud.firestore {
           ])) ||
           (warehouseId == 'wh_tehuacan_2' && membership.data.warehouseIds.hasAny([
             'wh_tehuacan_2', 'Tehuacan-2', 'ALM-002', 'almacen-002', 'warehouse-2'
+          ])) ||
+          (warehouseId == 'piloto-1' && membership.data.warehouseIds.hasAny([
+            'piloto-1'
           ]))))
       );
     }

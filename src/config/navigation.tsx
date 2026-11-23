@@ -7,6 +7,7 @@
 
 import type { Screen, NavItem, HeaderConfig } from "@/types";
 import { ASSETS, CANONICAL_WAREHOUSE_IDS } from "@/config/constants";
+import { isLabelingUiEnabledForWarehouse } from "@/config/featureFlags";
 
 // ============================================
 // Screen Order (for keyboard navigation, etc.)
@@ -101,6 +102,21 @@ export const navItems: readonly NavEntry[] = [
     icon: "etiquetado",
   },
 ] as const;
+
+/**
+ * Feature-gated entries must be filtered before they reach either navigation
+ * surface. Other module entries remain unchanged for every warehouse.
+ */
+export function getVisibleNavItems(
+  warehouseId: string | null | undefined,
+  labelingFeatureEnabled?: boolean,
+): readonly NavEntry[] {
+  return navItems.filter(
+    (item) =>
+      item.id !== "etiquetado" ||
+      isLabelingUiEnabledForWarehouse(warehouseId, labelingFeatureEnabled),
+  );
+}
 
 /** Mapping from NavItem id to asset icon */
 export function getNavIconAsset(iconId: NavItem): string {

@@ -18,7 +18,7 @@ except ValueError:
 
 
 ORG_ID = "org_exepa_001"
-WAREHOUSE_IDS = {"wh_tehuacan_1", "wh_tehuacan_2"}
+WAREHOUSE_IDS = {"wh_tehuacan_1", "wh_tehuacan_2", "piloto-1"}
 MAX_TRANSACTION_WRITES = 500
 MAX_TRANSACTION_READS = 500
 WAREHOUSE_ALIASES = {

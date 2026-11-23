@@ -29,6 +29,7 @@ class SecurityAndOcrTests(unittest.TestCase):
                 "mutate_reception",
             },
             "rbac.py": {"adjust_inventory", "update_membership", "import_inventory"},
+            "labeling.py": {"createBatch", "addBatchLine"},
             "shipments.py": {"confirm_shipment"},
         }
 

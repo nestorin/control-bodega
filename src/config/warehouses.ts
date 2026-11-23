@@ -7,6 +7,7 @@
 export const WAREHOUSE_IDS = {
   NORTH: "wh_tehuacan_1",
   SOUTH: "wh_tehuacan_2",
+  LABELING_PILOT: "piloto-1",
 } as const;
 
 export type WarehouseId = (typeof WAREHOUSE_IDS)[keyof typeof WAREHOUSE_IDS];
@@ -19,6 +20,7 @@ export interface WarehouseDefinition {
 export const WAREHOUSES: readonly WarehouseDefinition[] = [
   { id: WAREHOUSE_IDS.NORTH, name: "Tehuacan-1" },
   { id: WAREHOUSE_IDS.SOUTH, name: "Tehuacan-2" },
+  { id: WAREHOUSE_IDS.LABELING_PILOT, name: "Piloto 1" },
 ];
 
 /**

@@ -28,6 +28,7 @@ import { afterAll, afterEach, beforeAll, describe, it } from "vitest";
 const orgId = "org_exepa_001";
 const wh1 = "wh_tehuacan_1";
 const wh2 = "wh_tehuacan_2";
+const pilotWarehouse = "piloto-1";
 const rules = readFileSync(resolve(process.cwd(), "firestore.rules"), "utf8");
 
 let testEnv: RulesTestEnvironment | undefined;
@@ -598,6 +599,47 @@ describe("Firestore security rules (emulator)", () => {
     await assertSucceeds(
       updateDoc(doc(db, `organizations/${orgId}/shipments/shipment-legacy-update`), {
         status: "IN_PROGRESS",
+        lines: [],
+      }),
+    );
+  });
+
+  rulesTest("permits piloto-1 only for active members scoped to that warehouse", async () => {
+    await testEnv!.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `organizations/${orgId}/users/pilot-operator`), {
+        ...membership("pilot-operator", "OPERATOR", pilotWarehouse),
+      });
+    });
+
+    const authorizedDb = testEnv!.authenticatedContext("pilot-operator").firestore();
+    await assertSucceeds(
+      setDoc(doc(authorizedDb, `organizations/${orgId}/shipments/shipment-pilot-authorized`), {
+        id: "shipment-pilot-authorized",
+        organizationId: orgId,
+        warehouseId: pilotWarehouse,
+        status: "PROGRAMMED",
+        lines: [],
+      }),
+    );
+
+    const otherWarehouseDb = testEnv!.authenticatedContext("operator-1").firestore();
+    await assertFails(
+      setDoc(doc(otherWarehouseDb, `organizations/${orgId}/shipments/shipment-pilot-wrong-scope`), {
+        id: "shipment-pilot-wrong-scope",
+        organizationId: orgId,
+        warehouseId: pilotWarehouse,
+        status: "PROGRAMMED",
+        lines: [],
+      }),
+    );
+
+    const noMembershipDb = testEnv!.authenticatedContext("pilot-no-membership").firestore();
+    await assertFails(
+      setDoc(doc(noMembershipDb, `organizations/${orgId}/shipments/shipment-pilot-no-membership`), {
+        id: "shipment-pilot-no-membership",
+        organizationId: orgId,
+        warehouseId: pilotWarehouse,
+        status: "PROGRAMMED",
         lines: [],
       }),
     );

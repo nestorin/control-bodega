@@ -49,7 +49,7 @@ import RecibirEtiquetado from "./screens/RecibirEtiquetado";
 import ConciliarEtiquetado from "./screens/ConciliarEtiquetado";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { programacionToAppReception } from "@/services/domain/programacionToApp";
-import { isFeatureEnabled } from "@/config/featureFlags";
+import { isFeatureEnabled, isLabelingUiEnabledForWarehouse } from "@/config/featureFlags";
 import { createFirestoreServices } from "@/services/firestore";
 import { db } from "@/lib/firebase";
 import {
@@ -179,11 +179,12 @@ export default function App() {
 }
 
 function LabelingRoute({ children }: { children: ReactNode }) {
-  const { canQuery } = useAuthorization();
+  const { canQuery, profile } = useAuthorization();
+  const isLabelingEnabled = isLabelingUiEnabledForWarehouse(profile?.warehouseId);
 
   return (
     <ProtectedRoute>
-      {!isFeatureEnabled("ENABLE_LABELING_UI") ? (
+      {!isLabelingEnabled ? (
         <LabelingUnavailable />
       ) : (
         <LabelingBatchProvider>
@@ -228,6 +229,7 @@ function AppLayout() {
   const [activeNav, setActiveNav] = useState<NavItem>("home");
   const [editId, setEditId] = useState<string>("OC-24891");
   const [tarimaActual, setTarimaActual] = useState(3);
+  const isLabelingEnabled = isLabelingUiEnabledForWarehouse(profile?.warehouseId);
 
   // Screens navigate through useReceptionFlow, which dispatches NAVIGATE on
   // ReceptionContext; mirror that into the local screen state. A context
@@ -852,7 +854,7 @@ function AppLayout() {
     screen: Screen;
     icon: NavIcon;
   };
-  const navItems: NavEntry[] = [
+  const navItems = ([
     {
       id: "home" as NavItem,
       label: "Inicio",
@@ -901,7 +903,7 @@ function AppLayout() {
       screen: "etiquetado-dashboard" as Screen,
       icon: "etiquetado",
     },
-  ] as const;
+  ] as const).filter((item) => item.id !== "etiquetado" || isLabelingEnabled);
 
   function renderNavIcon(item: NavEntry, active: boolean, size = 22) {
     const iconColor = active ? "#f2b84b" : "#b9c9cf";

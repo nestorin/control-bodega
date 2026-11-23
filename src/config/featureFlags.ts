@@ -1,6 +1,8 @@
 // Feature Flags for incremental Firestore rollout
 // Controlled via Vite env vars: VITE_FIRESTORE_CATALOGOS=true, etc.
 
+import { normalizeWarehouseId, WAREHOUSE_IDS } from "@/config/warehouses";
+
 export const FEATURE_FLAGS = {
   ENABLE_LABELING_UI: import.meta.env.VITE_ENABLE_LABELING_UI === "true",
   // Catalogs are authoritative in Firestore. Keep this domain enabled in
@@ -24,6 +26,17 @@ export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
 
 export function isFeatureEnabled(flag: FeatureFlagKey): boolean {
   return FEATURE_FLAGS[flag];
+}
+
+/**
+ * The Etiquetado UI is a warehouse-scoped pilot. Membership access alone is
+ * not enough: the current warehouse must be the pilot warehouse as well.
+ */
+export function isLabelingUiEnabledForWarehouse(
+  warehouseId: string | null | undefined,
+  enabled = isFeatureEnabled("ENABLE_LABELING_UI"),
+): boolean {
+  return enabled && normalizeWarehouseId(warehouseId) === WAREHOUSE_IDS.LABELING_PILOT;
 }
 
 export function getEnabledFlags(): FeatureFlagKey[] {
