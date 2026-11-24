@@ -854,56 +854,58 @@ function AppLayout() {
     screen: Screen;
     icon: NavIcon;
   };
-  const navItems = ([
-    {
-      id: "home" as NavItem,
-      label: "Inicio",
-      screen: "home" as Screen,
-      icon: "home",
-    },
-    {
-      id: "recepciones" as NavItem,
-      label: "Recepciones",
-      screen: "recepciones" as Screen,
-      icon: "recepciones",
-    },
-    {
-      id: "embarques" as NavItem,
-      label: "Embarques",
-      screen: "embarques" as Screen,
-      icon: "embarques",
-    },
-    {
-      id: "qr" as NavItem,
-      label: "Escanear QR",
-      screen: "escanear-qr" as Screen,
-      icon: "qr",
-    },
-    {
-      id: "evidencias" as NavItem,
-      label: "Evidencias",
-      screen: "evidencias" as Screen,
-      icon: "evidencias",
-    },
-    {
-      id: "lotes" as NavItem,
-      label: "Inventario",
-      screen: "lotes-caducidades" as Screen,
-      icon: "lotes",
-    },
-    {
-      id: "configuracion" as NavItem,
-      label: "Config.",
-      screen: "configuracion" as Screen,
-      icon: "configuracion",
-    },
-    {
-      id: "etiquetado" as NavItem,
-      label: "Etiquetado",
-      screen: "etiquetado-dashboard" as Screen,
-      icon: "etiquetado",
-    },
-  ] as const).filter((item) => item.id !== "etiquetado" || isLabelingEnabled);
+  const navItems = (
+    [
+      {
+        id: "home" as NavItem,
+        label: "Inicio",
+        screen: "home" as Screen,
+        icon: "home",
+      },
+      {
+        id: "recepciones" as NavItem,
+        label: "Recepciones",
+        screen: "recepciones" as Screen,
+        icon: "recepciones",
+      },
+      {
+        id: "embarques" as NavItem,
+        label: "Embarques",
+        screen: "embarques" as Screen,
+        icon: "embarques",
+      },
+      {
+        id: "qr" as NavItem,
+        label: "Escanear QR",
+        screen: "escanear-qr" as Screen,
+        icon: "qr",
+      },
+      {
+        id: "evidencias" as NavItem,
+        label: "Evidencias",
+        screen: "evidencias" as Screen,
+        icon: "evidencias",
+      },
+      {
+        id: "lotes" as NavItem,
+        label: "Inventario",
+        screen: "lotes-caducidades" as Screen,
+        icon: "lotes",
+      },
+      {
+        id: "configuracion" as NavItem,
+        label: "Config.",
+        screen: "configuracion" as Screen,
+        icon: "configuracion",
+      },
+      {
+        id: "etiquetado" as NavItem,
+        label: "Etiquetado",
+        screen: "etiquetado-dashboard" as Screen,
+        icon: "etiquetado",
+      },
+    ] as const
+  ).filter((item) => item.id !== "etiquetado" || isLabelingEnabled);
 
   function renderNavIcon(item: NavEntry, active: boolean, size = 22) {
     const iconColor = active ? "#f2b84b" : "#b9c9cf";

@@ -140,9 +140,7 @@ export function ScannerTarimas({
           // Prefer the last locally saved pallet as the immediate source of
           // truth. The remote query can lag or fail while the shipment is
           // being scanned, which previously left every subsequent form blank.
-          const previous = [...tarimas]
-            .reverse()
-            .find((item) => item.lote || item.caducidad);
+          const previous = [...tarimas].reverse().find((item) => item.lote || item.caducidad);
           const remoteAutoFill = await getAutoFillData(embarqueId).catch(
             (): { lote?: string; caducidad?: Date } => ({}),
           );

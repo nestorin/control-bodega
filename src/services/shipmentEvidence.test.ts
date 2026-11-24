@@ -22,9 +22,7 @@ describe("shipment evidence storage", () => {
         file,
         "00000000-0000-4000-8000-000000000001",
       ),
-    ).toBe(
-      "organizations/org-1/warehouses/warehouse-2/shipments/shipment-3/evidence/invoice.png",
-    );
+    ).toBe("organizations/org-1/warehouses/warehouse-2/shipments/shipment-3/evidence/invoice.png");
   });
 
   it("uploads loaded-trailer evidence without returning a blob URL", async () => {

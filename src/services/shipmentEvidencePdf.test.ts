@@ -106,16 +106,27 @@ describe("generateShipmentEvidencePdf", () => {
 
     expect(blob.type).toBe("application/pdf");
     expect(pdfMock.state.texts).toContain("No hay fotografías asociadas a esta evidencia.");
-    expect(pdfMock.state.texts.some((t) => t.includes("Embarque cargado: fotografía no adjuntada."))).toBe(true);
-    expect(pdfMock.state.texts.some((t) => t.includes("Número de caja del tráiler: fotografía no adjuntada."))).toBe(true);
-    expect(pdfMock.state.texts.some((t) => t.includes("Factura: fotografía no adjuntada."))).toBe(true);
+    expect(
+      pdfMock.state.texts.some((t) => t.includes("Embarque cargado: fotografía no adjuntada.")),
+    ).toBe(true);
+    expect(
+      pdfMock.state.texts.some((t) =>
+        t.includes("Número de caja del tráiler: fotografía no adjuntada."),
+      ),
+    ).toBe(true);
+    expect(pdfMock.state.texts.some((t) => t.includes("Factura: fotografía no adjuntada."))).toBe(
+      true,
+    );
   });
 
   it("rejects when an attached photo cannot be downloaded", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 503 }));
 
     await expect(
-      generateShipmentEvidencePdf({ ...baseInput, loadedTrailerPhotos: ["https://example.test/bad.jpg"] }),
+      generateShipmentEvidencePdf({
+        ...baseInput,
+        loadedTrailerPhotos: ["https://example.test/bad.jpg"],
+      }),
     ).rejects.toThrow("Evidence photo download failed (503)");
   });
 });

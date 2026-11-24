@@ -18,10 +18,7 @@ import { mergeCanonicalConversions, type EmbarqueConversion } from "@/services/c
 import { normalizeShipmentProducts } from "@/services/domain/shipmentProductSelection";
 import { useQrScanner } from "@/hooks/useQrScanner";
 import { Panel } from "@/components/ui";
-import {
-  uploadShipmentEvidence,
-  type ShipmentEvidenceFileSlot,
-} from "@/services/shipmentEvidence";
+import { uploadShipmentEvidence, type ShipmentEvidenceFileSlot } from "@/services/shipmentEvidence";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

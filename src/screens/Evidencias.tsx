@@ -205,7 +205,10 @@ export function mapShipmentEvidence(shipment: any): EvidenciaData {
     proveedor: shipment.clientName || shipment.cliente || "Sin cliente",
     proveedorLogistico: evidence.carrier || "Sin dato",
     item: Array.isArray(shipment.lines)
-      ? shipment.lines.map((line: any) => line.productId).filter(Boolean).join(", ") || "Sin producto"
+      ? shipment.lines
+          .map((line: any) => line.productId)
+          .filter(Boolean)
+          .join(", ") || "Sin producto"
       : "Sin producto",
     tarimas: Array.isArray(shipment.lines)
       ? shipment.lines.reduce(
@@ -436,10 +439,14 @@ export default function Evidencias() {
           ]);
           return {
             receptions: receptions
-              .filter((record: any) => record.evidencePhotos && Object.keys(record.evidencePhotos).length)
+              .filter(
+                (record: any) => record.evidencePhotos && Object.keys(record.evidencePhotos).length,
+              )
               .map(mapReceptionEvidence),
             shipments: shipments
-              .filter((record: any) => record.evidencePhotos && Object.keys(record.evidencePhotos).length)
+              .filter(
+                (record: any) => record.evidencePhotos && Object.keys(record.evidencePhotos).length,
+              )
               .map(mapShipmentEvidence),
           };
         }),
@@ -699,7 +706,11 @@ export default function Evidencias() {
                   className="text-[#607078] text-[12px]"
                   style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400 }}
                 >
-                  {ev.tarimas} tarimas · {ev.source === "shipment" ? `Transportista ${ev.carrier || "Sin dato"}` : `Cad. ${ev.caducidad}`} · {ev.fecha}
+                  {ev.tarimas} tarimas ·{" "}
+                  {ev.source === "shipment"
+                    ? `Transportista ${ev.carrier || "Sin dato"}`
+                    : `Cad. ${ev.caducidad}`}{" "}
+                  · {ev.fecha}
                 </p>
                 <span
                   className="bg-[#e7f0f2] text-[#3276a8] text-[11px] font-bold px-2 py-0.5 rounded-full"
@@ -707,7 +718,11 @@ export default function Evidencias() {
                 >
                   📷{" "}
                   {ev.evidenceImages?.length ??
-                    (ev.fotoTrailer && ev.fotoProducto ? 2 : ev.fotoTrailer || ev.fotoProducto ? 1 : 0)}{" "}
+                    (ev.fotoTrailer && ev.fotoProducto
+                      ? 2
+                      : ev.fotoTrailer || ev.fotoProducto
+                        ? 1
+                        : 0)}{" "}
                   foto{!ev.fotoTrailer || !ev.fotoProducto ? "" : "s"}
                 </span>
                 {ev.estado === "Incompleta" && (

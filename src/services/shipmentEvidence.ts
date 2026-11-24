@@ -30,8 +30,7 @@ export function shipmentEvidencePath(
   file: File,
   uniqueId = crypto.randomUUID(),
 ): string {
-  const name =
-    slot === "loadedTrailer" ? `loaded-${uniqueId}` : FILE_NAMES[slot];
+  const name = slot === "loadedTrailer" ? `loaded-${uniqueId}` : FILE_NAMES[slot];
   return `organizations/${organizationId}/warehouses/${warehouseId}/shipments/${shipmentId}/evidence/${name}.${imageExtension(file)}`;
 }
 

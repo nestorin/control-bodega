@@ -183,7 +183,9 @@ export default function CapturaDocumentoFinal({
   const { canQuery, user } = useAuthorization();
   const useFirestore = isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery;
 
-  const [fsServices, setFsServices] = useState<ReturnType<typeof createFirestoreServices> | null>(null);
+  const [fsServices, setFsServices] = useState<ReturnType<typeof createFirestoreServices> | null>(
+    null,
+  );
   const [firestoreReady, setFirestoreReady] = useState(false);
 
   useEffect(() => {
@@ -214,7 +216,14 @@ export default function CapturaDocumentoFinal({
       const encargadoFile = photoFiles[0];
       const entregadorFile = photoFiles[1];
 
-      if (receptionId && user && evidenceStorage && warehouseId && encargadoFile && entregadorFile) {
+      if (
+        receptionId &&
+        user &&
+        evidenceStorage &&
+        warehouseId &&
+        encargadoFile &&
+        entregadorFile
+      ) {
         const evidencePath = (slot: string, file: File) => {
           const extension = file.type === "application/pdf" ? "pdf" : extensionForImage(file);
           return `organizations/${ORG_ID}/warehouses/${warehouseId}/receptions/${receptionId}/evidence/${slot}.${extension}`;
@@ -231,13 +240,21 @@ export default function CapturaDocumentoFinal({
         await uploadEvidencePair(
           [
             () =>
-              uploadBytes(ref(evidenceStorage, evidencePhotos.documentSignedByEncargado), encargadoFile, {
-                contentType: encargadoFile.type,
-              }),
+              uploadBytes(
+                ref(evidenceStorage, evidencePhotos.documentSignedByEncargado),
+                encargadoFile,
+                {
+                  contentType: encargadoFile.type,
+                },
+              ),
             () =>
-              uploadBytes(ref(evidenceStorage, evidencePhotos.documentSignedByEntregador), entregadorFile, {
-                contentType: entregadorFile.type,
-              }),
+              uploadBytes(
+                ref(evidenceStorage, evidencePhotos.documentSignedByEntregador),
+                entregadorFile,
+                {
+                  contentType: entregadorFile.type,
+                },
+              ),
           ],
           [
             () => deleteObject(ref(evidenceStorage, evidencePhotos.documentSignedByEncargado)),
@@ -390,13 +407,20 @@ export default function CapturaDocumentoFinal({
 
         {/* Save notice */}
         {saveNotice && (
-          <div
-            className="flex items-center gap-2 p-3 w-full bg-[#e2f5ec] border border-[#16845b] rounded-[10px]"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16845b" strokeWidth="2">
+          <div className="flex items-center gap-2 p-3 w-full bg-[#e2f5ec] border border-[#16845b] rounded-[10px]">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#16845b"
+              strokeWidth="2"
+            >
               <path d="M20 6L9 17l-5-5" />
             </svg>
-            <span className="text-[#16845b] font-semibold text-[13px]">Documento final guardado correctamente</span>
+            <span className="text-[#16845b] font-semibold text-[13px]">
+              Documento final guardado correctamente
+            </span>
           </div>
         )}
 
@@ -432,7 +456,14 @@ export default function CapturaDocumentoFinal({
           className="flex-1 h-12 md:h-[52px] bg-white border border-[#dce4e7] hover:bg-[#f4f7f8] flex items-center justify-center gap-3 text-[14px] font-bold rounded-[14px] transition-colors touch-target"
           style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, color: "#172126" }}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
           Volver
@@ -446,14 +477,29 @@ export default function CapturaDocumentoFinal({
           {saving ? (
             <>
               <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" fill="none" strokeDasharray="30 100" />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  fill="none"
+                  strokeDasharray="30 100"
+                />
               </svg>
               Guardando...
             </>
           ) : (
             <>
               Completar recepción
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             </>

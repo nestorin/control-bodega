@@ -346,13 +346,18 @@ export default function EvidenciaDetalle() {
     try {
       const path = draft!.documento;
       if (
-        !/^organizations\/org_exepa_001\/warehouses\/[^/]+\/(receptions|shipments)\/[^/]+\/evidence\/(documentation|purchase-order|supplier-invoice|invoice|signed-document)\.(pdf|jpg|jpeg|png|webp)$/.test(path)
+        !/^organizations\/org_exepa_001\/warehouses\/[^/]+\/(receptions|shipments)\/[^/]+\/evidence\/(documentation|purchase-order|supplier-invoice|invoice|signed-document)\.(pdf|jpg|jpeg|png|webp)$/.test(
+          path,
+        )
       ) {
         throw new Error("Invalid evidence document path");
       }
       const blob = await getBlob(ref(storage, path));
       const extension = path.split(".").pop() || "pdf";
-      downloadBlob(blob, `Documento-${draft!.receptionId || draft!.shipmentId || draft!.id}.${extension}`);
+      downloadBlob(
+        blob,
+        `Documento-${draft!.receptionId || draft!.shipmentId || draft!.id}.${extension}`,
+      );
     } catch (error) {
       console.error("Evidence document download failed:", error);
       setDownloadError("No se pudo descargar la orden de compra o factura.");

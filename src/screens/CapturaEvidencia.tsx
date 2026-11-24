@@ -233,8 +233,16 @@ export default function CapturaEvidencia({
   // ============================================
   // Local State
   // ============================================
-  const [photos, setPhotos] = useState<[string | null, string | null, string | null]>([null, null, null]);
-  const [photoFiles, setPhotoFiles] = useState<[File | null, File | null, File | null]>([null, null, null]);
+  const [photos, setPhotos] = useState<[string | null, string | null, string | null]>([
+    null,
+    null,
+    null,
+  ]);
+  const [photoFiles, setPhotoFiles] = useState<[File | null, File | null, File | null]>([
+    null,
+    null,
+    null,
+  ]);
   const [purchaseOrderFile, setPurchaseOrderFile] = useState<File | null>(null);
   // supplierInvoiceFile ahora se maneja como 3er slot de cámara (photos[2])
   const [form, setForm] = useState<EvidenceForm>({
@@ -313,7 +321,15 @@ export default function CapturaEvidencia({
       const trailerFile = photoFiles[0];
       const productFile = photoFiles[1];
       const supplierInvoiceFile = photoFiles[2];
-      if (receptionId && user && evidenceStorage && warehouseId && trailerFile && productFile && supplierInvoiceFile) {
+      if (
+        receptionId &&
+        user &&
+        evidenceStorage &&
+        warehouseId &&
+        trailerFile &&
+        productFile &&
+        supplierInvoiceFile
+      ) {
         const evidencePath = (slot: string, file: File) => {
           const extension = file.type === "application/pdf" ? "pdf" : extensionForImage(file);
           return `organizations/${ORG_ID}/warehouses/${warehouseId}/receptions/${receptionId}/evidence/${slot}.${extension}`;
@@ -363,8 +379,11 @@ export default function CapturaEvidencia({
           }
         } catch (error) {
           await Promise.allSettled(
-            [evidencePhotos.trailer, evidencePhotos.product, ...supplementalUploads.map((u) => u.path)]
-              .map((path) => deleteObject(ref(evidenceStorage, path))),
+            [
+              evidencePhotos.trailer,
+              evidencePhotos.product,
+              ...supplementalUploads.map((u) => u.path),
+            ].map((path) => deleteObject(ref(evidenceStorage, path))),
           );
           throw error;
         }
@@ -380,9 +399,7 @@ export default function CapturaEvidencia({
           await Promise.allSettled([
             deleteObject(ref(evidenceStorage, evidencePhotos.trailer)),
             deleteObject(ref(evidenceStorage, evidencePhotos.product)),
-            ...supplementalUploads.map((upload) =>
-              deleteObject(ref(evidenceStorage, upload.path)),
-            ),
+            ...supplementalUploads.map((upload) => deleteObject(ref(evidenceStorage, upload.path))),
           ]);
           throw error;
         }
@@ -557,7 +574,10 @@ export default function CapturaEvidencia({
 
         {hasPurchaseOrder && (
           <div className="w-full space-y-2">
-            <label htmlFor="purchase-order-evidence" className="block text-[12px] font-bold text-[#607078]">
+            <label
+              htmlFor="purchase-order-evidence"
+              className="block text-[12px] font-bold text-[#607078]"
+            >
               Orden de compra (opcional)
             </label>
             <input

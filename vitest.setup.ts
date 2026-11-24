@@ -26,10 +26,8 @@ vi.mock("@/config/featureFlags", () => ({
     USE_FIRESTORE_OFFLINE_QUEUE: false,
   },
   isFeatureEnabled: () => false,
-  isLabelingUiEnabledForWarehouse: (
-    warehouseId: string | null | undefined,
-    enabled = false,
-  ) => enabled && warehouseId === "piloto-1",
+  isLabelingUiEnabledForWarehouse: (warehouseId: string | null | undefined, enabled = false) =>
+    enabled && warehouseId === "piloto-1",
   getEnabledFlags: () => [],
 }));
 

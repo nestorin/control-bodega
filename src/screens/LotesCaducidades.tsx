@@ -95,7 +95,7 @@ export default function LotesCaducidades() {
   const { user, canQuery, profile, warehouseIds } = useAuthorization();
   const activeWarehouseId =
     normalizeWarehouseId(profile?.warehouseId) ??
-    normalizeWarehouseId(warehouseIds[0]) ??
+    (warehouseIds && warehouseIds.length > 0 ? normalizeWarehouseId(warehouseIds[0]) : null) ??
     WAREHOUSE_IDS.NORTH;
   const { closeSidebarOnMobile } = useUIContext();
 
@@ -426,7 +426,8 @@ export default function LotesCaducidades() {
               Inventario
             </h1>
             <p className="text-[12px] text-[#607078]" style={{ fontFamily: "'Inter',sans-serif" }}>
-              Control de inventario por lote · {getWarehouseName(activeWarehouseId) ?? activeWarehouseId}
+              Control de inventario por lote ·{" "}
+              {getWarehouseName(activeWarehouseId) ?? activeWarehouseId}
             </p>
           </div>
         </div>

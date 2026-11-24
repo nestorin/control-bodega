@@ -38,10 +38,16 @@ async function imageDataUrl(url: string): Promise<{ data: string; format: "JPEG"
 export async function generateShipmentEvidencePdf(input: ShipmentEvidencePdfInput): Promise<Blob> {
   const photos = [
     ...input.loadedTrailerPhotos.map((url, idx) => ({ label: `Embarque cargado ${idx + 1}`, url })),
-    input.trailerBoxPhoto ? { label: "Número de caja del tráiler", url: input.trailerBoxPhoto } : null,
+    input.trailerBoxPhoto
+      ? { label: "Número de caja del tráiler", url: input.trailerBoxPhoto }
+      : null,
     input.internalSealPhoto ? { label: "Sello interno", url: input.internalSealPhoto } : null,
-    input.externalSealPhoto ? { label: "Sello puesto en la caja del tráiler", url: input.externalSealPhoto } : null,
-    input.signedDocumentPhoto ? { label: "Documento firmado por el operador", url: input.signedDocumentPhoto } : null,
+    input.externalSealPhoto
+      ? { label: "Sello puesto en la caja del tráiler", url: input.externalSealPhoto }
+      : null,
+    input.signedDocumentPhoto
+      ? { label: "Documento firmado por el operador", url: input.signedDocumentPhoto }
+      : null,
     input.invoicePhoto ? { label: "Factura", url: input.invoicePhoto } : null,
   ].filter((photo): photo is { label: string; url: string } => photo !== null);
 
@@ -97,7 +103,7 @@ export async function generateShipmentEvidencePdf(input: ShipmentEvidencePdfInpu
     ["Transportista", input.carrier],
     ["Almacén", input.warehouse],
     ["Responsable", input.responsible],
-    ["Productos", input.items.map(i => `${i.productName} (${i.quantity} ${i.unit})`).join(", ")],
+    ["Productos", input.items.map((i) => `${i.productName} (${i.quantity} ${i.unit})`).join(", ")],
   ];
 
   let infoText = "";

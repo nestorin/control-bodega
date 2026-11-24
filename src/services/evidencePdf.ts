@@ -126,7 +126,11 @@ export async function generateEvidencePdf(input: EvidencePdfInput): Promise<Blob
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(19);
   pdf.setTextColor(...primary);
-  pdf.text(view.operationType === "shipment" ? "EVIDENCIA DE EMBARQUE" : "EVIDENCIA DE RECEPCIÓN", margin, y);
+  pdf.text(
+    view.operationType === "shipment" ? "EVIDENCIA DE EMBARQUE" : "EVIDENCIA DE RECEPCIÓN",
+    margin,
+    y,
+  );
   y += 9;
   pdf.setFontSize(13);
   pdf.text("BODEGA Exapa", margin, y);
@@ -147,23 +151,26 @@ export async function generateEvidencePdf(input: EvidencePdfInput): Promise<Blob
   pdf.text("INFORMACIÓN DE LA MERCANCÍA", margin, y);
   y += 7;
   pdf.setFontSize(9);
-  
+
   // Build inline info string: **Ítem:** X **Proveedor:** Y **Proveedor logístico:** Z **Orden de compra:** A **Lote:** B **Tarimas recibidas:** C **Caducidad:** D
   const infoParts: Array<[string, string]> = [
     ["Ítem", view.item],
     ["Proveedor", view.supplier],
     ["Proveedor logístico", view.logisticsProvider],
     ["Orden de compra", view.purchaseOrderNumber],
-    ["Lote", view.palletRows.length > 0 ? view.palletRows[0].lot : (view.invoiceReference || "Sin dato")],
+    [
+      "Lote",
+      view.palletRows.length > 0 ? view.palletRows[0].lot : view.invoiceReference || "Sin dato",
+    ],
     ["Tarimas recibidas", String(view.receivedPalletCount) + " tarimas"],
     ["Caducidad", view.palletRows.length > 0 ? view.palletRows[0].expiry : "Sin dato"],
   ];
-  
+
   let infoText = "";
   for (const [label, value] of infoParts) {
     infoText += "**" + label + ":** " + (value || "Sin dato") + "  ";
   }
-  
+
   // Render inline info with bold labels
   const infoLines = pdf.splitTextToSize(infoText, contentWidth);
   pdf.setFont("helvetica", "normal");

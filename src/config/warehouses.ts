@@ -38,8 +38,8 @@ const WAREHOUSE_ALIASES: Record<string, WarehouseId> = {
   "warehouse-2": WAREHOUSE_IDS.SOUTH,
   "piloto-1": WAREHOUSE_IDS.PILOTO,
   "Piloto-1": WAREHOUSE_IDS.PILOTO,
-  "piloto1": WAREHOUSE_IDS.PILOTO,
-  "pilot1": WAREHOUSE_IDS.PILOTO,
+  piloto1: WAREHOUSE_IDS.PILOTO,
+  pilot1: WAREHOUSE_IDS.PILOTO,
 };
 
 const canonicalIds = new Set<string>(Object.values(WAREHOUSE_IDS));
