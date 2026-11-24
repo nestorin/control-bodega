@@ -36,7 +36,7 @@ export function isLabelingUiEnabledForWarehouse(
   warehouseId: string | null | undefined,
   enabled = isFeatureEnabled("ENABLE_LABELING_UI"),
 ): boolean {
-  return enabled && normalizeWarehouseId(warehouseId) === WAREHOUSE_IDS.LABELING_PILOT;
+  return enabled && normalizeWarehouseId(warehouseId) === WAREHOUSE_IDS.PILOTO;
 }
 
 export function getEnabledFlags(): FeatureFlagKey[] {

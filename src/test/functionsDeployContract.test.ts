@@ -18,6 +18,7 @@ describe("Cloud Functions deployment contract", () => {
       "health",
       "extract_ocr_secure",
       "confirm_shipment",
+      "save_shipment_evidence",
       "adjust_inventory",
       "import_inventory",
       "update_membership",
@@ -30,6 +31,8 @@ describe("Cloud Functions deployment contract", () => {
       "validate_reception_pallet_scan",
       "reception_mutation_options",
       "mutate_reception",
+      "addBatchLine",
+      "createBatch",
     ]);
   });
 

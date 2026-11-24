@@ -621,7 +621,7 @@ describe("Recepciones presentation", () => {
     expect(routerNavigate).toHaveBeenCalledWith("/captura-tarima", { replace: true });
   });
 
-  it("resumes a DRAFT reception in the edit screen and replaces the URL", async () => {
+  it("resumes a DRAFT reception in the capture-tarima screen and replaces the URL", async () => {
     firestoreScenario.enabled = true;
     const reception = {
       id: "reception-draft",
@@ -649,10 +649,10 @@ describe("Recepciones presentation", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Reanudar recepción REC-RESUME-2" }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("current-screen")).toHaveTextContent("editar-recepcion");
-      expect(screen.getByTestId("edit-reception-id")).toHaveTextContent("reception-draft");
+      expect(screen.getByTestId("current-screen")).toHaveTextContent("captura-tarima");
+      expect(screen.getByTestId("current-reception-id")).toHaveTextContent("reception-draft");
     });
-    expect(routerNavigate).toHaveBeenCalledWith("/editar-recepcion", { replace: true });
+    expect(routerNavigate).toHaveBeenCalledWith("/captura-tarima", { replace: true });
   });
 
   it("does not resume a non-resumable reception document", async () => {

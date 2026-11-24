@@ -4,7 +4,7 @@ import { getVisibleNavItems } from "./navigation";
 
 describe("warehouse-scoped navigation", () => {
   it("shows Etiquetado for the enabled pilot warehouse", () => {
-    expect(getVisibleNavItems(WAREHOUSE_IDS.LABELING_PILOT, true).map((item) => item.id)).toContain(
+    expect(getVisibleNavItems(WAREHOUSE_IDS.PILOTO, true).map((item) => item.id)).toContain(
       "etiquetado",
     );
   });
