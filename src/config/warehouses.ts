@@ -7,7 +7,7 @@
 export const WAREHOUSE_IDS = {
   NORTH: "wh_tehuacan_1",
   SOUTH: "wh_tehuacan_2",
-  LABELING_PILOT: "piloto-1",
+  PILOTO: "piloto-1",
 } as const;
 
 export type WarehouseId = (typeof WAREHOUSE_IDS)[keyof typeof WAREHOUSE_IDS];
@@ -20,7 +20,7 @@ export interface WarehouseDefinition {
 export const WAREHOUSES: readonly WarehouseDefinition[] = [
   { id: WAREHOUSE_IDS.NORTH, name: "Tehuacan-1" },
   { id: WAREHOUSE_IDS.SOUTH, name: "Tehuacan-2" },
-  { id: WAREHOUSE_IDS.LABELING_PILOT, name: "Piloto 1" },
+  { id: WAREHOUSE_IDS.PILOTO, name: "Piloto-1" },
 ];
 
 /**
@@ -36,6 +36,10 @@ const WAREHOUSE_ALIASES: Record<string, WarehouseId> = {
   "ALM-002": WAREHOUSE_IDS.SOUTH,
   "warehouse-1": WAREHOUSE_IDS.NORTH,
   "warehouse-2": WAREHOUSE_IDS.SOUTH,
+  "piloto-1": WAREHOUSE_IDS.PILOTO,
+  "Piloto-1": WAREHOUSE_IDS.PILOTO,
+  "piloto1": WAREHOUSE_IDS.PILOTO,
+  "pilot1": WAREHOUSE_IDS.PILOTO,
 };
 
 const canonicalIds = new Set<string>(Object.values(WAREHOUSE_IDS));

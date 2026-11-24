@@ -58,7 +58,10 @@ service cloud.firestore {
           legacyOrCanonicalId in [
             'wh_tehuacan_2', 'Tehuacan-2', 'ALM-002', 'almacen-002', 'warehouse-2'
           ]) ||
-        (canonicalId == 'piloto-1' && legacyOrCanonicalId == 'piloto-1')
+        (canonicalId == 'piloto-1' &&
+          legacyOrCanonicalId in [
+            'piloto-1', 'Piloto-1', 'piloto1', 'pilot1'
+          ])
       );
     }
 
@@ -85,7 +88,7 @@ service cloud.firestore {
             'wh_tehuacan_2', 'Tehuacan-2', 'ALM-002', 'almacen-002', 'warehouse-2'
           ])) ||
           (warehouseId == 'piloto-1' && membership.data.warehouseIds.hasAny([
-            'piloto-1'
+            'piloto-1', 'Piloto-1', 'piloto1', 'pilot1'
           ]))))
       );
     }
@@ -496,119 +499,69 @@ service cloud.firestore {
 
       // ===== SHIPMENTS (EMBARQUES) =====
       match /shipments/{shipmentId} {
-        function validShipmentEvidence(data) {
-          return !('evidencePhotos' in data) ||
-            (data.evidencePhotos is map &&
-             data.evidencePhotos.keys().hasOnly([
-               'loadedTrailer', 'trailerBox', 'internalSeal', 'externalSeal',
-               'signedDocument', 'invoice', 'carrier'
-             ]) &&
-             (!('loadedTrailer' in data.evidencePhotos) ||
-               (data.evidencePhotos.loadedTrailer is list && data.evidencePhotos.loadedTrailer.size() <= 20)) &&
-             (!('trailerBox' in data.evidencePhotos) || data.evidencePhotos.trailerBox is string) &&
-             (!('internalSeal' in data.evidencePhotos) || data.evidencePhotos.internalSeal is string) &&
-             (!('externalSeal' in data.evidencePhotos) || data.evidencePhotos.externalSeal is string) &&
-             (!('signedDocument' in data.evidencePhotos) || data.evidencePhotos.signedDocument is string) &&
-             (!('invoice' in data.evidencePhotos) || data.evidencePhotos.invoice is string) &&
-             (!('carrier' in data.evidencePhotos) ||
-               (data.evidencePhotos.carrier is string && data.evidencePhotos.carrier.size() <= 256)));
-        }
         allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId);
         allow create: if isMemberOf(orgId) &&
           canAccessWarehouse(orgId, request.resource.data.warehouseId) &&
           isOperatorOrAbove(orgId) &&
-          request.resource.data.status == 'PROGRAMMED' &&
-          validShipmentEvidence(request.resource.data);
+          request.resource.data.status == 'PROGRAMMED';
         allow update: if isMemberOf(orgId) &&
           canAccessWarehouse(orgId, resource.data.warehouseId) &&
           warehouseAssignmentUnchanged() &&
           isOperatorOrAbove(orgId) &&
-          validShipmentEvidence(request.resource.data) &&
           ((resource.data.status == 'PROGRAMMED' && request.resource.data.status == 'PROGRAMMED' &&
             hasOnlyChanged([
               'folio', 'cliente', 'bodega', 'lines', 'tarimasEscaneadas',
-              'evidencePhotos', 'paso', 'fechaProgramada', 'updatedAt'
+              'evidencia', 'paso', 'fechaProgramada', 'updatedAt'
             ])) ||
            (hasOnlyChanged(['status', 'lines', 'updatedAt']) &&
-            (resource.data.status == 'PROGRAMMED' && request.resource.data.status == 'IN_PROGRESS')) ||
-           (resource.data.status == 'IN_PROGRESS' && request.resource.data.status == 'IN_PROGRESS') ||
-           (isSupervisorOrAdmin(orgId) && request.resource.data.status == 'CANCELLED'));
-        allow delete: if isSupervisorOrAdmin(orgId);
+             (resource.data.status == 'PROGRAMMED' && request.resource.data.status == 'IN_PROGRESS')));
+        allow delete: if isOrgAdmin(orgId);
       }
 
-      // ===== EMBARQUES (PLANIFICADOS) =====
-      match /embarques/{embarqueId} {
-        allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId);
+      // ===== EVIDENCES =====
+      match /evidences/{evidenceId} {
+        allow read: if isMemberOf(orgId);
+        allow create: if isMemberOf(orgId) &&
+          isOperatorOrAbove(orgId);
+        allow update: if isMemberOf(orgId) &&
+          isSupervisorOrAdmin(orgId);
+        allow delete: if isOrgAdmin(orgId);
+      }
 
-        // Create: operators can create planned embarques
+      // ===== LABELING BATCHES (PILOTO-1) =====
+      match /labelingBatches/{batchId} {
+        allow read: if isMemberOf(orgId) &&
+          canAccessWarehouse(orgId, resource.data.warehouseId);
         allow create: if isMemberOf(orgId) &&
           canAccessWarehouse(orgId, request.resource.data.warehouseId) &&
           isOperatorOrAbove(orgId) &&
-          request.resource.data.status == 'planned';
-
-        // Update: controlled transitions
+          request.resource.data.status == 'DRAFT';
         allow update: if isMemberOf(orgId) &&
           canAccessWarehouse(orgId, resource.data.warehouseId) &&
           warehouseAssignmentUnchanged() &&
-          (
-            // Operators: planned -> in_progress (al primer scan)
-            (isOperatorOrAbove(orgId) &&
-             resource.data.status == 'planned' &&
-             request.resource.data.status == 'in_progress' &&
-             hasOnlyChanged(['status', 'updatedAt'])) ||
-            // Operators: in_progress (increment tarimasCompletadas)
-            (isOperatorOrAbove(orgId) &&
-             resource.data.status == 'in_progress' &&
-             request.resource.data.status == 'in_progress' &&
-             request.resource.data.tarimasCompletadas is int &&
-             request.resource.data.totalTarimas is int &&
-             request.resource.data.tarimasCompletadas >= resource.data.tarimasCompletadas &&
-             request.resource.data.tarimasCompletadas <= request.resource.data.totalTarimas &&
-             hasOnlyChanged(['status', 'tarimasCompletadas', 'updatedAt'])) ||
-            // System/Supervisor: completed (cuando todas tarimas escaneadas)
-            (isSupervisorOrAdmin(orgId) &&
-             request.resource.data.status == 'completed' &&
-             request.resource.data.tarimasCompletadas == request.resource.data.totalTarimas &&
-             hasOnlyChanged(['status', 'tarimasCompletadas', 'updatedAt'])) ||
-            // Admin: cancelar planned
-            (isOrgAdmin(orgId) &&
-             resource.data.status == 'planned' &&
-             request.resource.data.status == 'cancelled' &&
-             hasOnlyChanged(['status', 'updatedAt']))
-          );
-
+          isOperatorOrAbove(orgId);
         allow delete: if isOrgAdmin(orgId);
       }
 
-      // ===== TARIMAS (STICKERS/ESCANEOS) =====
-      match /tarimas/{tarimaId} {
-        allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId,
-          get(/databases/$(database)/documents/organizations/$(orgId)/embarques/$(resource.data.embarqueId)).data.warehouseId);
-
-        // Create: solo backend al planificar embarque (status planned)
+      // ===== LABELING BATCH LINES =====
+      match /labelingBatches/{batchId}/lines/{lineId} {
+        allow read: if isMemberOf(orgId) &&
+          canAccessWarehouse(orgId,
+            get(/databases/$(database)/documents/organizations/$(orgId)/labelingBatches/$(batchId)).data.warehouseId);
         allow create: if isMemberOf(orgId) &&
-          isOperatorOrAbove(orgId) &&
           canAccessWarehouse(orgId,
-            get(/databases/$(database)/documents/organizations/$(orgId)/embarques/$(request.resource.data.embarqueId)).data.warehouseId) &&
-          get(/databases/$(database)/documents/organizations/$(orgId)/embarques/$(request.resource.data.embarqueId)).data.status == 'planned' &&
+            getAfter(/databases/$(database)/documents/organizations/$(orgId)/labelingBatches/$(batchId)).data.warehouseId) &&
+          request.resource.data.id == lineId &&
           request.resource.data.organizationId == orgId &&
-          request.resource.data.warehouseId ==
-            get(/databases/$(database)/documents/organizations/$(orgId)/embarques/$(request.resource.data.embarqueId)).data.warehouseId &&
-          request.resource.data.status == 'pending';
-
-        // Update: solo pending -> scanned con datos válidos
-        allow update: if isMemberOf(orgId) &&
+          request.resource.data.batchId == batchId &&
+          isOperatorOrAbove(orgId);
+        allow update, delete: if isMemberOf(orgId) &&
           canAccessWarehouse(orgId,
-            get(/databases/$(database)/documents/organizations/$(orgId)/embarques/$(resource.data.embarqueId)).data.warehouseId) &&
-          isOperatorOrAbove(orgId) &&
-          resource.data.status == 'pending' &&
-          request.resource.data.status == 'scanned' &&
-          request.resource.data.scannedBy == request.auth.uid &&
-          // Solo campos permitidos al escanear
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'lote', 'caducidad', 'observaciones', 'scannedAt', 'scannedBy', 'lastKnownLote', 'lastKnownCaducidad']);
-
-        allow delete: if isOrgAdmin(orgId);
+            get(/databases/$(database)/documents/organizations/$(orgId)/labelingBatches/$(batchId)).data.warehouseId) &&
+          resource.data.id == lineId &&
+          resource.data.organizationId == orgId &&
+          resource.data.batchId == batchId &&
+          isSupervisorOrAdmin(orgId);
       }
     }
   }
