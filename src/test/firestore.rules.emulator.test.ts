@@ -109,6 +109,17 @@ async function seedFixtures() {
         productId: "CB0302",
         cantidadCajas: 1,
       }),
+      setDoc(doc(db, `organizations/${orgId}/inventoryMonthly/${wh1}_CB0301_2026_11`), {
+        id: `${wh1}_CB0301_2026_11`,
+        warehouseId: wh1,
+        productId: "CB0301",
+        year: 2026,
+        month: 11,
+        cajas: 12,
+        tarimas: 3,
+        updatedAt: Timestamp.now(),
+        updatedBy: "operator-1",
+      }),
     ]);
   });
 }
@@ -403,6 +414,116 @@ describe("Firestore security rules (emulator)", () => {
     await assertSucceeds(getDoc(doc(db, `organizations/${orgId}/lotes_caducidades/lot-wh1`)));
     await assertFails(getDoc(doc(db, `organizations/${orgId}/lotes_caducidades/lot-wh2`)));
   });
+
+  rulesTest("scopes monthly aggregate queries to the member warehouse", async () => {
+    const db = testEnv.authenticatedContext("operator-1").firestore();
+    const monthly = collection(db, `organizations/${orgId}/inventoryMonthly`);
+    // Live grid path: getMonthlyGridData filters by warehouseId and year.
+    await assertSucceeds(
+      getDocs(query(monthly, where("warehouseId", "==", wh1), where("year", "==", 2026))),
+    );
+    // Without a warehouse filter the member's scope cannot be proven.
+    await assertFails(getDocs(query(monthly, where("year", "==", 2026))));
+    // Cross-warehouse reads stay out of scope for a warehouse-scoped operator.
+    await assertFails(
+      getDocs(query(monthly, where("warehouseId", "==", wh2), where("year", "==", 2026))),
+    );
+  });
+
+  rulesTest(
+    "denies monthly aggregate reads to unauthenticated and non-member callers",
+    async () => {
+      const seedId = `${wh1}_CB0301_2026_11`;
+      const unauthenticatedDb = testEnv.unauthenticatedContext().firestore();
+      await assertFails(
+        getDoc(doc(unauthenticatedDb, `organizations/${orgId}/inventoryMonthly/${seedId}`)),
+      );
+      const nonMemberDb = testEnv.authenticatedContext("unknown-user").firestore();
+      await assertFails(
+        getDocs(
+          query(
+            collection(nonMemberDb, `organizations/${orgId}/inventoryMonthly`),
+            where("warehouseId", "==", wh1),
+            where("year", "==", 2026),
+          ),
+        ),
+      );
+    },
+  );
+
+  rulesTest("enforces role and warehouse scope on monthly aggregate creates", async () => {
+    const db = testEnv.authenticatedContext("operator-1").firestore();
+    const validMonthly = (id: string, warehouseId: string) => ({
+      id,
+      warehouseId,
+      productId: "CB0302",
+      year: 2026,
+      month: 12,
+      cajas: 5,
+      tarimas: 2,
+      updatedAt: Timestamp.now(),
+      updatedBy: "operator-1",
+    });
+
+    const inScopeId = `${wh1}_CB0302_2026_12`;
+    await assertSucceeds(
+      setDoc(
+        doc(db, `organizations/${orgId}/inventoryMonthly/${inScopeId}`),
+        validMonthly(inScopeId, wh1),
+      ),
+    );
+    const outOfScopeId = `${wh2}_CB0302_2026_12`;
+    await assertFails(
+      setDoc(
+        doc(db, `organizations/${orgId}/inventoryMonthly/${outOfScopeId}`),
+        validMonthly(outOfScopeId, wh2),
+      ),
+    );
+    // role-4 is AUDITOR: a member below operator cannot write aggregates.
+    const auditorDb = testEnv.authenticatedContext("role-4").firestore();
+    const auditorId = `${wh1}_CB0401_2026_11`;
+    await assertFails(
+      setDoc(
+        doc(auditorDb, `organizations/${orgId}/inventoryMonthly/${auditorId}`),
+        validMonthly(auditorId, wh1),
+      ),
+    );
+  });
+
+  rulesTest("limits monthly aggregate updates to counters and audit fields", async () => {
+    const db = testEnv.authenticatedContext("operator-1").firestore();
+    const monthlyRef = doc(db, `organizations/${orgId}/inventoryMonthly/${wh1}_CB0301_2026_11`);
+
+    await assertSucceeds(
+      updateDoc(monthlyRef, {
+        cajas: 13,
+        tarimas: 4,
+        updatedAt: Timestamp.now(),
+        updatedBy: "operator-1",
+      }),
+    );
+    await assertFails(updateDoc(monthlyRef, { cajas: 14, warehouseId: wh2 }));
+    await assertFails(updateDoc(monthlyRef, { productId: "CB9999" }));
+  });
+
+  rulesTest("restricts monthly aggregate deletion to org admins", async () => {
+    const seedPath = `organizations/${orgId}/inventoryMonthly/${wh1}_CB0301_2026_11`;
+    const operatorDb = testEnv.authenticatedContext("operator-1").firestore();
+    await assertFails(deleteDoc(doc(operatorDb, seedPath)));
+    const adminDb = testEnv.authenticatedContext("admin-1").firestore();
+    await assertSucceeds(deleteDoc(doc(adminDb, seedPath)));
+  });
+
+  rulesTest(
+    "allows reading a nonexistent monthly aggregate for transaction pre-reads",
+    async () => {
+      // incrementMonthly runs transaction.get() before the create branch writes.
+      const db = testEnv.authenticatedContext("operator-1").firestore();
+      await assertSucceeds(
+        getDoc(doc(db, `organizations/${orgId}/inventoryMonthly/${wh1}_CB0301_2027_01`)),
+      );
+    },
+  );
 
   rulesTest("allows reception and line creation atomically", async () => {
     const db = testEnv.authenticatedContext("operator-1").firestore();

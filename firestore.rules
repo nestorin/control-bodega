@@ -479,6 +479,43 @@ service cloud.firestore {
         allow delete: if isOrgAdmin(orgId);
       }
 
+      // ===== MONTHLY INVENTORY AGGREGATE =====
+      match /inventoryMonthly/{monthlyId} {
+        function isValidMonthlyAggregate(data, monthlyId) {
+          return data.keys().hasAll([
+              'id', 'warehouseId', 'productId', 'year', 'month',
+              'cajas', 'tarimas', 'updatedAt', 'updatedBy'
+            ]) &&
+            data.keys().hasOnly([
+              'id', 'warehouseId', 'productId', 'year', 'month',
+              'cajas', 'tarimas', 'updatedAt', 'updatedBy'
+            ]) &&
+            data.id == monthlyId &&
+            data.warehouseId is string && data.warehouseId.size() > 0 &&
+            data.warehouseId.size() <= 100 &&
+            data.productId is string && data.productId.size() <= 128 &&
+            data.year is int && data.year >= 2000 && data.year <= 2100 &&
+            data.month is int && data.month >= 1 && data.month <= 12 &&
+            data.cajas is number &&
+            data.tarimas is number &&
+            data.updatedAt is timestamp &&
+            data.updatedBy is string && data.updatedBy.size() <= 128;
+        }
+
+        // Reception transactions call transaction.get() before the document
+        // exists, so a missing document must stay readable within scope.
+        allow read: if isMemberOf(orgId) &&
+          (resource == null || canAccessWarehouse(orgId, resource.data.warehouseId));
+        allow create: if isOperatorOrAbove(orgId) &&
+          canAccessWarehouse(orgId, request.resource.data.warehouseId) &&
+          isValidMonthlyAggregate(request.resource.data, monthlyId);
+        allow update: if isOperatorOrAbove(orgId) &&
+          canAccessWarehouse(orgId, request.resource.data.warehouseId) &&
+          warehouseAssignmentUnchanged() &&
+          hasOnlyChanged(['cajas', 'tarimas', 'updatedAt', 'updatedBy']);
+        allow delete: if isOrgAdmin(orgId);
+      }
+
       // ===== EXPIRY LOTS =====
       match /lotes_caducidades/{lotId} {
         allow read: if isMemberOf(orgId) && canAccessWarehouse(orgId, resource.data.warehouseId);
