@@ -4,7 +4,7 @@ import "@testing-library/jest-dom";
 
 const mocks = vi.hoisted(() => ({ getBlob: vi.fn(), downloadBlob: vi.fn() }));
 
-vi.mock("@/lib/firebase", () => ({ storage: {} }));
+vi.mock("@/lib/firebase", () => ({ db: {}, storage: {} }));
 vi.mock("firebase/storage", () => ({
   ref: (_storage: unknown, path: string) => path,
   getBlob: mocks.getBlob,
