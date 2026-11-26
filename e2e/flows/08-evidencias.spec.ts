@@ -15,7 +15,7 @@ test.describe("Flujo: Evidencias Fotográficas (P0)", () => {
     await home.expectLoaded();
   });
 
-  test("captura completa: sube 2 fotos -> completa formulario -> guarda -> envía WhatsApp", async ({
+  test("captura completa: sube 3 fotos -> completa formulario -> guarda -> envía WhatsApp", async ({
     page,
   }) => {
     const captura = new CapturaEvidenciaPage(page);
@@ -47,6 +47,15 @@ test.describe("Flujo: Evidencias Fotográficas (P0)", () => {
     await page.waitForTimeout(500);
     await page.locator('input[type="file"]').nth(1).setInputFiles(productoFixture);
     await expect(page.getByText("Foto capturada").nth(1)).toBeVisible({
+      timeout: 5000,
+    });
+
+    // Slot 3: Foto de la factura del proveedor — obligatoria para guardar
+    // (handleSave exige photoFiles[2] desde 1594abe).
+    await page.getByText("Foto de la factura del proveedor").click();
+    await page.waitForTimeout(500);
+    await page.locator('input[type="file"]').nth(2).setInputFiles(productoFixture);
+    await expect(page.getByText("Foto capturada").nth(2)).toBeVisible({
       timeout: 5000,
     });
 
