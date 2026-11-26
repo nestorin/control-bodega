@@ -39,10 +39,30 @@ import { db as firebaseDb } from "@/lib/firebase";
 
 // Reuse the app-level Firestore instance; initializing a second default
 // instance here would race with the configured persistent cache.
-const DB = firebaseDb as Firestore;
-const EMBARQUES_COL = "embarques";
-const TARIMAS_COL = "tarimas";
-const INVENTARIO_MOVIMIENTOS_COL = "inventario_movimientos";
+export const DB = firebaseDb as Firestore;
+export const EMBARQUES_COL = "embarques";
+export const TARIMAS_COL = "tarimas";
+export const INVENTARIO_MOVIMIENTOS_COL = "inventario_movimientos";
+
+// Re-export Firestore functions for use in other modules
+export {
+  doc,
+  getDoc,
+  getDocs,
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  updateDoc,
+  deleteDoc,
+  writeBatch,
+  runTransaction,
+  serverTimestamp,
+  Timestamp,
+  increment,
+  DocumentSnapshot,
+} from "firebase/firestore";
 
 function now(): Date {
   return new Date();
@@ -65,7 +85,7 @@ function generateQR(embarqueId: string, tarimaIndex: number): string {
   return `${embarqueId}|${tarimaIndex}`;
 }
 
-function parseQR(qr: string): {
+export function parseQR(qr: string): {
   embarqueId: string;
   tarimaIndex: number;
 } | null {

@@ -12,6 +12,7 @@ import { planificarEmbarque } from "@/services/embarques";
 import { httpsCallable, getFunctions } from "firebase/functions";
 import { getStockDisponible } from "@/services/inventario";
 import type { DocumentoCargado } from "@/types/documento";
+import type { Tarima } from "@/types/embarque";
 import { WAREHOUSE_IDS } from "@/config/warehouses";
 import { buildUpcomingExpiryAlert } from "@/services/expiryAlerts";
 import { mergeCanonicalConversions, type EmbarqueConversion } from "@/services/conversiones";
@@ -19,6 +20,7 @@ import { normalizeShipmentProducts } from "@/services/domain/shipmentProductSele
 import { useQrScanner } from "@/hooks/useQrScanner";
 import { Panel } from "@/components/ui";
 import { uploadShipmentEvidence, type ShipmentEvidenceFileSlot } from "@/services/shipmentEvidence";
+import { doc, getDoc, DB, TARIMAS_COL, parseQR } from "@/services/embarques";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1169,9 +1171,32 @@ function Paso2({
 
   const tarimasTotales = totalTarimas(embarque.productos);
 
-  function findProductoByTarima(tarId: string): Producto | null {
-    // In a real system this would cross-reference warehouse DB.
-    // Simulate: assign to first product with remaining capacity.
+  async function findProductoByTarima(tarId: string): Promise<Producto | null> {
+    // Parse QR to get embarqueId and tarimaIndex
+    const parsed = parseQR(tarId);
+    if (!parsed) return null;
+
+    const { embarqueId, tarimaIndex } = parsed;
+
+    // Verify this QR belongs to the current embarque
+    if (embarqueId !== embarque.id) return null;
+
+    // Fetch the tarima from Firestore to get its productId
+    if (useFirestore && fsServices) {
+      try {
+        const tarimaSnap = await getDoc(doc(DB, TARIMAS_COL, tarId));
+        if (!tarimaSnap.exists()) return null;
+        const tarima = tarimaSnap.data() as Tarima;
+
+        // Find the product in the embarque that matches this tarima's productId
+        const producto = embarque.productos.find((p) => p.id === tarima.productoId);
+        return producto ?? null;
+      } catch (err) {
+        console.warn("Error fetching tarima from Firestore:", err);
+      }
+    }
+
+    // Fallback: local-only logic - find product with remaining capacity
     const scanned = embarque.tarimasEscaneadas;
     for (const p of embarque.productos) {
       const used = scanned.filter((t) => t.productoNombre === p.nombre).length;
@@ -1215,7 +1240,7 @@ function Paso2({
       return;
     }
 
-    const producto = findProductoByTarima(id);
+    const producto = await findProductoByTarima(id);
     if (!producto) {
       setError("No hay capacidad declarada para más tarimas en este embarque.");
       setQrInput("");
