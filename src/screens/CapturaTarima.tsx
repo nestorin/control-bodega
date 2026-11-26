@@ -628,6 +628,24 @@ export default function CapturaTarima({
         transition("completed");
         onFinish();
       } else {
+        // Pre-fill the next tarima's lot and expiry from the current one so
+        // the operator doesn't need to retype values that typically repeat
+        // across all pallets in the same reception.
+        const nextIndex = currentIndex + 1;
+        if (nextIndex < tarimasList.length) {
+          setTarimasList((prev) =>
+            prev.map((p, i) =>
+              i === nextIndex && (!p.lote || !p.caducidad)
+                ? {
+                    ...p,
+                    lote: p.lote || currentTarima.lote,
+                    caducidad: p.caducidad || currentTarima.caducidad,
+                  }
+                : p,
+            ),
+          );
+        }
+
         // Keep the "QR Detectado" banner visible for a beat after advancing,
         // then auto-clear it (pre-refactor 1500ms behavior). Only clear if the
         // operator has not already validated the next pallet.
