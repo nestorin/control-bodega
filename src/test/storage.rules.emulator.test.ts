@@ -7,7 +7,7 @@ import {
   initializeTestEnvironment,
 } from "@firebase/rules-unit-testing";
 import { doc, setDoc } from "firebase/firestore";
-import { deleteObject, ref, uploadBytes } from "firebase/storage";
+import { deleteObject, getBytes, ref, uploadBytes } from "firebase/storage";
 import { afterAll, beforeAll, describe, it } from "vitest";
 
 const orgId = "org_exepa_001";
@@ -15,6 +15,8 @@ const warehouseId = "wh_tehuacan_1";
 const receptionId = "storage-reception";
 const shipmentId = "storage-shipment";
 const evidencePath = `organizations/${orgId}/warehouses/${warehouseId}/receptions/${receptionId}/evidence/trailer.jpg`;
+const shipmentEvidencePath = `organizations/${orgId}/warehouses/${warehouseId}/shipments/${shipmentId}/evidence/invoice.jpg`;
+const legacyPreviewPath = `receptions/${receptionId}/invoice-preview.jpeg`;
 
 let testEnv: RulesTestEnvironment;
 
@@ -37,6 +39,19 @@ beforeAll(async () => {
       status: "ACTIVE",
       role: "ALMACENISTA",
       warehouseId,
+    });
+    await setDoc(doc(db, `organizations/${orgId}/users/other-warehouse-user`), {
+      userId: "other-warehouse-user",
+      organizationId: orgId,
+      status: "ACTIVE",
+      role: "ALMACENISTA",
+      warehouseId: "wh_tehuacan_2",
+    });
+    await setDoc(doc(db, `organizations/${orgId}/users/admin-user`), {
+      userId: "admin-user",
+      organizationId: orgId,
+      status: "ACTIVE",
+      role: "ADMIN",
     });
     await setDoc(doc(db, `organizations/${orgId}/shipments/${shipmentId}`), {
       organizationId: orgId,
@@ -150,5 +165,59 @@ describe("Storage security rules (emulator)", () => {
         { contentType: "image/jpeg" },
       ),
     );
+  });
+
+  it("denies anonymous reads of reception and shipment evidence", async () => {
+    const uploader = testEnv.authenticatedContext("warehouse-user").storage();
+    await assertSucceeds(
+      uploadBytes(ref(uploader, evidencePath), new Uint8Array([1]), { contentType: "image/jpeg" }),
+    );
+    await assertSucceeds(
+      uploadBytes(ref(uploader, shipmentEvidencePath), new Uint8Array([1]), {
+        contentType: "image/jpeg",
+      }),
+    );
+    const anonymous = testEnv.unauthenticatedContext().storage();
+    await assertFails(getBytes(ref(anonymous, evidencePath)));
+    await assertFails(getBytes(ref(anonymous, shipmentEvidencePath)));
+  });
+
+  it("lets a warehouse member read evidence but denies a member of another warehouse", async () => {
+    const uploader = testEnv.authenticatedContext("warehouse-user").storage();
+    await assertSucceeds(
+      uploadBytes(ref(uploader, evidencePath), new Uint8Array([1]), { contentType: "image/jpeg" }),
+    );
+    const member = testEnv.authenticatedContext("warehouse-user").storage();
+    await assertSucceeds(getBytes(ref(member, evidencePath)));
+    const otherMember = testEnv.authenticatedContext("other-warehouse-user").storage();
+    await assertFails(getBytes(ref(otherMember, evidencePath)));
+  });
+
+  it("denies deletion to roles outside the admin list", async () => {
+    const storage = testEnv.authenticatedContext("warehouse-user").storage();
+    await assertSucceeds(
+      uploadBytes(ref(storage, evidencePath), new Uint8Array([1]), { contentType: "image/jpeg" }),
+    );
+    await assertFails(deleteObject(ref(storage, evidencePath)));
+    await assertSucceeds(
+      uploadBytes(ref(storage, shipmentEvidencePath), new Uint8Array([1]), {
+        contentType: "image/jpeg",
+      }),
+    );
+    await assertFails(deleteObject(ref(storage, shipmentEvidencePath)));
+  });
+
+  it("accepts legacy .jpeg previews from the actor and blocks non-actor deletes", async () => {
+    const actorStorage = testEnv
+      .authenticatedContext("claim-admin", { superAdmin: true })
+      .storage();
+    const adminStorage = testEnv.authenticatedContext("admin-user").storage();
+
+    await assertSucceeds(
+      uploadBytes(ref(actorStorage, legacyPreviewPath), new Uint8Array([1]), {
+        contentType: "image/jpeg",
+      }),
+    );
+    await assertFails(deleteObject(ref(adminStorage, legacyPreviewPath)));
   });
 });

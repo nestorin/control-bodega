@@ -64,7 +64,9 @@ service firebase.storage {
 
     // Canonical path. The warehouse segment is checked against the reception document.
     match /organizations/{orgId}/warehouses/{warehouseId}/receptions/{receptionId}/evidence/{fileName} {
-      allow read: if receptionIsInScope(orgId, warehouseId, receptionId) &&
+      // Reads need warehouse membership; scope and file name alone never grant access.
+      allow read: if hasWarehouseAccess(orgId, warehouseId) &&
+        receptionIsInScope(orgId, warehouseId, receptionId) &&
         (fileName.matches('^(invoice-preview|trailer|product|documentation|purchase-order|supplier-invoice)\\.(jpg|jpeg|png|webp)$') ||
          fileName.matches('^(documentation|purchase-order)\\.pdf$'));
       allow create, update: if receptionIsInScope(orgId, warehouseId, receptionId) &&
@@ -79,7 +81,8 @@ service firebase.storage {
 
 
     match /organizations/{orgId}/warehouses/{warehouseId}/shipments/{shipmentId}/evidence/{fileName} {
-      allow read: if shipmentIsInScope(orgId, warehouseId, shipmentId) &&
+      allow read: if hasWarehouseAccess(orgId, warehouseId) &&
+        shipmentIsInScope(orgId, warehouseId, shipmentId) &&
         fileName.matches('^(loaded-[A-Za-z0-9-]+|trailer-box|internal-seal|external-seal|signed-document|invoice)\\.(jpg|jpeg|png|webp)$');
       allow create, update: if shipmentIsInScope(orgId, warehouseId, shipmentId) &&
         hasRole(orgId, ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'AUXILIAR_ALMACENISTA', 'ALMACENISTA', 'SUPERVISOR', 'OPERATOR']) &&
@@ -90,12 +93,18 @@ service firebase.storage {
     }
 
     // Legacy compatibility path, bounded while clients migrate to the canonical path.
-    match /receptions/{receptionId}/invoice-preview.jpg {
-      allow read: if (hasActiveMembership(membership('org_exepa_001'), 'org_exepa_001') || hasSuperAdminClaim('org_exepa_001')) &&
+    // The file-name check inside each rule mirrors the canonical blocks: the
+    // wildcard matches any legacy object, only invoice previews are admitted.
+    match /receptions/{receptionId}/{fileName} {
+      allow read: if fileName.matches('^invoice-preview\\.(jpg|jpeg)$') &&
+        (hasActiveMembership(membership('org_exepa_001'), 'org_exepa_001') || hasSuperAdminClaim('org_exepa_001')) &&
         firestore.get(/databases/(default)/documents/organizations/org_exepa_001/receptions/$(receptionId)).data.actorUserId == request.auth.uid;
-      allow create, update: if hasRole('org_exepa_001', ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'AUXILIAR_ALMACENISTA', 'ALMACENISTA', 'SUPERVISOR', 'OPERATOR']) &&
+      allow create, update: if fileName.matches('^invoice-preview\\.(jpg|jpeg)$') &&
+        hasRole('org_exepa_001', ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'AUXILIAR_ALMACENISTA', 'ALMACENISTA', 'SUPERVISOR', 'OPERATOR']) &&
         firestore.get(/databases/(default)/documents/organizations/org_exepa_001/receptions/$(receptionId)).data.actorUserId == request.auth.uid && validEvidenceUpload();
-      allow delete: if hasRole('org_exepa_001', ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'SUPERVISOR']);
+      allow delete: if fileName.matches('^invoice-preview\\.(jpg|jpeg)$') &&
+        hasRole('org_exepa_001', ['SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN', 'SUPERVISOR']) &&
+        firestore.get(/databases/(default)/documents/organizations/org_exepa_001/receptions/$(receptionId)).data.actorUserId == request.auth.uid;
     }
   }
 }
