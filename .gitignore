@@ -66,3 +66,6 @@ playwright-report/
 /fix_ts_annotations.py
 /extraccion-diseno-grafico/
 /componentes-interfaz/
+# One-off backfill output (not part of the deliverable)
+/backfill_reception_id_report_*.csv
+/functions/scripts/
