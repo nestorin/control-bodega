@@ -377,6 +377,44 @@ export default function CapturaTarima({
     }
   }, [currentReception?.ocFolio, currentReception?.plannedPallets, useFirestore]);
 
+  // Fallback: if tarimasList is empty but the canonical plan has pallets,
+  // populate it so scanned QRs can be matched. This covers edge cases where
+  // the load effect above did not run (e.g. currentReception set before first render).
+  useEffect(() => {
+    if (
+      currentReception?.ocFolio &&
+      currentReception.plannedPallets?.length &&
+      tarimasList.length === 0
+    ) {
+      setTarimasList(
+        (currentReception.plannedPallets ?? []).map((pallet, index) => ({
+          id: pallet.qrIdentifier,
+          numero: pallet.palletNumber ?? index + 1,
+          total: (currentReception.plannedPallets ?? []).length,
+          ocFolio: currentReception.ocFolio,
+          fechaRecepcion: currentReception.fechaRecepcion || "",
+          producto: pallet.productName,
+          productId: pallet.productId ?? null,
+          codigo: "",
+          caducidad: currentReception.caducidad || "",
+          cajas: pallet.quantity,
+          unidadesPorCaja: 1,
+          unidad: pallet.unit,
+          lote: "",
+          observaciones: "",
+          proveedor: currentReception.proveedor,
+          proveedorLogistico: currentReception.proveedorLogistico,
+          completed: pallet.status === "RECEIVED",
+        })),
+      );
+      setCurrentIndex(
+        getFirstIncompletePalletIndex(
+          (currentReception.plannedPallets ?? []) as Array<{ status?: string }>,
+        ),
+      );
+    }
+  }, [currentReception?.ocFolio, currentReception?.plannedPallets, tarimasList.length]);
+
   async function retryReceptionConfirmation() {
     if (!currentReception?.receptionId || !fsServices) return;
     setIsSaving(true);
@@ -412,7 +450,10 @@ export default function CapturaTarima({
         return;
       }
 
-      const tarimaIndex = tarimasList.findIndex((pallet) => pallet.id === code);
+      // Trim whitespace so accidental spaces in the scanned code do not break
+      // the match against the planned pallet identifiers.
+      const normalizedCode = code.trim();
+      const tarimaIndex = tarimasList.findIndex((pallet) => pallet.id === normalizedCode);
       const tarimaNum = String(parsed.tarimaIndex).padStart(3, "0");
 
       if (tarimaIndex < 0) {
@@ -426,6 +467,9 @@ export default function CapturaTarima({
         handlingScanRef.current = false;
         return;
       }
+
+      // Use the normalized code for downstream validation.
+      const validatedCode = normalizedCode;
       try {
         if (useFirestore) {
           if (!fsServices || !currentReception?.receptionId) {
@@ -433,7 +477,7 @@ export default function CapturaTarima({
           }
           const validated = await fsServices.receptions.validatePalletScan(
             currentReception.receptionId,
-            code,
+            validatedCode,
             almacenActivo?.id || WAREHOUSE_IDS.NORTH,
           );
           setTarimasList((prev) =>
@@ -448,8 +492,8 @@ export default function CapturaTarima({
             ),
           );
         }
-        setScannedQrCode(code);
-        setActiveQr(code);
+        setScannedQrCode(validatedCode);
+        setActiveQr(validatedCode);
         setManualPalletId("");
         setCurrentIndex(tarimaIndex);
         stopScanning();
