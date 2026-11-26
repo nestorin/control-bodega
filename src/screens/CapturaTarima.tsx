@@ -453,16 +453,44 @@ export default function CapturaTarima({
       // Trim whitespace so accidental spaces in the scanned code do not break
       // the match against the planned pallet identifiers.
       const normalizedCode = code.trim();
-      const tarimaIndex = tarimasList.findIndex((pallet) => pallet.id === normalizedCode);
+
+      // Guard: if tarimasList is empty but the canonical plan has pallets,
+      // populate it now so the QR can be matched. This covers timing issues
+      // where the load effect hasn't run yet when the operator scans.
+      let workingList = tarimasList;
+      if (workingList.length === 0 && currentReception?.plannedPallets?.length) {
+        workingList = (currentReception.plannedPallets ?? []).map((pallet, index) => ({
+          id: pallet.qrIdentifier,
+          numero: pallet.palletNumber ?? index + 1,
+          total: (currentReception.plannedPallets ?? []).length,
+          ocFolio: currentReception.ocFolio,
+          fechaRecepcion: currentReception.fechaRecepcion || "",
+          producto: pallet.productName,
+          productId: pallet.productId ?? null,
+          codigo: "",
+          caducidad: currentReception.caducidad || "",
+          cajas: pallet.quantity,
+          unidadesPorCaja: 1,
+          unidad: pallet.unit,
+          lote: "",
+          observaciones: "",
+          proveedor: currentReception.proveedor,
+          proveedorLogistico: currentReception.proveedorLogistico,
+          completed: pallet.status === "RECEIVED",
+        }));
+        setTarimasList(workingList);
+      }
+
+      const tarimaIndex = workingList.findIndex((pallet) => pallet.id === normalizedCode);
       const tarimaNum = String(parsed.tarimaIndex).padStart(3, "0");
 
       if (tarimaIndex < 0) {
-        alert(`Tarima ${tarimaNum} no existe en esta recepción (total: ${tarimasList.length})`);
+        alert(`Tarima ${tarimaNum} no existe en esta recepción (total: ${workingList.length})`);
         handlingScanRef.current = false;
         return;
       }
 
-      if (tarimasList[tarimaIndex].completed) {
+      if (workingList[tarimaIndex].completed) {
         alert(`El código ${tarimaNum} ya está activo y asociado a una tarima.`);
         handlingScanRef.current = false;
         return;
@@ -480,8 +508,11 @@ export default function CapturaTarima({
             validatedCode,
             almacenActivo?.id || WAREHOUSE_IDS.NORTH,
           );
-          setTarimasList((prev) =>
-            prev.map((pallet, index) =>
+          // If we populated workingList from plannedPallets (because
+          // tarimasList was empty), use it as the base for the map update.
+          setTarimasList((prev) => {
+            const base = prev.length > 0 ? prev : workingList;
+            return base.map((pallet, index) =>
               index === tarimaIndex
                 ? {
                     ...pallet,
@@ -489,8 +520,8 @@ export default function CapturaTarima({
                     caducidad: validated.expiryDate ?? pallet.caducidad,
                   }
                 : pallet,
-            ),
-          );
+            );
+          });
         }
         setScannedQrCode(validatedCode);
         setActiveQr(validatedCode);
@@ -510,6 +541,7 @@ export default function CapturaTarima({
       useFirestore,
       fsServices,
       currentReception?.receptionId,
+      currentReception?.plannedPallets,
       almacenActivo?.id,
       setScannedQrCode,
       setCurrentIndex,
