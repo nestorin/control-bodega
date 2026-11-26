@@ -330,6 +330,31 @@ export default function CapturaTarima({
     if (currentReception?.ocFolio) {
       const canonicalPlan = currentReception.plannedPallets;
       if (!shouldReadLocalPalletCache(Boolean(canonicalPlan?.length), useFirestore)) {
+        // Populate tarimasList from the canonical plan so scanned QR codes can
+        // be matched against pallets of this reception. Without this, the list
+        // stays empty (it was initialized on first render when currentReception
+        // was still null) and no QR validates, blocking the capture flow.
+        setTarimasList(
+          (canonicalPlan ?? []).map((pallet, index) => ({
+            id: pallet.qrIdentifier,
+            numero: pallet.palletNumber ?? index + 1,
+            total: (canonicalPlan ?? []).length,
+            ocFolio: currentReception.ocFolio,
+            fechaRecepcion: currentReception.fechaRecepcion || "",
+            producto: pallet.productName,
+            productId: pallet.productId ?? null,
+            codigo: "",
+            caducidad: currentReception.caducidad || "",
+            cajas: pallet.quantity,
+            unidadesPorCaja: 1,
+            unidad: pallet.unit,
+            lote: "",
+            observaciones: "",
+            proveedor: currentReception.proveedor,
+            proveedorLogistico: currentReception.proveedorLogistico,
+            completed: pallet.status === "RECEIVED",
+          })),
+        );
         setCurrentIndex(
           getFirstIncompletePalletIndex((canonicalPlan || []) as Array<{ status?: string }>),
         );
