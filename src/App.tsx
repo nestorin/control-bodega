@@ -50,6 +50,7 @@ import ConciliarEtiquetado from "./screens/ConciliarEtiquetado";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { programacionToAppReception } from "@/services/domain/programacionToApp";
 import { isFeatureEnabled, isLabelingUiEnabledForWarehouse } from "@/config/featureFlags";
+import { testDeepLinksEnabled } from "@/config/testMode";
 import { createFirestoreServices } from "@/services/firestore";
 import { db } from "@/lib/firebase";
 import {
@@ -252,7 +253,7 @@ function AppLayout() {
   // Enable with: ?test=legacy-tarima-detalle
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const testMode = params.get("test");
+    const testMode = testDeepLinksEnabled ? params.get("test") : null;
     if (testMode === "legacy-tarima-detalle") {
       setScreen("tarima-detalle");
       setActiveNav("qr");

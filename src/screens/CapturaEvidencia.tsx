@@ -10,6 +10,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { isFeatureEnabled } from "@/config/featureFlags";
+import { testDeepLinksEnabled } from "@/config/testMode";
 import { createFirestoreServices } from "@/services/firestore";
 import { db, storage } from "@/lib/firebase";
 import { useAuthorization } from "@/hooks/useAuthorization";
@@ -261,7 +262,7 @@ export default function CapturaEvidencia({
   // TEST-ONLY: Load test data from localStorage for legacy mode
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("test") === "legacy-captura-evidencia") {
+    if (testDeepLinksEnabled && params.get("test") === "legacy-captura-evidencia") {
       try {
         const saved = localStorage.getItem("test-evidencia-form");
         if (saved) {
@@ -285,6 +286,7 @@ export default function CapturaEvidencia({
 
   // TEST-ONLY: Disable Firestore in test mode to avoid emulator connection issues
   const isTestMode =
+    testDeepLinksEnabled &&
     new URLSearchParams(window.location.search).get("test") === "legacy-captura-evidencia";
   const useFirestore =
     !isTestMode && isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery;

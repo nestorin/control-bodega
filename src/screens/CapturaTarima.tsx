@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { isFeatureEnabled } from "@/config/featureFlags";
+import { testDeepLinksEnabled } from "@/config/testMode";
 import { createFirestoreServices } from "@/services/firestore";
 import { db, storage } from "@/lib/firebase";
 import { WAREHOUSE_IDS } from "@/config/warehouses";
@@ -166,7 +167,7 @@ export default function CapturaTarima({
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("test") === "legacy-captura-tarima") {
+    if (testDeepLinksEnabled && params.get("test") === "legacy-captura-tarima") {
       setTestModeKey((prev) => prev + 1);
     }
   }, []);
@@ -181,6 +182,7 @@ export default function CapturaTarima({
   // Firestore Services Init
   // ============================================
   const isTestMode =
+    testDeepLinksEnabled &&
     new URLSearchParams(window.location.search).get("test") === "legacy-captura-tarima";
   const useFirestore =
     !isTestMode && isFeatureEnabled("USE_FIRESTORE_RECEPCIONES") && !!db && canQuery;
