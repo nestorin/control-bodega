@@ -176,25 +176,32 @@ service cloud.firestore {
         // The owner may read status before ACTIVE, but cannot list memberships.
         allow get: if request.auth != null && request.auth.uid == userId;
         allow list: if isMemberOf(orgId);
-        // Open sign-up: the first login provisions an immediately usable
-        // profile. The writer cannot choose role, status or warehouse scope,
-        // so this cannot be used to self-elevate, and only ACTIVE is ever
-        // created - there is no approval queue to wait in.
-        allow create: if request.auth != null && request.auth.uid == userId
+        // Admin-only creation: an org admin provisions a membership FOR another
+        // user. This closes cross-tenant sign-up - a caller can no longer
+        // self-provision into an attacker-chosen orgId, and role/status/warehouse
+        // scope can never be self-elevated because creation is gated on
+        // isOrgAdmin(orgId) (one membership get, already required for reads).
+        allow create: if isOrgAdmin(orgId)
           && request.resource.data.keys().hasOnly([
                'userId', 'organizationId', 'role', 'status',
                'warehouseId', 'warehouseIds', 'displayName', 'email'
              ])
-          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.userId is string
+          && request.resource.data.userId.size() >= 1
+          && request.resource.data.userId.size() <= 128
           && request.resource.data.organizationId == orgId
-          && request.resource.data.status == 'ACTIVE'
-          && request.resource.data.role == 'ALMACENISTA'
+          && request.resource.data.status in ['ACTIVE', 'INACTIVE']
+          && request.resource.data.role in [
+            'SUPER_ADMIN', 'ADMIN', 'GERENTE_ALMACEN',
+            'SUPERVISOR', 'AUXILIAR_ALMACENISTA', 'ALMACENISTA', 'AUDITOR', 'OPERATOR'
+          ]
           && (!('warehouseId' in request.resource.data) ||
-              request.resource.data.warehouseId == null)
+              (request.resource.data.warehouseId == null ||
+                (request.resource.data.warehouseId is string &&
+                 request.resource.data.warehouseId.size() <= 100)))
           && request.resource.data.warehouseIds is list
-          && request.resource.data.warehouseIds.size() == 2
-          && request.resource.data.warehouseIds.hasAll(['wh_tehuacan_1', 'wh_tehuacan_2'])
-          && request.resource.data.warehouseIds.hasOnly(['wh_tehuacan_1', 'wh_tehuacan_2'])
+          && request.resource.data.warehouseIds.size() >= 1
+          && request.resource.data.warehouseIds.size() <= 20
           && (!('displayName' in request.resource.data) ||
               (request.resource.data.displayName is string &&
                request.resource.data.displayName.size() <= 120))

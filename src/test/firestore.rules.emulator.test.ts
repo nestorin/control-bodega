@@ -867,10 +867,15 @@ describe("Firestore security rules (emulator)", () => {
       ...overrides,
     });
 
-    rulesTest("lets a brand-new user provision an immediately usable profile", async () => {
+    rulesTest("denies a non-admin from self-provisioning a membership", async () => {
       const db = testEnv!.authenticatedContext("new-user-1").firestore();
+      await assertFails(setDoc(doc(db, userPath("new-user-1")), provisionedProfile("new-user-1")));
+    });
+
+    rulesTest("allows an org admin to create a membership for another user", async () => {
+      const db = testEnv!.authenticatedContext("admin-1").firestore();
       await assertSucceeds(
-        setDoc(doc(db, userPath("new-user-1")), provisionedProfile("new-user-1")),
+        setDoc(doc(db, userPath("new-member-1")), provisionedProfile("new-member-1")),
       );
     });
 

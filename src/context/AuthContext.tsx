@@ -126,10 +126,15 @@ function requireMembership(value: unknown, uid: string): UserProfile {
  *
  * Provisioning happens here instead of in a sign-up handler so that every
  * auth provider (password, Google, any future one) follows the same path.
+ * Self-provisioning is closed: only org admins may create memberships
+ * (firestore.rules `allow create: if isOrgAdmin(orgId)`), so a first-time
+ * non-admin's `setDoc` is expected to be denied. In that case provisioning
+ * returns `null` and login degrades gracefully instead of crashing; admins
+ * create memberships through the membership management UI.
  * `setDoc` on an existing profile is an update, which the rules reserve for
  * admins, so an existing membership can never be overwritten or self-elevated.
  */
-async function provisionMembership(firestore: Firestore, user: User): Promise<UserProfile> {
+async function provisionMembership(firestore: Firestore, user: User): Promise<UserProfile | null> {
   const profileRef = doc(firestore, "organizations", ORGANIZATION_ID, "users", user.uid);
   const existing = await getDoc(profileRef);
 
@@ -145,10 +150,11 @@ async function provisionMembership(firestore: Firestore, user: User): Promise<Us
         email: user.email ?? "",
       });
     } catch (error) {
-      // A concurrent session may have provisioned the profile first; the rules
-      // reject overwriting an existing membership, so re-read it instead.
+      // Self-provisioning is denied by firestore.rules for non-admins. Re-read
+      // in case a concurrent session created it; otherwise return null so the
+      // caller can surface that an administrator must create the account.
       const concurrent = await getDoc(profileRef);
-      if (!concurrent.exists()) throw error;
+      if (!concurrent.exists()) return null;
       return requireMembership(concurrent.data(), user.uid);
     }
     return normalizeMembership({
@@ -262,8 +268,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const membership = await provisionMembership(firestore, firebaseUser);
           if (!active) return;
 
-          setProfile(membership);
-          setAccessStatus(membership.status);
+          if (membership) {
+            setProfile(membership);
+            setAccessStatus(membership.status);
+          } else {
+            // No existing membership and self-provisioning is denied (only org
+            // admins can create memberships). Surface a clear message instead
+            // of throwing an unhandled error and blocking login.
+            setProfile(null);
+            setAccessStatus("ERROR");
+            setAuthError(
+              new Error(
+                "Esta cuenta debe ser creada por un administrador antes de poder iniciar sesión.",
+              ),
+            );
+          }
         } catch (error) {
           if (!active) return;
           setProfile(null);

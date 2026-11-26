@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { isFeatureEnabled } from "@/config/featureFlags";
 import { createFirestoreServices } from "@/services/firestore";
 import { db } from "@/lib/firebase";
 import { useAuthorization, isPermissionDenied } from "@/hooks/useAuthorization";
-import { WAREHOUSE_IDS } from "@/config/warehouses";
+import { WAREHOUSE_IDS, WAREHOUSES } from "@/config/warehouses";
 import { Panel } from "@/components/ui";
+import { MembershipRole, MembershipStatus } from "@/schemas/membership";
 import {
   CANONICAL_SUPPLIER_LOCAL,
   mergeSupplierCatalog,
@@ -1702,6 +1704,7 @@ function TabRoles({
   firestoreReady: boolean;
   canQuery: boolean;
 }) {
+  const { user } = useAuth();
   const [members, setMembers] = useState<
     Array<{
       id: string;
@@ -1716,6 +1719,17 @@ function TabRoles({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Create-member form state
+  const [creating, setCreating] = useState(false);
+  const [newUserId, setNewUserId] = useState("");
+  const [newRole, setNewRole] = useState<MembershipRole>("ALMACENISTA");
+  const [newWarehouseIds, setNewWarehouseIds] = useState<string[]>([]);
+  const [newDisplayName, setNewDisplayName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newStatus, setNewStatus] = useState<MembershipStatus>("ACTIVE");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createNotice, setCreateNotice] = useState<string | null>(null);
 
   const ROLE_OPTIONS = [
     { value: "SUPER_ADMIN", label: "Super Admin" },
@@ -1759,15 +1773,12 @@ function TabRoles({
 
   const handleRoleChange = async (userId: string, newRole: (typeof ROLE_OPTIONS)[0]["value"]) => {
     if (!firestoreReady || !fsServices || !canQuery) return;
+    const actorUserId = user?.uid;
+    if (!actorUserId) return;
     setError(null);
     setNotice(null);
     try {
-      await fsServices.userMemberships.updateRole(
-        userId,
-        newRole,
-        "current-user",
-        `op-${Date.now()}`,
-      );
+      await fsServices.userMemberships.updateRole(userId, newRole, actorUserId, `op-${Date.now()}`);
       setMembers((prev) => prev.map((m) => (m.userId === userId ? { ...m, role: newRole } : m)));
       setNotice(`Rol actualizado a ${getRoleLabel(newRole)} — el cambio ya está guardado.`);
     } catch (e) {
@@ -1778,13 +1789,15 @@ function TabRoles({
 
   const handleStatusChange = async (userId: string, newStatus: "ACTIVE" | "INACTIVE") => {
     if (!firestoreReady || !fsServices || !canQuery) return;
+    const actorUserId = user?.uid;
+    if (!actorUserId) return;
     setError(null);
     setNotice(null);
     try {
       await fsServices.userMemberships.updateStatus(
         userId,
         newStatus,
-        "current-user",
+        actorUserId,
         `op-${Date.now()}`,
       );
       setMembers((prev) =>
@@ -1823,12 +1836,86 @@ function TabRoles({
     }
   };
 
+  const toggleWarehouse = (warehouseId: string) => {
+    setNewWarehouseIds((prev) =>
+      prev.includes(warehouseId) ? prev.filter((id) => id !== warehouseId) : [...prev, warehouseId],
+    );
+  };
+
+  const handleWarehouseChange = async (userId: string, warehouseId: string): Promise<void> => {
+    if (!firestoreReady || !fsServices || !canQuery) return;
+    const actorUserId = user?.uid;
+    if (!actorUserId) return;
+    setError(null);
+    setNotice(null);
+    try {
+      await fsServices.userMemberships.update(
+        userId,
+        { warehouseId: warehouseId || null },
+        actorUserId,
+        `op-${Date.now()}`,
+      );
+      setMembers((prev) =>
+        prev.map((m) => (m.userId === userId ? { ...m, warehouseId: warehouseId || null } : m)),
+      );
+      setNotice("Almacén actualizado.");
+    } catch (e) {
+      console.error("Error updating warehouse:", e);
+      setError("No se pudo actualizar el almacén. Verifica que seas ADMIN o SUPER_ADMIN.");
+    }
+  };
+
+  const handleCreateMember = async (): Promise<void> => {
+    if (!firestoreReady || !fsServices || !canQuery) return;
+    const actorUserId = user?.uid;
+    if (!actorUserId) {
+      setCreateError("No se identificó al usuario actual.");
+      return;
+    }
+    if (!newUserId.trim()) {
+      setCreateError("El ID de usuario es obligatorio.");
+      return;
+    }
+    if (newWarehouseIds.length === 0) {
+      setCreateError("Selecciona al menos un almacén.");
+      return;
+    }
+    setCreateError(null);
+    setCreateNotice(null);
+    try {
+      await fsServices.userMemberships.createMembership({
+        userId: newUserId.trim(),
+        role: newRole,
+        status: newStatus,
+        warehouseId: newWarehouseIds[0] ?? null,
+        warehouseIds: newWarehouseIds,
+        displayName: newDisplayName.trim(),
+        email: newEmail.trim(),
+        actorUserId,
+        operationId: `op-${Date.now()}`,
+      });
+      setCreateNotice("Usuario creado. El nuevo miembro ya puede iniciar sesión.");
+      setCreating(false);
+      setNewUserId("");
+      setNewWarehouseIds([]);
+      setNewDisplayName("");
+      setNewEmail("");
+      await loadMembers();
+    } catch (e) {
+      console.error("Error creating member:", e);
+      setCreateError("No se pudo crear el usuario. Verifica que seas ADMIN o SUPER_ADMIN.");
+    }
+  };
+
   return (
     <div className="min-w-0 flex-1 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-bold text-[#172126]">Roles y usuarios</h2>
         <Btn variant="secondary" small onClick={loadMembers} disabled={loading}>
           {loading ? "Cargando..." : "Actualizar"}
+        </Btn>
+        <Btn small onClick={() => setCreating(!creating)} disabled={loading}>
+          {creating ? "Cancelar" : "Agregar usuario"}
         </Btn>
       </div>
 
@@ -1845,6 +1932,120 @@ function TabRoles({
         >
           {notice}
         </div>
+      )}
+
+      {creating && (
+        <Panel className="p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-[#172126]">Crear usuario</span>
+            <span className="text-xs text-[#607078]">solo ADMIN / SUPER_ADMIN</span>
+          </div>
+          {createError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
+              {createError}
+            </div>
+          )}
+          {createNotice && (
+            <div
+              role="status"
+              className="bg-green-50 border border-green-200 text-green-700 rounded-lg p-3 text-sm"
+            >
+              {createNotice}
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="col-span-full sm:col-span-2">
+              <label className="block text-xs font-semibold text-[#607078] mb-1">
+                ID de usuario
+              </label>
+              <input
+                value={newUserId}
+                onChange={(e) => setNewUserId(e.target.value)}
+                placeholder="uid del nuevo miembro"
+                className="w-full rounded-lg border border-[#dce4e7] bg-white px-3 py-1.5 text-sm text-[#172126] focus:border-[#3276a8] focus:outline-none"
+                disabled={loading}
+              />
+            </div>
+            <div className="col-span-full sm:col-span-1">
+              <label className="block text-xs font-semibold text-[#607078] mb-1">Rol</label>
+              <select
+                value={newRole}
+                onChange={(e) => setNewRole(e.target.value as MembershipRole)}
+                className="w-full rounded-lg border border-[#dce4e7] bg-white px-3 py-1.5 text-sm text-[#172126] focus:border-[#3276a8] focus:outline-none"
+                disabled={loading}
+              >
+                {ROLE_OPTIONS.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="col-span-full sm:col-span-1">
+              <label className="block text-xs font-semibold text-[#607078] mb-1">Estado</label>
+              <select
+                value={newStatus}
+                onChange={(e) => setNewStatus(e.target.value as MembershipStatus)}
+                className="w-full rounded-lg border border-[#dce4e7] bg-white px-3 py-1.5 text-sm text-[#172126] focus:border-[#3276a8] focus:outline-none"
+                disabled={loading}
+              >
+                <option value="ACTIVE">Activo</option>
+                <option value="INACTIVE">Inactivo</option>
+              </select>
+            </div>
+            <div className="col-span-full">
+              <label className="block text-xs font-semibold text-[#607078] mb-1">Almacenes</label>
+              <div className="flex flex-wrap gap-2">
+                {WAREHOUSES.map((wh) => (
+                  <label
+                    key={wh.id}
+                    className="flex items-center gap-2 text-sm cursor-pointer select-none"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={newWarehouseIds.includes(wh.id)}
+                      onChange={() => toggleWarehouse(wh.id)}
+                      className="rounded border border-[#dce4e7] text-[#3276a8] focus:ring-[#3276a8]"
+                    />
+                    {wh.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="col-span-full sm:col-span-2">
+              <label className="block text-xs font-semibold text-[#607078] mb-1">
+                Nombre para mostrar
+              </label>
+              <input
+                value={newDisplayName}
+                onChange={(e) => setNewDisplayName(e.target.value)}
+                placeholder="opcional"
+                className="w-full rounded-lg border border-[#dce4e7] bg-white px-3 py-1.5 text-sm text-[#172126] focus:border-[#3276a8] focus:outline-none"
+                disabled={loading}
+              />
+            </div>
+            <div className="col-span-full sm:col-span-2">
+              <label className="block text-xs font-semibold text-[#607078] mb-1">
+                Correo electrónico
+              </label>
+              <input
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="opcional"
+                className="w-full rounded-lg border border-[#dce4e7] bg-white px-3 py-1.5 text-sm text-[#172126] focus:border-[#3276a8] focus:outline-none"
+                disabled={loading}
+              />
+            </div>
+            <div className="col-span-full">
+              <Btn
+                onClick={handleCreateMember}
+                disabled={loading || !newUserId.trim() || newWarehouseIds.length === 0}
+              >
+                Crear
+              </Btn>
+            </div>
+          </div>
+        </Panel>
       )}
 
       <Panel className="hidden overflow-hidden p-0 sm:block">
@@ -1915,8 +2116,20 @@ function TabRoles({
                         <option value="INACTIVE">Inactivo</option>
                       </select>
                     </td>
-                    <td className="px-4 py-3 text-sm text-[#607078]">
-                      {member.warehouseId || "—"}
+                    <td className="px-4 py-3">
+                      <select
+                        value={member.warehouseId ?? ""}
+                        onChange={(e) => handleWarehouseChange(member.userId, e.target.value)}
+                        className="border border-[#dce4e7] rounded-lg px-3 py-1.5 text-sm text-[#172126] bg-white focus:border-[#3276a8] focus:outline-none w-full"
+                        disabled={!firestoreReady || loading}
+                      >
+                        <option value="">—</option>
+                        {WAREHOUSES.map((wh) => (
+                          <option key={wh.id} value={wh.id}>
+                            {wh.name}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                   </tr>
                 ))

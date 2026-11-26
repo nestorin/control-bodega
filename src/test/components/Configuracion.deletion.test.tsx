@@ -76,6 +76,11 @@ vi.mock("@/hooks/useAuthorization", () => ({
   useAuthorization: () => ({ canQuery: true }),
 }));
 
+// TabRoles now reads the actor uid from useAuth(); keep it resolvable in tests.
+vi.mock("@/context/AuthContext", () => ({
+  useAuth: vi.fn(() => ({ user: { uid: "current-user" } as any })),
+}));
+
 vi.mock("@/lib/firebase", () => ({ db: {} }));
 vi.mock("@/services/firestore", () => ({
   createFirestoreServices: () => mocks.services,

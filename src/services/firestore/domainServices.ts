@@ -117,6 +117,43 @@ export class UserMembershipService extends BaseService<UserMembershipDoc> {
       operationId,
     );
   }
+
+  /**
+   * Creates a membership document for another user (admin-only path).
+   *
+   * Writes directly with `setDoc` and intentionally skips read-back: an admin
+   * cannot `get` another member's document (rules restrict `get` to the
+   * member's own uid), so `BaseService.create`'s read-back would fail even
+   * though the write committed. `canReadBackAfterWrite()` is `false` for this
+   * class for the same reason.
+   *
+   * Only the fields the create rule allows are sent; timestamps are omitted
+   * because `allow create` restricts the document to exactly these 8 keys
+   * (`hasOnly`), so adding `createdAt`/`updatedAt` would be denied.
+   */
+  async createMembership(input: {
+    userId: string;
+    role: UserMembershipDoc["role"];
+    status: UserMembershipDoc["status"];
+    warehouseId?: string | null;
+    warehouseIds: string[];
+    displayName?: string;
+    email?: string;
+    actorUserId: string;
+    operationId: string;
+  }): Promise<void> {
+    const ref = doc(this.db, "organizations", this.orgId, "users", input.userId);
+    await setDoc(ref, {
+      userId: input.userId,
+      organizationId: this.orgId,
+      role: input.role,
+      status: input.status,
+      warehouseId: input.warehouseId ?? null,
+      warehouseIds: input.warehouseIds,
+      displayName: input.displayName ?? "",
+      email: input.email ?? "",
+    });
+  }
 }
 
 export class SupplierService extends BaseService<SupplierDoc> {
