@@ -4,9 +4,9 @@ import { isFeatureEnabled } from "@/config/featureFlags";
 import { createFirestoreServices } from "@/services/firestore";
 import { db } from "@/lib/firebase";
 import { useAuthorization, isPermissionDenied } from "@/hooks/useAuthorization";
-import { WAREHOUSE_IDS, WAREHOUSES } from "@/config/warehouses";
+import { WAREHOUSE_IDS, WAREHOUSES, normalizeWarehouseId } from "@/config/warehouses";
 import { Panel } from "@/components/ui";
-import { MembershipRole, MembershipStatus } from "@/schemas/membership";
+import { MembershipRole, MembershipStatus, warehouseIdsMatch } from "@/schemas/membership";
 import {
   CANONICAL_SUPPLIER_LOCAL,
   mergeSupplierCatalog,
@@ -1838,7 +1838,9 @@ function TabRoles({
 
   const toggleWarehouse = (warehouseId: string) => {
     setNewWarehouseIds((prev) =>
-      prev.includes(warehouseId) ? prev.filter((id) => id !== warehouseId) : [...prev, warehouseId],
+      warehouseIdsMatch(prev, warehouseId)
+        ? prev.filter((id) => normalizeWarehouseId(id) !== normalizeWarehouseId(warehouseId))
+        : [...prev, warehouseId],
     );
   };
 

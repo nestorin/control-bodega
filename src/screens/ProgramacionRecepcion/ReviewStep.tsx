@@ -14,6 +14,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { TouchTarget } from "@/components/ui/TouchTarget";
+import { warehouseIdsMatch } from "@/schemas/membership";
 
 interface Props {
   state: any;
@@ -42,7 +43,7 @@ export default function ReviewStep({
   onSave,
   saving,
 }: Props) {
-  const warehouse = warehouses.find((w) => w.id === state.warehouseId);
+  const warehouse = warehouses.find((w) => warehouseIdsMatch([w.id], state.warehouseId));
   const supplier = suppliers.find((s) => s.id === state.supplierId);
 
   const hasProductsWithoutQuantity = matchedProducts.some((p) => p.cantidad <= 0);

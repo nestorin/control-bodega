@@ -12,6 +12,7 @@ import { ExportButtons } from "./ExportButtons";
 import { Badge } from "@/components/configuracion/Badge";
 import { BreakdownModal } from "./BreakdownModal";
 import type { GridData, GridFilters, ReceptionBreakdown } from "@/types/csvImport";
+import { warehouseIdsMatch } from "@/schemas/membership";
 
 const MONTH_NAMES = [
   "Ene",
@@ -53,7 +54,9 @@ export function InventoryGridTab() {
 
   // Default to current year
   const currentYear = new Date().getFullYear();
-  const selectedWarehouse = availableWarehouses.find((w) => w.id === filters.warehouseId);
+  const selectedWarehouse = availableWarehouses.find((w) =>
+    warehouseIdsMatch([w.id], filters.warehouseId),
+  );
   const activeWarehouseName = selectedWarehouse?.nombre || "Todos";
 
   const handleWarehouseChange = useCallback(

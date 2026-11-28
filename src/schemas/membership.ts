@@ -78,4 +78,21 @@ export function isCanonicalMembershipWarehouse(value: unknown): boolean {
   return typeof value === "string" && normalizeWarehouseId(value) != null;
 }
 
+/**
+ * Returns true when any of the user's warehouse IDs matches the target warehouse ID,
+ * after normalizing both sides. Handles legacy aliases (e.g. 'Tehuacan-1' <-> 'wh_tehuacan_1').
+ * Use this instead of plain `warehouseIds.includes(warehouseId)` or `===` comparisons.
+ */
+export function warehouseIdsMatch(
+  userWarehouseIds: string[],
+  targetWarehouseId: string | null | undefined,
+): boolean {
+  const normalizedTarget = normalizeWarehouseId(targetWarehouseId);
+  if (!normalizedTarget) return false;
+  const normalizedUserIds = userWarehouseIds
+    .map((id) => normalizeWarehouseId(id))
+    .filter((id): id is NonNullable<typeof id> => id != null);
+  return normalizedUserIds.includes(normalizedTarget);
+}
+
 export const CANONICAL_WAREHOUSE_IDS = Object.values(WAREHOUSE_IDS);

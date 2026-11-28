@@ -15,6 +15,7 @@ import type {
   GridCell,
   ReceptionBreakdown,
 } from "@/types/csvImport";
+import { warehouseIdsMatch } from "@/schemas/membership";
 
 export function useInventoryGrid() {
   const { canQuery } = useAuthorization();
@@ -189,7 +190,9 @@ export function useInventoryGrid() {
       const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
       // Title
-      const warehouse = catalogoAlmacenes.find((a) => a.id === filters.warehouseId);
+      const warehouse = catalogoAlmacenes.find((a) =>
+        warehouseIdsMatch([a.id], filters.warehouseId),
+      );
       doc.setFontSize(16);
       doc.text(
         `Grid Inventario Mensual — ${warehouse?.nombre || filters.warehouseId} — ${filters.year}`,
