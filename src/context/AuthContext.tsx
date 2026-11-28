@@ -96,6 +96,10 @@ export function canAccessWarehouseForProfile(
 ): boolean {
   if (accessStatus !== "ACTIVE" || !profile) return false;
   if (isGlobalMembershipRole(profile.role)) return true;
+  // If the document has no warehouse assigned yet (e.g. a DRAFT reception
+  // that hasn't been assigned to a warehouse), no warehouse-specific
+  // restriction applies yet.
+  if (!warehouseId) return true;
   const requestedWarehouseId = normalizeWarehouseId(warehouseId);
   const memberWarehouseIds = normalizeMembershipWarehouses(profile);
   return (
