@@ -498,10 +498,17 @@ export default function Recepciones({
   const accessibleWarehouseIds = warehouseIds.length > 0 ? warehouseIds : [WAREHOUSE_IDS.NORTH];
   const canQueryAnyWarehouse = useFirestore && accessibleWarehouseIds.length > 0;
 
-  // Firestore services
-  const [fsServices, setFsServices] = useState(() =>
-    useFirestore && db ? createFirestoreServices(db, ORG_ID) : null,
+  // Firestore services — initialize lazily when canQuery becomes true so we
+  // don't get stuck with null if the profile resolved after the first render.
+  const [fsServices, setFsServices] = useState<ReturnType<typeof createFirestoreServices> | null>(
+    null,
   );
+
+  useEffect(() => {
+    if (useFirestore && db && !fsServices) {
+      setFsServices(createFirestoreServices(db, ORG_ID));
+    }
+  }, [useFirestore, db, fsServices]);
 
   // Local state (fallback)
   const [listaLocal, setListaLocal] = useState<ReceptionView[]>(recepcionesLocal);
