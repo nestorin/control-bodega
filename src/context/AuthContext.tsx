@@ -101,11 +101,12 @@ export function canAccessWarehouseForProfile(
   // restriction applies yet.
   if (!warehouseId) return true;
   const requestedWarehouseId = normalizeWarehouseId(warehouseId);
+  // If we can't recognize the warehouse ID (legacy format, unknown alias),
+  // don't block access on the frontend - let Firestore rules enforce
+  // authorization instead of causing false negatives here.
+  if (!requestedWarehouseId) return true;
   const memberWarehouseIds = normalizeMembershipWarehouses(profile);
-  return (
-    requestedWarehouseId != null &&
-    (memberWarehouseIds == null || memberWarehouseIds.includes(requestedWarehouseId))
-  );
+  return memberWarehouseIds == null || memberWarehouseIds.includes(requestedWarehouseId);
 }
 
 export function normalizeMembership(profile: UserProfile): UserProfile {
