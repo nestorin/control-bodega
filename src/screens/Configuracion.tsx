@@ -550,6 +550,8 @@ function TabAlmacenes({
   onUpdate,
   onDelete,
   firestoreReady,
+  fsServices,
+  actorUserId,
 }: {
   almacenes: Almacen[];
   setAlmacenes: React.Dispatch<React.SetStateAction<Almacen[]>>;
@@ -565,6 +567,8 @@ function TabAlmacenes({
   ) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   firestoreReady: boolean;
+  fsServices?: ReturnType<typeof createFirestoreServices> | null;
+  actorUserId?: string;
 }) {
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Almacen | null>(null);
@@ -575,6 +579,9 @@ function TabAlmacenes({
   });
   const [deleteTarget, setDeleteTarget] = useState<Almacen | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [activatingId, setActivatingId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   function openNew() {
     setEditing(null);
@@ -603,9 +610,36 @@ function TabAlmacenes({
     setEditing(null);
   }
 
-  function toggleActivo(id: string) {
-    setAlmacenes((prev) => prev.map((a) => ({ ...a, activo: a.id === id })));
-    onActivarAlmacen(id);
+  async function toggleActivo(id: string) {
+    if (activatingId) return;
+    setActivatingId(id);
+    setNotice(null);
+    setError(null);
+
+    try {
+      if (fsServices && actorUserId) {
+        // Persistir en Firestore: desactivar todos, activar el seleccionado
+        const operations = almacenes.map((a) => ({
+          type: "update" as const,
+          id: a.id,
+          data: { active: a.id === id },
+        }));
+        await fsServices.warehouses.batchWrite(
+          operations,
+          actorUserId,
+          `op-activate-${id}-${Date.now()}`,
+        );
+      }
+
+      // Actualizar estado local tras confirmar persistencia
+      setAlmacenes((prev) => prev.map((a) => ({ ...a, activo: a.id === id })));
+      setNotice("Almacén activado correctamente.");
+    } catch (e) {
+      console.error("Error activando almacén:", e);
+      setError("No se pudo activar el almacén. Intentá de nuevo.");
+    } finally {
+      setActivatingId(null);
+    }
   }
 
   function openDelete(a: Almacen) {
@@ -646,6 +680,19 @@ function TabAlmacenes({
       </div>
 
       <div className="flex flex-col gap-3">
+        {notice && (
+          <div
+            role="status"
+            className="bg-green-50 border border-green-200 text-green-700 rounded-lg p-3 text-sm"
+          >
+            {notice}
+          </div>
+        )}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
+            {error}
+          </div>
+        )}
         {almacenes.map((a) => (
           <div
             key={a.id}
@@ -712,9 +759,10 @@ function TabAlmacenes({
                   variant="secondary"
                   small
                   onClick={() => toggleActivo(a.id)}
+                  disabled={activatingId === a.id || activatingId !== null}
                   className="w-full sm:w-auto"
                 >
-                  Activar
+                  {activatingId === a.id ? "Activando..." : "Activar"}
                 </Btn>
               )}
               <Btn
@@ -2413,7 +2461,7 @@ export default function Configuracion({
   const setAlmacenes = setAlmacenesProp ?? setLocalAlmacenes;
   const handleActivarAlmacen = onActivarAlmacen ?? (() => {});
 
-  const { canQuery } = useAuthorization();
+  const { user, canQuery } = useAuthorization();
   const [tab, setTab] = useState<Tab>("almacenes");
   const [firestoreReady, setFirestoreReady] = useState(false);
   const [fsServices, setFsServices] = useState<ReturnType<typeof createFirestoreServices> | null>(
@@ -2926,6 +2974,8 @@ export default function Configuracion({
             onUpdate={handleUpdateAlmacen}
             onDelete={handleDeleteAlmacen}
             firestoreReady={firestoreReady}
+            fsServices={fsServices}
+            actorUserId={user?.uid}
           />
         )}
         {tab === "conversiones" && (
