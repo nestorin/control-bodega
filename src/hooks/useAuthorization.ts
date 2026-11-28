@@ -18,7 +18,7 @@ export function useAuthorization() {
     hasAnyRole: (roles: UserProfile["role"][]) =>
       canQuery && roles.some((role) => authState.hasRole([role])),
     canAccessWarehouse: (warehouseId: string) =>
-      canQuery && authState.profile ? warehouseIds.includes(warehouseId) : false,
+      canQuery && authState.canAccessWarehouse(warehouseId),
   };
 }
 
